@@ -82,7 +82,9 @@ def valid_optional_email(value: str) -> bool:
     if not value.strip():
         return True
     parsed = parseaddr(value.strip())[1]
-    return parsed == value.strip() and "@" in parsed and "." in parsed.rsplit("@", 1)[-1]
+    return (
+        parsed == value.strip() and "@" in parsed and "." in parsed.rsplit("@", 1)[-1]
+    )
 
 
 def participant_number() -> int:
@@ -299,8 +301,8 @@ def open_integration_confirmation(action_id: str) -> None:
                 rationale_skipped=bool(st.session_state.get("rationale_skipped")),
             )
             try:
-                st.session_state.integrated_profile = repository.integrate_strategic_profile(
-                    profile
+                st.session_state.integrated_profile = (
+                    repository.integrate_strategic_profile(profile)
                 )
             except Exception:
                 st.error(
@@ -338,7 +340,7 @@ else:
         ),
         title="Question the commons.",
         copy=(
-            "There is no right or wrong answer. We are exploring strategies, not testing knowledge."
+            "There is no right or wrong answer. We are exploring strategies, fuck the system."
             if refined_commons
             else "One situation. One strategic move. One sentence about why. Then see your trajectory enter a collective map."
         ),
@@ -402,7 +404,9 @@ elif stage == "scenario":
         scenario.decision.prompt,
         options=[action.id for action in scenario.decision.actions],
         format_func=lambda action_id: next(
-            action.label for action in scenario.decision.actions if action.id == action_id
+            action.label
+            for action in scenario.decision.actions
+            if action.id == action_id
         ),
         index=None,
         key="scenario_action_choice",
@@ -417,7 +421,9 @@ elif stage == "scenario":
 
     def continue_scenario() -> None:
         if not choice:
-            st.session_state.scenario_validation = "Choose one first move or skip with a reason."
+            st.session_state.scenario_validation = (
+                "Choose one first move or skip with a reason."
+            )
             st.rerun()
         st.session_state.scenario_validation = ""
         st.session_state.action_id = choice
@@ -533,7 +539,9 @@ elif stage == "coordination":
         )
         st.divider()
     else:
-        st.success("Your anonymous trajectory has been added to the Commons Map.", icon="✅")
+        st.success(
+            "Your anonymous trajectory has been added to the Commons Map.", icon="✅"
+        )
     st.subheader("Would you like to help build the next step?")
     privacy_note()
     with st.form("coordination_form"):
@@ -552,7 +560,9 @@ elif stage == "coordination":
         if interest is None:
             st.error("Choose Yes or Not now.")
         elif interest == "Yes" and not valid_optional_email(email):
-            st.error("That email address does not look complete. You can also leave it blank.")
+            st.error(
+                "That email address does not look complete. You can also leave it blank."
+            )
         else:
             if interest == "Yes":
                 try:
@@ -564,7 +574,9 @@ elif stage == "coordination":
                         consented_at=utc_now_iso(),
                     )
                 except Exception:
-                    st.error("Your coordination preference was not saved. Please try again.")
+                    st.error(
+                        "Your coordination preference was not saved. Please try again."
+                    )
                     st.stop()
             st.session_state.stage = "done"
             st.rerun()
@@ -588,9 +600,13 @@ elif stage == "done":
     st.markdown("**Full verification hash**")
     st.code(access_key_hash(participant), language=None)
     if contact and contact.get("coordination_status") == "reachable_interest":
-        st.write("Coordination interest recorded with an email. No automatic introduction will be made.")
+        st.write(
+            "Coordination interest recorded with an email. No automatic introduction will be made."
+        )
     elif contact:
-        st.write("Anonymous coordination interest recorded. No contact route was stored.")
+        st.write(
+            "Anonymous coordination interest recorded. No contact route was stored."
+        )
     else:
         st.write("No coordination record was created.")
 
@@ -598,7 +614,9 @@ elif stage == "done":
     if contact:
         st.divider()
         st.caption("Contact controls")
-        st.write("Deleting this coordination record does not delete your anonymous strategy.")
+        st.write(
+            "Deleting this coordination record does not delete your anonymous strategy."
+        )
         if st.button("Delete my contact data", width="stretch"):
             try:
                 deleted = repository.delete_contact_data(participant)
@@ -606,7 +624,9 @@ elif stage == "done":
                 st.error("Contact deletion did not complete. Please try again.")
             else:
                 if deleted:
-                    st.success("Contact data deleted. Your anonymous strategy remains in the map.")
+                    st.success(
+                        "Contact data deleted. Your anonymous strategy remains in the map."
+                    )
                 st.rerun()
 
 footer(protocol)
