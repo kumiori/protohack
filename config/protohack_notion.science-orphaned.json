@@ -1,0 +1,55 @@
+{
+  "schema_version": "protohack-notion-v2-mapping-coordination",
+  "prefix": "protohack",
+  "parent_page_id": "3a58547f-fe9a-8104-b382-e2755d13f7c4",
+  "parent_page_url": "https://app.notion.com/p/3a58547ffe9a8104b382e2755d13f7c4",
+  "status": "archived_wrong_workspace",
+  "archive_note": "Created through the Science workspace connector; inaccessible to the IceIceBaby integration. Retained for provenance only.",
+  "seed_session": {
+    "session_code": "commons_pilot_2026",
+    "page_id": "3a58547f-fe9a-81d4-ba53-cc8c5b0ed925",
+    "page_url": "https://app.notion.com/p/3a58547ffe9a81d4ba53cc8c5b0ed925"
+  },
+  "databases": {
+    "sessions": {
+      "title": "protohack_Sessions",
+      "database_id": "f4609909dd1e4c51bc747b7bc61be2f6",
+      "data_source_id": "86533166-515e-4a8e-9dc6-76a9e487196c"
+    },
+    "statements": {
+      "title": "protohack_Statements",
+      "database_id": "b1638f8ad2d6459791a0dd5d34342d9f",
+      "data_source_id": "6053826c-edee-43b0-9b9e-f52b3c33b75a"
+    },
+    "players": {
+      "title": "protohack_Players",
+      "database_id": "f2b49db9d1cc41bc93b22b473ff5be4f",
+      "data_source_id": "d3932ca7-289a-40f1-b30e-1ed839c40f8b"
+    },
+    "responses": {
+      "title": "protohack_Responses",
+      "database_id": "67ffe2002692448a845c0622a0f32381",
+      "data_source_id": "9eee785d-3b00-4dba-a6ce-2b2279dd02ac"
+    },
+    "questions": {
+      "title": "protohack_Questions",
+      "database_id": "f736145d6b00481ea3880ac237b08051",
+      "data_source_id": "49ed4739-fa68-4452-8938-54985ed7f477"
+    },
+    "moderation_votes": {
+      "title": "protohack_ModerationVotes",
+      "database_id": "ff622fc53e0e44a6805df805eaf01357",
+      "data_source_id": "785a1f95-b5d2-4d3b-9fd2-ceec2c7591f6"
+    },
+    "decisions": {
+      "title": "protohack_Decisions",
+      "database_id": "90a6c7def1754e2f90eec11a46d50432",
+      "data_source_id": "88da7da1-9efb-48e2-abf6-870cf672adc6"
+    },
+    "events": {
+      "title": "protohack_Events",
+      "database_id": "5a0043046c4647d0af6c7ead49c02d27",
+      "data_source_id": "1adb3fd9-81c2-4ccd-a65c-5c983979e3f7"
+    }
+  }
+}

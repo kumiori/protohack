@@ -1,0 +1,55 @@
+{
+  "schema_version": "protohack-notion-v2-mapping-coordination",
+  "prefix": "protohack",
+  "parent_page_id": "3a554516-e9e1-8023-b1f4-ef9fc0cad03c",
+  "parent_page_url": "https://app.notion.com/p/ProtocolHack-3a554516e9e18023b1f4ef9fc0cad03c",
+  "status": "ready",
+  "updated_at": "2026-07-22T19:07:38+00:00",
+  "seed_session": {
+    "session_code": "commons_pilot_2026",
+    "page_id": "3a554516-e9e1-813b-8b18-ef1ea51ea96c",
+    "page_url": "https://app.notion.com/p/3a554516e9e1813b8b18ef1ea51ea96c"
+  },
+  "databases": {
+    "sessions": {
+      "title": "protohack_Sessions",
+      "database_id": "a3e22243-75ce-4345-b594-53c6587f0baf",
+      "data_source_id": "03542e73-9efd-4c88-abcc-a9c1c48227d0"
+    },
+    "statements": {
+      "title": "protohack_Statements",
+      "database_id": "19f0138d-c89c-45dc-bee6-341063569200",
+      "data_source_id": "b4bae7e3-5752-417c-b3f7-bc69bf3f0cdd"
+    },
+    "players": {
+      "title": "protohack_Players",
+      "database_id": "b7c60677-8bdd-45dd-8885-1e14ac139f04",
+      "data_source_id": "365c5005-65e2-4c9b-bfe6-8af338080a10"
+    },
+    "responses": {
+      "title": "protohack_Responses",
+      "database_id": "172b80f9-73cf-4a7e-94d1-d57ed1015600",
+      "data_source_id": "706687de-eab4-4914-90a0-e05eed29fa7c"
+    },
+    "questions": {
+      "title": "protohack_Questions",
+      "database_id": "ad994a43-a24c-4161-b84a-274a77d60fea",
+      "data_source_id": "aec0bf6b-e300-44ec-bc93-a9bab3f7f6d6"
+    },
+    "moderation_votes": {
+      "title": "protohack_ModerationVotes",
+      "database_id": "200a5bc7-3ce0-4153-935b-1426daf9ccc6",
+      "data_source_id": "6f56d474-0c97-4abb-932d-84b3935d26c2"
+    },
+    "decisions": {
+      "title": "protohack_Decisions",
+      "database_id": "f687a5a3-fe8e-41e2-b947-933ec874d1e1",
+      "data_source_id": "0beb4991-944a-40ec-b38c-00bb5bfee6a1"
+    },
+    "events": {
+      "title": "protohack_Events",
+      "database_id": "0af0774e-15fa-4250-aaa3-3f9cd491f170",
+      "data_source_id": "db45d224-5e69-4ca3-a11d-5030ea85f50f"
+    }
+  }
+}

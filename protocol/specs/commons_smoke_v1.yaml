@@ -1,0 +1,80 @@
+id: commons_smoke
+version: '0.2.0-draft'
+status: draft_provisional
+title: Questioning the Commons
+session_code: commons_pilot_2026
+tagger_version: authored-actions-v1
+privacy_version: strategy-contact-separation-v1
+coordination_consent_version: pilot-interest-v1
+
+# Initial interaction contract flow. These are
+# protocol guarantees, not optional presentation details.
+interaction:
+    question_actions:
+        - continue
+        - flag
+        - skip
+    feedback_profile: iceicebaby-v1
+    skip_requires_reason: true
+    confirmation_before_integration: true
+    show_textual_return_key: true
+    show_full_verification_hash: true
+    balloons_after_integration: true
+
+# DRAFT CONTENT: intentionally easy to replace once Nathalie and the team settle
+# the precise smoking-gun scenario. The data contract and identifiers can remain.
+scenario:
+    id: SCN_001
+    title: A shared resource reaches a threshold
+    body: >-
+        Your community depends on a shared place, dataset, or service. Use is growing,
+        maintenance is uneven, and nobody agrees who should decide what happens next.
+        You can make one first move.
+    notice: There is no right or wrong answer. Choose the move you would make first.
+    decision:
+        id: DEC_001
+        prompt: What do you do first?
+        actions:
+            - id: ACT_001
+              label: Make the system visible
+              description: Gather evidence about use, care, pressure, and who is affected.
+              semantic_tags:
+                  - visibility
+                  - evidence
+                  - mapping
+              capacities:
+                  - local knowledge
+                  - synthesis
+              resource_types:
+                  - Knowledge
+                  - Time
+            - id: ACT_002
+              label: Convene the people affected
+              description: Create a space where those who use and care for it can frame the problem together.
+              semantic_tags:
+                  - participation
+                  - legitimacy
+                  - dialogue
+              capacities:
+                  - facilitation
+                  - convening
+              resource_types:
+                  - Social
+                  - Time
+            - id: ACT_003
+              label: Establish a temporary rule
+              description: Put a reversible boundary in place while a longer-term arrangement is built.
+              semantic_tags:
+                  - governance
+                  - coordination
+                  - immediate action
+              capacities:
+                  - rule-making
+                  - stewardship
+              resource_types:
+                  - Institutional
+                  - Political
+
+rationale_prompt: Why did you choose this?
+rationale_hint: One sentence is enough.
+rationale_id: RAT_001
