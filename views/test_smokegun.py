@@ -340,7 +340,7 @@ else:
         ),
         title="Question the commons.",
         copy=(
-            "There is no right or wrong answer. We are exploring strategies, fuck the system."
+            "There is no right or wrong answer. We are exploring strategies. Fuck the system."
             if refined_commons
             else "One situation. One strategic move. One sentence about why. Then see your trajectory enter a collective map."
         ),
