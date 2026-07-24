@@ -15,6 +15,16 @@ bundle = load_question_set(
 )
 repository = get_repository()
 participant = participant_uuid()
+existing_submission = next(
+    (
+        row
+        for row in repository.list_question_set_submissions(
+            bundle.question_set_id
+        )
+        if str(row.get("participant_uuid") or "") == participant
+    ),
+    None,
+)
 
 
 def submit_identity(answers: dict[str, Any]) -> dict[str, Any]:
@@ -29,7 +39,10 @@ def submit_identity(answers: dict[str, Any]) -> dict[str, Any]:
 render_question_track(
     bundle=bundle,
     submit=submit_identity,
+    repository=repository,
+    participant_id=participant,
     completion_copy="Your identity signals have been added.",
     next_page="views/capacity.py",
     next_label="Continue to Capacity →",
+    existing_result=existing_submission,
 )

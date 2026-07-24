@@ -6,6 +6,16 @@ from typing import Any, Protocol
 
 
 class Repository(Protocol):
+    def record_question_event(
+        self, event: dict[str, Any]
+    ) -> dict[str, Any]: ...
+
+    def list_question_events(
+        self,
+        track_id: str,
+        participant_id: str | None = None,
+    ) -> list[dict[str, Any]]: ...
+
     def record_question_set_submission(
         self, submission: dict[str, Any]
     ) -> dict[str, Any]: ...

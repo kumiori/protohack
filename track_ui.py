@@ -4,13 +4,25 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from email.utils import parseaddr
 import html
 import uuid
 from typing import Any
 
 import streamlit as st
 
-from protocol import QuestionDefinition, QuestionSetBundle, normalize_access_key
+from protocol import (
+    FLAG_REASON_LABELS,
+    FLAG_REASON_OPTIONS,
+    SKIP_REASON_LABELS,
+    SKIP_REASON_OPTIONS,
+    QuestionDefinition,
+    QuestionSetBundle,
+    build_question_event,
+    build_track_feedback,
+    normalize_access_key,
+)
+from storage.base import Repository
 from ui import participant_refinement_styles
 
 
@@ -62,20 +74,10 @@ def _track_state(bundle: QuestionSetBundle) -> dict[str, Any]:
     if not isinstance(state, dict):
         state = {
             "stage": "intro",
-            "index": 0,
-            "answers": {},
             "result": None,
         }
         st.session_state[key] = state
     return state
-
-
-def _reset_track(bundle: QuestionSetBundle) -> None:
-    prefix = f"track_widget_{bundle.question_set_id}_"
-    for key in list(st.session_state):
-        if str(key).startswith(prefix):
-            st.session_state.pop(key, None)
-    st.session_state.pop(_state_key(bundle), None)
 
 
 def _apply_track_styles() -> None:
@@ -89,15 +91,20 @@ def _apply_track_styles() -> None:
         .track-hero { padding:clamp(2.8rem,7vw,6rem) 0 2rem; max-width:960px; }
         .track-hero h1 { margin:.35rem 0 1rem; }
         .track-hero p { max-width:720px; font-size:1.2rem; line-height:1.55; color:rgba(18,33,27,.68); }
-        .track-question { padding:clamp(1.2rem,3vw,2.4rem); margin:1rem 0 2rem; border:2px solid var(--ink); border-radius:22px; background:#fffdf6; box-shadow:9px 9px 0 var(--ink); }
+        [class*="st-key-question_card_"] { padding:clamp(1.2rem,3vw,2.4rem); margin:1rem 0 2rem; border:2px solid var(--ink); border-radius:22px; background:#fffdf6; box-shadow:9px 9px 0 var(--ink); }
+        [class*="st-key-question_card_"] .track-question { margin:0 0 1.15rem; }
+        [class*="st-key-question_card_"] .scenario { padding:0; margin:0; border:0; border-radius:0; background:transparent; box-shadow:none; }
         .track-question h2 { font-size:clamp(1.65rem,3.4vw,2.8rem) !important; margin:.5rem 0 .75rem; max-width:900px; }
-        .track-context { color:rgba(18,33,27,.66); max-width:760px; line-height:1.55; }
+        .track-context { color:rgba(18,33,27,.66); max-width:760px; line-height:1.55; margin-bottom:.4rem; }
         .track-review-row { display:grid; grid-template-columns:4rem minmax(0,1fr); gap:1rem; padding:1rem 0; border-bottom:1px solid rgba(18,33,27,.16); }
         .track-review-id { font-family:"DM Mono",monospace; font-size:.72rem; color:rgba(18,33,27,.55); }
         .track-review-row strong { display:block; margin-bottom:.35rem; }
         .track-review-value { color:rgba(18,33,27,.72); overflow-wrap:anywhere; }
         .track-done { padding:clamp(2rem,5vw,4rem); border:2px solid var(--ink); border-radius:22px; background:#fffdf6; text-align:center; margin:2rem 0; }
         .track-done-mark { width:4rem; height:4rem; margin:0 auto 1rem; display:grid; place-items:center; border:2px solid var(--ink); border-radius:50%; background:var(--acid); font-size:2rem; font-weight:800; }
+        .track-access-key { margin:1rem 0; padding:1rem; border:2px solid var(--ink); border-radius:14px; background:#fffdf6; font-family:"DM Mono",monospace; font-size:clamp(1rem,2.4vw,1.45rem); text-align:center; letter-spacing:.04em; overflow-wrap:anywhere; }
+        .track-integration-copy { color:rgba(18,33,27,.72); line-height:1.55; }
+        .track-action-help { margin:.35rem 0 .65rem; color:rgba(18,33,27,.58); font-size:.82rem; }
         [class*="st-key-begin_"] button {
           background:var(--acid) !important;
           color:var(--ink) !important;
@@ -110,7 +117,7 @@ def _apply_track_styles() -> None:
           box-shadow:2px 2px 0 var(--ink) !important;
         }
         @media (max-width:640px) {
-          .track-question { box-shadow:5px 5px 0 var(--ink); }
+          [class*="st-key-question_card_"] { box-shadow:5px 5px 0 var(--ink); }
           .track-review-row { grid-template-columns:2.6rem minmax(0,1fr); }
         }
         </style>
@@ -124,9 +131,35 @@ def _is_answered(value: Any) -> bool:
         return False
     if isinstance(value, str):
         return bool(value.strip())
-    if isinstance(value, (list, tuple, dict, set)):
-        return bool(value)
+    if isinstance(value, dict):
+        return any(_is_answered(item) for item in value.values())
+    if isinstance(value, (list, tuple, set)):
+        return any(_is_answered(item) for item in value)
     return True
+
+
+def _valid_optional_email(value: str) -> bool:
+    if not value.strip():
+        return True
+    parsed = parseaddr(value.strip())[1]
+    return (
+        parsed == value.strip()
+        and "@" in parsed
+        and "." in parsed.rsplit("@", 1)[-1]
+    )
+
+
+def _answer_validation_error(
+    question: QuestionDefinition,
+    answer: Any,
+) -> str:
+    if not _is_answered(answer):
+        return "Answer this question or use Skip."
+    if question.input_type == "contact" and isinstance(answer, dict):
+        for field, value in answer.items():
+            if "email" in str(field).lower() and not _valid_optional_email(str(value or "")):
+                return "That email address does not look complete."
+    return ""
 
 
 def _format_answer(value: Any, runtime_options: tuple[RuntimeOption, ...] = ()) -> str:
@@ -244,20 +277,41 @@ def _render_question_input(
 def _review_rows(
     *,
     bundle: QuestionSetBundle,
-    answers: dict[str, Any],
+    events: dict[str, dict[str, Any]],
     runtime: TrackRuntime,
 ) -> None:
     for question in bundle.questions:
         if question.input_type == "review":
             continue
-        value = answers.get(question.field_id)
+        event = events.get(question.id) or {}
+        status = str(event.get("status") or "")
+        if status == "skipped":
+            reason = SKIP_REASON_LABELS.get(
+                str(event.get("reason_code") or ""),
+                str(event.get("reason_code") or "Reason not recorded"),
+            )
+            note = str(event.get("reason_text") or "")
+            value_copy = f"Skipped · {reason}"
+            if note:
+                value_copy += f" — {note}"
+        else:
+            value_copy = _format_answer(
+                event.get("answer"),
+                runtime.options_for(question.id),
+            )
+            if status == "answered_and_flagged":
+                reason = FLAG_REASON_LABELS.get(
+                    str(event.get("reason_code") or ""),
+                    str(event.get("reason_code") or "Flagged"),
+                )
+                value_copy += f" · Flagged: {reason}"
         st.markdown(
             f"""
             <div class="track-review-row">
               <div class="track-review-id">{html.escape(question.id)}</div>
               <div>
                 <strong>{html.escape(question.title)}</strong>
-                <div class="track-review-value">{html.escape(_format_answer(value, runtime.options_for(question.id)))}</div>
+                <div class="track-review-value">{html.escape(value_copy)}</div>
               </div>
             </div>
             """,
@@ -265,16 +319,206 @@ def _review_rows(
         )
 
 
+def _latest_flag(
+    feedback: list[dict[str, Any]],
+    *,
+    participant_id: str,
+    track_id: str,
+    question_id: str,
+) -> dict[str, Any] | None:
+    matches = [
+        row
+        for row in feedback
+        if row.get("event_type") == "question_flagged"
+        and str(row.get("participant_id") or row.get("participant_uuid") or "")
+        == participant_id
+        and str(row.get("track_id") or "") == track_id
+        and str(row.get("question_id") or "") == question_id
+    ]
+    return matches[-1] if matches else None
+
+
+def _render_flag_control(
+    *,
+    repository: Repository,
+    bundle: QuestionSetBundle,
+    participant_id: str,
+    question: QuestionDefinition,
+    existing_flag: dict[str, Any] | None,
+) -> None:
+    with st.popover("Flag", width="stretch"):
+        st.caption("Flag this question without losing your current answer.")
+        with st.form(
+            f"track_flag_form_{bundle.question_set_id}_{question.id}",
+            border=False,
+        ):
+            existing_code = str((existing_flag or {}).get("reason_code") or "")
+            reason_codes = [value for value, _label in FLAG_REASON_OPTIONS]
+            selected = st.selectbox(
+                "Reason",
+                options=reason_codes,
+                index=(
+                    reason_codes.index(existing_code)
+                    if existing_code in reason_codes
+                    else None
+                ),
+                placeholder="Choose a reason",
+                format_func=lambda value: FLAG_REASON_LABELS[value],
+            )
+            comment = st.text_input(
+                "Optional short comment",
+                value=str((existing_flag or {}).get("reason_text") or ""),
+                placeholder="Optional short comment",
+            )
+            submitted = st.form_submit_button("Save flag", width="stretch")
+        if submitted:
+            try:
+                feedback = build_track_feedback(
+                    event_type="question_flagged",
+                    participant_id=participant_id,
+                    session_code=bundle.session_code,
+                    track_id=bundle.question_set_id,
+                    question_id=question.id,
+                    question_prompt=question.title,
+                    reason_code=selected,
+                    reason_text=comment,
+                )
+                repository.record_question_feedback(feedback)
+            except ValueError as exc:
+                st.warning(str(exc))
+            except Exception:
+                st.error("The flag was not saved. Your answer is still here.")
+            else:
+                st.success("Flag saved. Continue or skip when you are ready.")
+                st.rerun()
+
+
+def _render_skip_dialog(
+    *,
+    repository: Repository,
+    bundle: QuestionSetBundle,
+    participant_id: str,
+    question: QuestionDefinition,
+    state: dict[str, Any],
+) -> None:
+    @st.dialog("Skip question", width="large")
+    def skip_dialog() -> None:
+        st.markdown(f"### {question.title}")
+        st.caption(
+            "Tell us why you are skipping. The reason is part of the protocol record."
+        )
+        reason_codes = [value for value, _label in SKIP_REASON_OPTIONS]
+        selected = st.radio(
+            "Why skip?",
+            options=reason_codes,
+            index=None,
+            format_func=lambda value: SKIP_REASON_LABELS[value],
+        )
+        comment = st.text_area(
+            "Short comment",
+            placeholder="Optional, except when choosing Other",
+            height=120,
+        )
+        if st.button(
+            "Skip and continue",
+            type="primary",
+            width="stretch",
+            key=f"confirm_skip_{bundle.question_set_id}_{question.id}",
+        ):
+            try:
+                feedback = build_track_feedback(
+                    event_type="question_skipped",
+                    participant_id=participant_id,
+                    session_code=bundle.session_code,
+                    track_id=bundle.question_set_id,
+                    question_id=question.id,
+                    question_prompt=question.title,
+                    reason_code=selected,
+                    reason_text=comment,
+                )
+                event = build_question_event(
+                    status="skipped",
+                    participant_id=participant_id,
+                    session_code=bundle.session_code,
+                    track_id=bundle.question_set_id,
+                    question_id=question.id,
+                    question_prompt=question.title,
+                    reason_code=selected,
+                    reason_text=comment,
+                )
+                repository.record_question_feedback(feedback)
+                repository.record_question_event(event)
+            except ValueError as exc:
+                st.warning(str(exc))
+                return
+            except Exception:
+                st.error("The skip was not saved. Please try again.")
+                return
+            state.pop("skip_question_id", None)
+            st.rerun()
+
+    skip_dialog()
+
+
+def _render_integration_dialog(
+    *,
+    bundle: QuestionSetBundle,
+    participant_id: str,
+    completion_copy: str,
+    map_page: str,
+) -> None:
+    @st.dialog("Contribution integrated", width="large")
+    def integration_dialog() -> None:
+        st.markdown(f"## {html.escape(completion_copy)}")
+        st.markdown("**Access key**")
+        st.markdown(
+            f'<div class="track-access-key">{html.escape(participant_id)}</div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            """
+            <div class="track-integration-copy">
+              <strong>Take a screenshot of this screen.</strong><br>
+              Keep this key if you want to recognise or retrieve your contribution later.
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.caption(
+            f"This key is stable for {bundle.title} and remains in your private run link."
+        )
+        map_column, finish_column = st.columns([1.4, 1])
+        map_column.page_link(
+            map_page,
+            label="View the Commons Map",
+            icon="🗺️",
+            width="stretch",
+        )
+        if finish_column.button(
+            "Finish",
+            type="secondary",
+            width="stretch",
+            key=f"finish_{bundle.question_set_id}",
+        ):
+            st.switch_page("views/home_redirect.py")
+
+    integration_dialog()
+
+
 def render_question_track(
     *,
     bundle: QuestionSetBundle,
     submit: Callable[[dict[str, Any]], dict[str, Any]],
+    repository: Repository,
+    participant_id: str,
     runtime: TrackRuntime | None = None,
     completion_copy: str,
     next_page: str | None = None,
     next_label: str = "Continue",
+    existing_result: dict[str, Any] | None = None,
+    integration: bool = False,
 ) -> None:
-    """Render a progressive track directly from one resolved YAML bundle."""
+    """Render an immutable, forward-only track from one resolved YAML bundle."""
 
     _apply_track_styles()
     runtime = runtime or TrackRuntime()
@@ -284,6 +528,33 @@ def render_question_track(
         for question in bundle.questions
         if question.input_type != "review"
     )
+    try:
+        persisted_events = repository.list_question_events(
+            bundle.question_set_id,
+            participant_id,
+        )
+        feedback = repository.list_question_feedback(bundle.session_code)
+    except Exception:
+        st.error("This track could not load its saved progression. Please refresh.")
+        return
+    events_by_question = {
+        str(event.get("question_id") or ""): event
+        for event in persisted_events
+        if str(event.get("question_id") or "")
+    }
+    completed_count = 0
+    for question in questions:
+        if question.id not in events_by_question:
+            break
+        completed_count += 1
+
+    if existing_result:
+        state["result"] = existing_result
+        state["stage"] = "integration" if integration else "done"
+    elif questions and completed_count >= len(questions):
+        state["stage"] = "review"
+    elif completed_count:
+        state["stage"] = "questions"
 
     st.markdown(
         f"""
@@ -315,7 +586,6 @@ def render_question_track(
             key=f"begin_{bundle.question_set_id}",
         ):
             state["stage"] = "questions"
-            state["index"] = 0
             st.rerun()
         return
 
@@ -332,115 +602,161 @@ def render_question_track(
         )
         if next_page:
             st.page_link(next_page, label=next_label, width="stretch")
-        if st.button(
-            f"Review {bundle.title.lower()} again",
-            width="stretch",
-            key=f"reset_{bundle.question_set_id}",
-        ):
-            _reset_track(bundle)
-            st.rerun()
+        return
+
+    if stage == "integration":
+        st.progress(1.0, text=f"{bundle.title} · Integrated")
+        _render_integration_dialog(
+            bundle=bundle,
+            participant_id=participant_id,
+            completion_copy=completion_copy,
+            map_page=next_page or "views/commons_map.py",
+        )
         return
 
     if stage == "review":
         st.progress(1.0, text=f"{bundle.title} · Review")
-        st.markdown("## Review before submission")
+        st.markdown("## Review before integration")
         st.caption(
-            "Check the complete track. Use Back to change any answer before submitting."
+            "This is a record of the contribution as it was made. Earlier responses cannot be revised."
         )
         _review_rows(
             bundle=bundle,
-            answers=dict(state.get("answers") or {}),
+            events=events_by_question,
             runtime=runtime,
         )
-        back, submit_column = st.columns([1, 2])
-        if back.button("Back", width="stretch", key=f"review_back_{bundle.id}"):
-            state["stage"] = "questions"
-            state["index"] = max(0, len(questions) - 1)
-            st.rerun()
-        if submit_column.button(
-            f"Submit {bundle.title.lower()}",
+        submit_label = (
+            "Integrate contribution"
+            if integration
+            else f"Complete {bundle.title}"
+        )
+        if st.button(
+            submit_label,
             type="primary",
             width="stretch",
             key=f"submit_{bundle.id}",
         ):
+            answers = {
+                question.field_id: events_by_question[question.id]["answer"]
+                for question in questions
+                if question.id in events_by_question
+                and "answer" in events_by_question[question.id]
+            }
             try:
-                state["result"] = submit(dict(state.get("answers") or {}))
+                state["result"] = submit(answers)
             except ValueError as exc:
                 st.error(str(exc))
             except Exception:
-                st.error("Submission did not complete. Your answers are still here.")
+                st.error(
+                    "Integration did not complete. Your immutable question events are still saved."
+                )
             else:
-                state["stage"] = "done"
+                state["stage"] = "integration" if integration else "done"
                 st.rerun()
         return
 
-    index = min(max(int(state.get("index") or 0), 0), max(len(questions) - 1, 0))
     if not questions:
         st.error("This question set has no participant questions.")
         return
+    index = min(completed_count, len(questions) - 1)
     question = questions[index]
-    answers = state.setdefault("answers", {})
     progress = (index + 1) / (len(questions) + 1)
     st.progress(
         progress,
         text=f"{bundle.title} · {index + 1} of {len(questions)}",
     )
-    if question.input_type != "scenario":
-        st.markdown(
-            f"""
-            <div class="track-question">
-              <div class="eyebrow">{html.escape(question.id)} · {html.escape(question.group)} · {"Required" if question.required else "Optional"}</div>
-              <h2>{html.escape(question.title)}</h2>
-              <div class="track-context">{html.escape(question.context)}</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
+    with st.container(
+        key=f"question_card_{bundle.question_set_id}_{question.id}",
+        border=False,
+    ):
+        if question.input_type != "scenario":
+            st.markdown(
+                f"""
+                <div class="track-question">
+                  <div class="eyebrow">{html.escape(question.id)} · {html.escape(question.group)} · {"Required" if question.required else "Optional"}</div>
+                  <h2>{html.escape(question.title)}</h2>
+                  <div class="track-context">{html.escape(question.context)}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+        answer = _render_question_input(
+            bundle=bundle,
+            question=question,
+            saved_answer=None,
+            runtime=runtime,
         )
-    answer = _render_question_input(
-        bundle=bundle,
-        question=question,
-        saved_answer=answers.get(question.field_id),
-        runtime=runtime,
+        validation_error = _answer_validation_error(question, answer)
+        if validation_error:
+            st.markdown(
+                f'<div class="track-action-help">{html.escape(validation_error)}</div>',
+                unsafe_allow_html=True,
+            )
+    existing_flag = _latest_flag(
+        feedback,
+        participant_id=participant_id,
+        track_id=bundle.question_set_id,
+        question_id=question.id,
     )
-
-    continue_column, back_column, skip_column = st.columns([1.6, 0.5, 0.4])
+    continue_column, flag_column, skip_column = st.columns([1.6, 0.5, 0.4])
     continue_clicked = continue_column.button(
-        "Continue to review" if index + 1 >= len(questions) else "Continue",
-        type="secondary",
+        "Continue",
+        type="primary",
         width="stretch",
+        disabled=bool(validation_error),
         key=f"continue_{bundle.id}_{question.id}",
     )
-    back_clicked = back_column.button(
-        "Back",
-        width="stretch",
-        disabled=index == 0,
-        key=f"back_{bundle.id}_{question.id}",
-    )
+    with flag_column:
+        _render_flag_control(
+            repository=repository,
+            bundle=bundle,
+            participant_id=participant_id,
+            question=question,
+            existing_flag=existing_flag,
+        )
     skip_clicked = skip_column.button(
         "Skip",
         width="stretch",
-        disabled=question.required,
         key=f"skip_{bundle.id}_{question.id}",
     )
 
     if continue_clicked:
-        if question.required and not _is_answered(answer):
-            st.error("This question is required before continuing.")
+        status = "answered_and_flagged" if existing_flag else "answered"
+        try:
+            event = build_question_event(
+                status=status,
+                participant_id=participant_id,
+                session_code=bundle.session_code,
+                track_id=bundle.question_set_id,
+                question_id=question.id,
+                question_prompt=question.title,
+                answer=answer,
+                reason_code=(
+                    str(existing_flag.get("reason_code") or "")
+                    if existing_flag
+                    else None
+                ),
+                reason_text=(
+                    str(existing_flag.get("reason_text") or "")
+                    if existing_flag
+                    else None
+                ),
+            )
+            repository.record_question_event(event)
+        except ValueError as exc:
+            st.error(str(exc))
+        except Exception:
+            st.error("The response was not saved. Please try again.")
         else:
-            answers[question.field_id] = answer
-            if index + 1 >= len(questions):
-                state["stage"] = "review"
-            else:
-                state["index"] = index + 1
             st.rerun()
-    elif back_clicked:
-        answers[question.field_id] = answer
-        state["index"] = index - 1
-        st.rerun()
     elif skip_clicked:
-        answers[question.field_id] = None
-        if index + 1 >= len(questions):
-            state["stage"] = "review"
-        else:
-            state["index"] = index + 1
-        st.rerun()
+        state["skip_question_id"] = question.id
+
+    if state.get("skip_question_id") == question.id:
+        _render_skip_dialog(
+            repository=repository,
+            bundle=bundle,
+            participant_id=participant_id,
+            question=question,
+            state=state,
+        )

@@ -10,10 +10,42 @@ from typing import Any
 class InMemoryRepository:
     def __init__(self) -> None:
         self._strategies: dict[tuple[str, str, str], dict[str, Any]] = {}
+        self._question_events: dict[tuple[str, str, str], dict[str, Any]] = {}
         self._question_set_submissions: dict[tuple[str, str, str], dict[str, Any]] = {}
         self._coordination: dict[str, dict[str, Any]] = {}
         self._feedback: list[dict[str, Any]] = []
         self._lock = RLock()
+
+    @staticmethod
+    def _question_event_key(event: dict[str, Any]) -> tuple[str, str, str]:
+        return (
+            str(event["participant_id"]),
+            str(event["track_id"]),
+            str(event["question_id"]),
+        )
+
+    def record_question_event(self, event: dict[str, Any]) -> dict[str, Any]:
+        key = self._question_event_key(event)
+        with self._lock:
+            self._question_events.setdefault(key, deepcopy(event))
+            return deepcopy(self._question_events[key])
+
+    def list_question_events(
+        self,
+        track_id: str,
+        participant_id: str | None = None,
+    ) -> list[dict[str, Any]]:
+        with self._lock:
+            rows = [
+                deepcopy(row)
+                for row in self._question_events.values()
+                if row.get("track_id") == track_id
+                and (
+                    participant_id is None
+                    or row.get("participant_id") == participant_id
+                )
+            ]
+        return sorted(rows, key=lambda row: str(row.get("timestamp", "")))
 
     @staticmethod
     def _submission_key(submission: dict[str, Any]) -> tuple[str, str, str]:

@@ -577,6 +577,30 @@ st.html(
           </p>
         </div>
       </section>
+      
+      
+      <section class="landing-about" id="about" aria-labelledby="about-title">
+        <div class="landing-about-label">About the simulation</div>
+        <div>
+          <h2 id="about-title">One situation. One strategic move.</h2>
+          <p>
+            Choose how you would act when a shared resource reaches a threshold,
+            explain why, and add your anonymous trajectory to the Commons Map.
+          </p>
+        </div>
+      </section>
+    </main>
+      
+      <section class="landing-about" id="about" aria-labelledby="about-title">
+        <div class="landing-about-label">About the simulation</div>
+        <div>
+          <h2 id="about-title">One situation. One strategic move.</h2>
+          <p>
+            Choose how you would act when a shared resource reaches a threshold,
+            explain why, and add your anonymous trajectory to the Commons Map.
+          </p>
+        </div>
+      </section>
     </main>
 
     <script>

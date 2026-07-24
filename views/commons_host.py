@@ -15,6 +15,7 @@ from protocol import (
     QuestionSetCatalog,
     load_question_set_catalog,
 )
+from storage import get_repository
 
 
 def configured_host_code() -> str:
@@ -125,6 +126,49 @@ def _render_statistics(bundle: QuestionSetBundle) -> None:
     columns[5].metric("Estimated time", f"{bundle.estimated_minutes} min")
 
 
+def _render_activity(
+    *,
+    bundle: QuestionSetBundle,
+    events: list[dict[str, object]],
+    feedback: list[dict[str, object]],
+) -> None:
+    answered = sum(event.get("status") == "answered" for event in events)
+    skipped = sum(event.get("status") == "skipped" for event in events)
+    answered_and_flagged = sum(
+        event.get("status") == "answered_and_flagged" for event in events
+    )
+    flags = sum(
+        event.get("event_type") == "question_flagged"
+        and event.get("track_id") == bundle.question_set_id
+        for event in feedback
+    )
+
+    st.markdown("### Question activity")
+    metrics = st.columns(4)
+    metrics[0].metric("Answered", answered)
+    metrics[1].metric("Skipped", skipped)
+    metrics[2].metric("Flags", flags)
+    metrics[3].metric("Answered + flagged", answered_and_flagged)
+
+    if events:
+        st.dataframe(
+            [
+                {
+                    "question_id": event.get("question_id"),
+                    "status": event.get("status"),
+                    "reason_code": event.get("reason_code") or "—",
+                    "participant": event.get("participant_alias") or "—",
+                    "timestamp": event.get("timestamp"),
+                }
+                for event in events
+            ],
+            hide_index=True,
+            width="stretch",
+        )
+    else:
+        st.caption("No participant question events have been recorded yet.")
+
+
 def _render_question_detail(question: QuestionDefinition) -> None:
     st.markdown("**Context**")
     st.write(question.context or "—")
@@ -208,7 +252,12 @@ def _render_simulation_flow(bundle: QuestionSetBundle) -> None:
             st.markdown('<div class="host-flow-arrow"></div>', unsafe_allow_html=True)
 
 
-def render_question_set(bundle: QuestionSetBundle) -> None:
+def render_question_set(
+    bundle: QuestionSetBundle,
+    *,
+    events: list[dict[str, object]] | None = None,
+    feedback: list[dict[str, object]] | None = None,
+) -> None:
     """Render any validated YAML questionnaire bundle without protocol-specific code."""
 
     st.markdown("### Question Set Overview")
@@ -229,6 +278,11 @@ def render_question_set(bundle: QuestionSetBundle) -> None:
 
     st.markdown("### Resolved bundle")
     _render_bundle_header(bundle)
+    _render_activity(
+        bundle=bundle,
+        events=events or [],
+        feedback=feedback or [],
+    )
 
     if bundle.flow:
         _render_simulation_flow(bundle)
@@ -355,11 +409,19 @@ if not authenticated():
     st.stop()
 
 catalog = load_question_set_catalog()
+repository = get_repository()
 tab_labels = [bundle.title for bundle in catalog.bundles] + ["Diagnostics"]
 tabs = st.tabs(tab_labels)
 for tab, bundle in zip(tabs[:-1], catalog.bundles):
     with tab:
-        render_question_set(bundle)
+        try:
+            events = repository.list_question_events(bundle.question_set_id)
+            feedback = repository.list_question_feedback(bundle.session_code)
+        except Exception:
+            st.error("Question activity could not be loaded.")
+            events = []
+            feedback = []
+        render_question_set(bundle, events=events, feedback=feedback)
 with tabs[-1]:
     _render_diagnostics(catalog)
 

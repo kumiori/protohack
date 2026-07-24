@@ -241,6 +241,106 @@ class NotionRepository:
         ]
         return sorted(feedback, key=lambda row: str(row.get("created_at", "")))
 
+    @staticmethod
+    def _question_event_from_page(page: dict[str, Any]) -> dict[str, Any]:
+        properties = page.get("properties") or {}
+        raw = _rich(properties, "metadata_json")
+        try:
+            event = json.loads(raw) if raw else {}
+        except json.JSONDecodeError:
+            event = {}
+        event.setdefault("event_type", _select(properties, "event_type"))
+        event.setdefault("status", _select(properties, "status"))
+        event.setdefault("question_id", _rich(properties, "item_id"))
+        event.setdefault("track_id", _rich(properties, "page"))
+        event.setdefault("participant_id", _rich(properties, "device_id"))
+        event.setdefault("timestamp", _date(properties, "timestamp"))
+        event["_page_id"] = str(page.get("id") or "")
+        return event
+
+    def record_question_event(self, event: dict[str, Any]) -> dict[str, Any]:
+        existing = next(
+            (
+                row
+                for row in self.list_question_events(
+                    str(event["track_id"]),
+                    str(event["participant_id"]),
+                )
+                if row.get("question_id") == event.get("question_id")
+            ),
+            None,
+        )
+        if existing:
+            return existing
+
+        metadata_json = json.dumps(event, ensure_ascii=False, separators=(",", ":"))
+        created = self._client.pages.create(
+            parent={
+                "type": "data_source_id",
+                "data_source_id": self._sources["events"],
+            },
+            properties={
+                "Name": {
+                    "title": _text(
+                        f"{str(event['status']).replace('_', ' ').title()} "
+                        f"{event['participant_alias']} · {event['question_id']}"
+                    )
+                },
+                "session": _relation(self._session_page_id),
+                "timestamp": {"date": {"start": str(event["timestamp"])}},
+                "event_type": {"select": {"name": "question_event"}},
+                "item_id": {"rich_text": _text(str(event["question_id"]))},
+                "page": {"rich_text": _text(str(event["track_id"]))},
+                "value_label": {"rich_text": _text(str(event["status"]))},
+                "metadata_json": {"rich_text": _text(metadata_json)},
+                "device_id": {"rich_text": _text(str(event["participant_id"]))},
+                "status": {"select": {"name": str(event["status"])}},
+            },
+        )
+        result = dict(event)
+        result["_page_id"] = str(created["id"])
+        return result
+
+    def list_question_events(
+        self,
+        track_id: str,
+        participant_id: str | None = None,
+    ) -> list[dict[str, Any]]:
+        clauses: list[dict[str, Any]] = [
+            {
+                "property": "event_type",
+                "select": {"equals": "question_event"},
+            },
+            {
+                "property": "page",
+                "rich_text": {"equals": track_id},
+            },
+        ]
+        if participant_id is not None:
+            clauses.append(
+                {
+                    "property": "device_id",
+                    "rich_text": {"equals": participant_id},
+                }
+            )
+        pages = self._query_all(
+            "events",
+            filter_={"and": clauses},
+        )
+        events = [
+            self._question_event_from_page(page)
+            for page in pages
+            if _select(page.get("properties") or {}, "event_type")
+            == "question_event"
+            and _rich(page.get("properties") or {}, "page") == track_id
+            and (
+                participant_id is None
+                or _rich(page.get("properties") or {}, "device_id")
+                == participant_id
+            )
+        ]
+        return sorted(events, key=lambda row: str(row.get("timestamp", "")))
+
     def _query_all(
         self, data_source: str, *, filter_: dict[str, Any] | None = None
     ) -> Iterable[dict[str, Any]]:

@@ -100,16 +100,3 @@ questions:
       placeholder: >
           Think about coordination, visibility,
           knowledge sharing or collaboration.
-
-    - id: C7
-      field: coordination_contact
-      type: contact
-      group: Coordination
-      required: false
-      title: Stay connected (optional)
-      context: >
-          Leave your name or username and email if
-          you would like to hear about future collaborations.
-      fields:
-          - Name or username
-          - Email
