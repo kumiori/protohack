@@ -10,6 +10,15 @@ from .feedback import (
 )
 from .loader import load_protocol
 from .models import Action, Decision, InteractionContract, Protocol, Scenario
+from .question_sets import (
+    BundleValidation,
+    QuestionDefinition,
+    QuestionSetBundle,
+    QuestionSetCatalog,
+    load_question_set,
+    load_question_set_catalog,
+)
+from .submissions import build_question_set_submission
 
 __all__ = [
     "Action",
@@ -19,11 +28,18 @@ __all__ = [
     "Scenario",
     "QUESTION_FLAG_LABELS",
     "QUESTION_FLAG_OPTIONS",
+    "BundleValidation",
+    "QuestionDefinition",
+    "QuestionSetBundle",
+    "QuestionSetCatalog",
     "access_key_emoji",
     "access_key_hash",
     "build_question_feedback",
+    "build_question_set_submission",
     "build_strategic_profile",
     "load_protocol",
+    "load_question_set",
+    "load_question_set_catalog",
     "normalize_access_key",
     "normalize_question_feedback",
     "normalize_rationale",

@@ -6,6 +6,14 @@ from typing import Any, Protocol
 
 
 class Repository(Protocol):
+    def record_question_set_submission(
+        self, submission: dict[str, Any]
+    ) -> dict[str, Any]: ...
+
+    def list_question_set_submissions(
+        self, question_set_id: str
+    ) -> list[dict[str, Any]]: ...
+
     def record_question_feedback(self, feedback: dict[str, Any]) -> dict[str, Any]: ...
 
     def list_question_feedback(self, session_code: str) -> list[dict[str, Any]]: ...
@@ -26,6 +34,7 @@ class Repository(Protocol):
         email: str | None,
         consent_version: str,
         consented_at: str,
+        name: str | None = None,
     ) -> dict[str, Any]: ...
 
     def get_coordination_interest(self, participant_uuid: str) -> dict[str, Any] | None: ...

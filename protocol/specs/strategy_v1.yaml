@@ -1,0 +1,111 @@
+id: strategy
+title: Strategy
+summary: Scenario-driven simulation flow.
+description: |
+    Explore how participants reason when faced with uncertainty
+    around the stewardship of the commons.
+metadata:
+    campaign_slug: questioning_commons
+    event_slug: commons_inquiry
+    session_code: commons_pilot_2026
+    question_set_id: strategy_v1
+    schema_id: questionnaire_v1
+    version: v1
+    order: 30
+
+flow:
+    - Scenario
+
+    - Strategic priority
+
+    - Actors to mobilise
+
+    - Capacities to activate
+
+    - First action
+
+    - Explain your reasoning
+
+    - Review before integration
+
+questions:
+    - id: S1
+      field: scenario
+      type: scenario
+      group: Scenario
+      node_kind: scenario
+      dynamic: true
+      runtime_source: commons_smoke_v1.scenario
+      required: false
+      title: Scenario
+
+    - id: S2
+      field: strategic_priority
+      type: single_choice
+      group: Decision
+      node_kind: decision
+      required: true
+      title: What is your immediate strategic priority?
+      options:
+          - Perceive
+          - Mobilise
+          - Decide
+          - Transform
+
+    - id: S3
+      field: actors_to_mobilise
+      type: multiselect
+      group: Decision
+      node_kind: decision
+      required: true
+      title: Who would you mobilise first?
+      options:
+          - Residents
+          - Researchers
+          - Institutions
+          - Technologists
+          - Journalists
+          - Stewards
+
+    - id: S4
+      field: capacities_to_activate
+      type: multiselect
+      group: Decision
+      node_kind: decision
+      required: true
+      title: Which capacities would you activate?
+      options:
+          - Human expertise
+          - Technical tools
+          - Knowledge & data
+          - Community trust
+          - Institutional support
+          - Time & attention
+
+    - id: S5
+      field: first_action
+      type: single_choice
+      group: Action
+      node_kind: action
+      dynamic: true
+      runtime_source: commons_smoke_v1.scenario.decision.actions
+      required: true
+      title: What would be your first move?
+
+    - id: S6
+      field: reasoning
+      type: textarea
+      group: Reasoning
+      node_kind: rationale
+      required: true
+      title: Why?
+      placeholder: >
+          One or two sentences are enough.
+
+    - id: S7
+      field: review
+      type: review
+      group: Review
+      node_kind: review
+      required: false
+      title: Review before integration

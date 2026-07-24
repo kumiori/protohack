@@ -30,6 +30,8 @@ PROTOHACK_DEMO_MODE=true PROTOHACK_HOST_CODE=demo .venv/bin/streamlit run app.py
 
 - `/` — Commons Simulator landing page and entry point;
 - `/commons` — refined participant simulation, review, integration, and optional coordination;
+- `/capacity` — YAML-driven needs, resources, contributions, time horizon, and coordination track;
+- `/strategy` — YAML-driven scenario, priority, actors, capacities, action, rationale, and review track;
 - `/commons-map` — public strategic distribution and participant-theme graph;
 - `/commons-host` — access-code-protected strategic, coordination, and diagnostic views;
 - `/test-landing-primitives` — landing-page study composed from native Streamlit primitives and scoped styled containers, without authored HTML markup;

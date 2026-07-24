@@ -1,0 +1,106 @@
+id: identity
+title: Identity
+summary: Who is here?
+description: |
+    Understand who participates in the ecosystem and the perspectives represented.
+metadata:
+    campaign_slug: questioning_commons
+    event_slug: commons_inquiry
+    session_code: commons_pilot_2026
+    question_set_id: identity_v1
+    schema_id: questionnaire_v1
+    version: v1
+    order: 10
+
+questions:
+    - id: I1
+      field: roles
+      type: multiselect
+      group: Roles
+      required: false
+      title: Which roles best describe your participation?
+      context: >
+          People often contribute through several roles simultaneously.
+          Understanding these perspectives helps reveal the diversity of the ecosystem.
+      options:
+          - Community editor
+          - Researcher
+          - AI developer
+          - Public institution
+          - Policy practitioner
+          - Coordinator / facilitator
+          - Civil society organisation
+          - Educator
+          - Student
+          - Observer
+          - Other
+      allow_other: true
+
+    - id: I2
+      field: expertise
+      type: multiselect
+      group: Expertise
+      required: false
+      title: Which areas of expertise do you bring?
+      context: >
+          Expertise helps interpret, connect and advance collective work.
+      groups:
+          Technical:
+              - Tool development
+              - Infrastructure
+              - Data engineering
+
+          Governance:
+              - Policy
+              - Licensing
+              - Governance
+
+          Research:
+              - Research
+              - Evaluation
+              - Foresight
+
+          Community:
+              - Community facilitation
+              - Stakeholder engagement
+              - Education
+              - Communication
+
+          Other:
+              - Other
+
+      allow_other: true
+
+    - id: I3
+      field: location
+      type: location
+      group: Location
+      required: false
+      title: Where are you primarily based?
+      context: >
+          Geographic diversity helps understand regional perspectives and enables local coordination.
+      fields:
+          - Country
+          - City (optional)
+          - Institution (optional)
+
+    - id: I4
+      field: regions
+      type: multiselect
+      group: Regions
+      required: false
+      title: Which regions are most relevant to your work?
+      context: >
+          Many participants contribute across multiple regions.
+      options:
+          - Central and Eastern Europe
+          - East, Southeast Asia and the Pacific
+          - Europe
+          - Latin America and the Caribbean
+          - Middle East and North Africa
+          - North America
+          - South Asia
+          - Sub-Saharan Africa
+          - Global
+          - Other
+      allow_other: true

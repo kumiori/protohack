@@ -1,19 +1,20 @@
-"""Protected pilot diagnostics with intentionally separated strategy/contact tabs."""
+"""Protected, YAML-first operator console for every questionnaire bundle."""
 
 from __future__ import annotations
 
 import hmac
+import html
 import os
+from pathlib import Path
 
 import streamlit as st
 
-from protocol import load_protocol, participant_alias
-from storage import get_repository
-from ui import footer, header, repository_mode, strategic_graph_dot
-
-
-protocol = load_protocol()
-repository = get_repository()
+from protocol import (
+    QuestionDefinition,
+    QuestionSetBundle,
+    QuestionSetCatalog,
+    load_question_set_catalog,
+)
 
 
 def configured_host_code() -> str:
@@ -44,111 +45,325 @@ def authenticated() -> bool:
     return False
 
 
-header(
-    protocol,
-    eyebrow="Pilot operations",
-    title="Commons Host",
-    copy="Strategic analysis and coordination records are kept in separate views, joined only by the participant's random code.",
+def _host_styles() -> None:
+    st.markdown(
+        """
+        <style>
+        .host-hero { padding:2.4rem 0 1rem; max-width:920px; }
+        .host-hero h1 { margin:.35rem 0 .7rem; }
+        .host-hero p { max-width:760px; color:rgba(18,33,27,.68); font-size:1.08rem; line-height:1.55; }
+        .host-overview { display:flex; align-items:flex-end; justify-content:space-between; gap:1rem; padding:.65rem 0 1.2rem; }
+        .host-overview h2 { margin:0 0 .3rem; }
+        .host-overview p { margin:0; color:rgba(18,33,27,.66); }
+        .host-count { font-family:"DM Mono",monospace; font-size:.78rem; text-transform:uppercase; letter-spacing:.08em; white-space:nowrap; }
+        .host-meta-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.65rem; margin:.65rem 0 1.5rem; }
+        .host-meta-card { min-width:0; background:#fffdf6; border:1px solid rgba(18,33,27,.34); border-radius:12px; padding:.72rem .78rem; }
+        .host-meta-label { font-family:"DM Mono",monospace; font-size:.62rem; text-transform:uppercase; letter-spacing:.09em; color:rgba(18,33,27,.55); }
+        .host-meta-value { margin-top:.25rem; font-family:"DM Mono",monospace; font-size:.76rem; overflow-wrap:anywhere; }
+        .host-question-title { font-size:1.03rem; font-weight:700; line-height:1.35; margin:.08rem 0 .2rem; }
+        .host-question-id { font-family:"DM Mono",monospace; font-size:.7rem; letter-spacing:.08em; color:rgba(18,33,27,.58); }
+        .host-question-meta { color:rgba(18,33,27,.62); font-size:.8rem; }
+        .host-flow-node { display:grid; grid-template-columns:3rem minmax(0,1fr) auto; align-items:center; gap:.9rem; padding:.9rem 1rem; background:#fffdf6; border:1px solid rgba(18,33,27,.3); border-radius:13px; margin:.35rem 0; }
+        .host-flow-index { font-family:"DM Mono",monospace; font-size:.7rem; color:rgba(18,33,27,.55); }
+        .host-flow-title { font-weight:700; }
+        .host-flow-meta { font-family:"DM Mono",monospace; font-size:.68rem; color:rgba(18,33,27,.58); text-align:right; }
+        .host-flow-arrow { height:1rem; margin-left:2.4rem; border-left:1px solid rgba(18,33,27,.45); }
+        .host-section-space { height:.55rem; }
+        @media (max-width: 820px) {
+          .host-meta-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+          .host-overview { align-items:flex-start; flex-direction:column; }
+          .host-flow-node { grid-template-columns:2.4rem minmax(0,1fr); }
+          .host-flow-meta { grid-column:2; text-align:left; }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _source_label(bundle: QuestionSetBundle) -> str:
+    try:
+        return str(bundle.source_path.relative_to(Path.cwd()))
+    except ValueError:
+        return str(bundle.source_path)
+
+
+def _metadata_card(label: str, value: str) -> str:
+    return (
+        '<div class="host-meta-card">'
+        f'<div class="host-meta-label">{html.escape(label)}</div>'
+        f'<div class="host-meta-value">{html.escape(value or "—")}</div>'
+        "</div>"
+    )
+
+
+def _render_bundle_header(bundle: QuestionSetBundle) -> None:
+    st.markdown(
+        f"""
+        <div class="host-meta-grid">
+          {_metadata_card("campaign_slug", bundle.campaign_slug)}
+          {_metadata_card("event_slug", bundle.event_slug)}
+          {_metadata_card("question_set_id", bundle.question_set_id)}
+          {_metadata_card("schema_id", bundle.schema_id)}
+          {_metadata_card("YAML source", _source_label(bundle))}
+          {_metadata_card("version", bundle.version)}
+          {_metadata_card("question count", str(bundle.question_count))}
+          {_metadata_card("last loaded", bundle.loaded_at.strftime("%Y-%m-%d %H:%M:%S UTC"))}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _render_statistics(bundle: QuestionSetBundle) -> None:
+    columns = st.columns(6)
+    columns[0].metric("Questions", bundle.question_count)
+    columns[1].metric("Required", bundle.required_count)
+    columns[2].metric("Optional", bundle.optional_count)
+    columns[3].metric("Multiple choice", bundle.multiple_choice_count)
+    columns[4].metric("Open text", bundle.open_text_count)
+    columns[5].metric("Estimated time", f"{bundle.estimated_minutes} min")
+
+
+def _render_question_detail(question: QuestionDefinition) -> None:
+    st.markdown("**Context**")
+    st.write(question.context or "—")
+
+    if question.option_groups:
+        st.markdown("**Options**")
+        for group, options in question.option_groups:
+            st.markdown(f"**{group}**")
+            st.markdown("\n".join(f"- {option}" for option in options))
+    elif question.options:
+        st.markdown("**Options**")
+        st.markdown("\n".join(f"- {option}" for option in question.options))
+    else:
+        st.markdown("**Options**")
+        st.write("Resolved by the runtime." if question.dynamic else "—")
+
+    identifiers, authoring = st.columns(2)
+    with identifiers:
+        st.markdown("**Identifiers**")
+        st.code(
+            f"yaml_id  = {question.id}\nfield_id = {question.field_id}",
+            language="text",
+        )
+    with authoring:
+        st.markdown("**Notes**")
+        st.write(question.notes or "—")
+        if question.placeholder:
+            st.caption(f"Placeholder: {question.placeholder}")
+        if question.allow_other:
+            st.caption("An authored “Other” response is allowed.")
+
+
+def _render_question_list(bundle: QuestionSetBundle) -> None:
+    for question in bundle.questions:
+        with st.container(border=True):
+            identity, metadata = st.columns([3, 2])
+            with identity:
+                st.markdown(
+                    f'<div class="host-question-id">{html.escape(question.id)}</div>'
+                    f'<div class="host-question-title">{html.escape(question.title)}</div>',
+                    unsafe_allow_html=True,
+                )
+            with metadata:
+                status = "Required" if question.required else "Optional"
+                st.markdown(
+                    f'<div class="host-question-meta">{html.escape(question.type_label)}<br>'
+                    f'{html.escape(question.group)}<br>{status}</div>',
+                    unsafe_allow_html=True,
+                )
+            with st.expander("↓ Expand", expanded=False):
+                _render_question_detail(question)
+
+
+def _render_simulation_flow(bundle: QuestionSetBundle) -> None:
+    metrics = st.columns(5)
+    metrics[0].metric("Scenario count", bundle.count_nodes("scenario"))
+    metrics[1].metric("Decision nodes", bundle.count_nodes("decision"))
+    metrics[2].metric("Action nodes", bundle.count_nodes("action"))
+    metrics[3].metric("Review node", bundle.count_nodes("review"))
+    metrics[4].metric("Simulation flow", f"{len(bundle.flow)} steps")
+
+    st.markdown("### Simulation flow")
+    for index, label in enumerate(bundle.flow, start=1):
+        question = bundle.questions[index - 1] if index <= len(bundle.questions) else None
+        question_id = question.id if question else "—"
+        question_type = question.type_label if question else "Unmapped"
+        st.markdown(
+            f"""
+            <div class="host-flow-node">
+              <div class="host-flow-index">{index:02d}</div>
+              <div class="host-flow-title">{html.escape(label)}</div>
+              <div class="host-flow-meta">{html.escape(question_id)} · {html.escape(question_type)}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        if question:
+            with st.expander(f"Inspect node {question.id}", expanded=False):
+                _render_question_detail(question)
+        if index < len(bundle.flow):
+            st.markdown('<div class="host-flow-arrow"></div>', unsafe_allow_html=True)
+
+
+def render_question_set(bundle: QuestionSetBundle) -> None:
+    """Render any validated YAML questionnaire bundle without protocol-specific code."""
+
+    st.markdown("### Question Set Overview")
+    st.markdown(
+        f"""
+        <div class="host-overview">
+          <div>
+            <h2>{html.escape(bundle.title)}</h2>
+            <p>{html.escape(bundle.summary or bundle.description)}</p>
+          </div>
+          <div class="host-count">{bundle.question_count} questions</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    if bundle.description and bundle.summary:
+        st.caption(bundle.description)
+
+    st.markdown("### Resolved bundle")
+    _render_bundle_header(bundle)
+
+    if bundle.flow:
+        _render_simulation_flow(bundle)
+    else:
+        st.markdown("### Question statistics")
+        _render_statistics(bundle)
+        st.markdown('<div class="host-section-space"></div>', unsafe_allow_html=True)
+        st.markdown("### Question list")
+        _render_question_list(bundle)
+
+
+def _diagnostic_values(values: list[str], empty_message: str) -> None:
+    if values:
+        st.code("\n".join(values), language="text")
+    else:
+        st.success(empty_message)
+
+
+def _render_diagnostics(catalog: QuestionSetCatalog) -> None:
+    st.markdown("### Loaded YAML")
+    st.dataframe(
+        [
+            {
+                "bundle": bundle.title,
+                "question_set_id": bundle.question_set_id,
+                "source": _source_label(bundle),
+                "version": bundle.version,
+                "questions": bundle.question_count,
+                "loaded": bundle.loaded_at.strftime("%Y-%m-%d %H:%M:%S UTC"),
+            }
+            for bundle in catalog.bundles
+        ],
+        hide_index=True,
+        width="stretch",
+    )
+
+    validation_errors = [
+        f"{bundle.title}: {message}"
+        for bundle in catalog.bundles
+        for message in bundle.validation.errors
+    ] + list(catalog.discovery_errors)
+    warnings = [
+        f"{bundle.title}: {message}"
+        for bundle in catalog.bundles
+        for message in bundle.validation.warnings
+    ]
+    missing_fields = [
+        f"{bundle.title}: {field}"
+        for bundle in catalog.bundles
+        for field in bundle.validation.missing_fields
+    ]
+    unknown_types = sorted(
+        {
+            field_type
+            for bundle in catalog.bundles
+            for field_type in bundle.validation.unknown_field_types
+        }
+    )
+    duplicate_ids = sorted(
+        set(catalog.duplicate_question_ids).union(
+            duplicate
+            for bundle in catalog.bundles
+            for duplicate in bundle.validation.duplicate_ids
+        )
+    )
+
+    st.markdown("### Validation")
+    status = st.columns(3)
+    status[0].metric("Bundles", len(catalog.bundles))
+    status[1].metric("Errors", len(validation_errors))
+    status[2].metric("Warnings", len(warnings))
+    _diagnostic_values(validation_errors, "All loaded bundles passed structural validation.")
+
+    left, right = st.columns(2)
+    with left:
+        st.markdown("### Schema")
+        st.dataframe(
+            [
+                {
+                    "question_set_id": bundle.question_set_id,
+                    "schema_id": bundle.schema_id,
+                }
+                for bundle in catalog.bundles
+            ],
+            hide_index=True,
+            width="stretch",
+        )
+        st.markdown("### Missing fields")
+        _diagnostic_values(missing_fields, "No required fields are missing.")
+        st.markdown("### Unknown field types")
+        _diagnostic_values(unknown_types, "All field types are known.")
+    with right:
+        st.markdown("### Warnings")
+        _diagnostic_values(warnings, "No authoring warnings.")
+        st.markdown("### Question ids")
+        st.code("\n".join(catalog.question_ids) or "—", language="text")
+        st.markdown("### Duplicate ids")
+        _diagnostic_values(duplicate_ids, "Question ids are unique.")
+
+    st.markdown("### Estimated duration")
+    st.metric("All loaded question sets", f"{catalog.estimated_minutes} min")
+    st.caption(
+        "Estimate uses a fixed per-field reading and response allowance; it is an operator planning aid."
+    )
+
+    if st.button("Lock host view"):
+        st.session_state.host_authenticated = False
+        st.rerun()
+
+
+_host_styles()
+st.markdown(
+    """
+    <div class="host-hero">
+      <div class="eyebrow">Protocol operations</div>
+      <h1>Commons Host</h1>
+      <p>Inspect the loaded questionnaire bundles, their authored questions and their technical health.</p>
+    </div>
+    """,
+    unsafe_allow_html=True,
 )
 
 if not authenticated():
     st.stop()
 
-strategies = repository.list_strategic_profiles(protocol.session_code)
-coordination = repository.list_coordination_interests(protocol.session_code)
-feedback = repository.list_question_feedback(protocol.session_code)
-reachable = [row for row in coordination if row.get("coordination_status") == "reachable_interest"]
-anonymous = [row for row in coordination if row.get("coordination_status") == "anonymous_interest"]
+catalog = load_question_set_catalog()
+tab_labels = [bundle.title for bundle in catalog.bundles] + ["Diagnostics"]
+tabs = st.tabs(tab_labels)
+for tab, bundle in zip(tabs[:-1], catalog.bundles):
+    with tab:
+        render_question_set(bundle)
+with tabs[-1]:
+    _render_diagnostics(catalog)
 
-st.warning(
-    "Coordination policy: OPEN — pending discussion with Nathalie. This pilot records interest only; it sends nothing and makes no automatic introductions."
+st.markdown(
+    f'<div class="footer">QUESTION-SET CONSOLE · {len(catalog.bundles)} YAML BUNDLES</div>',
+    unsafe_allow_html=True,
 )
-
-strategy_tab, feedback_tab, coordination_tab, diagnostics_tab = st.tabs(
-    ["Strategic profiles", "Question feedback", "Coordination", "Diagnostics"]
-)
-
-with strategy_tab:
-    st.caption("Anonymous analysis layer")
-    if strategies:
-        st.graphviz_chart(strategic_graph_dot(strategies), width="stretch")
-        st.dataframe(
-            [
-                {
-                    "Alias": row.get("participant_alias"),
-                    "Move": row.get("action_label"),
-                    "Rationale": row.get("rationale"),
-                    "Themes": ", ".join(row.get("semantic_tags") or []),
-                    "Integrated": row.get("integrated_at"),
-                }
-                for row in strategies
-            ],
-            hide_index=True,
-            width="stretch",
-        )
-    else:
-        st.info("No strategies integrated yet.")
-
-with feedback_tab:
-    st.caption("Anonymous flag and skip trail")
-    if feedback:
-        st.dataframe(
-            [
-                {
-                    "Alias": row.get("participant_alias"),
-                    "Event": str(row.get("event_type") or "").replace("question_", ""),
-                    "Question": row.get("question_id"),
-                    "Reasons": ", ".join(row.get("flag_labels") or []),
-                    "Note": row.get("note"),
-                    "Recorded": row.get("created_at"),
-                }
-                for row in feedback
-            ],
-            hide_index=True,
-            width="stretch",
-        )
-    else:
-        st.info("No flags or skips recorded yet.")
-
-with coordination_tab:
-    st.caption("Consent-based contact layer")
-    first, second = st.columns(2)
-    first.metric("Reachable interest", len(reachable))
-    second.metric("Anonymous interest", len(anonymous))
-    if reachable:
-        st.dataframe(
-            [
-                {
-                    "Alias": participant_alias(str(row["participant_uuid"])),
-                    "Email": row.get("email"),
-                    "Consented": row.get("coordination_consented_at"),
-                    "Consent version": row.get("coordination_consent_version"),
-                }
-                for row in reachable
-            ],
-            hide_index=True,
-            width="stretch",
-        )
-    if anonymous:
-        st.write(f"{len(anonymous)} participant(s) expressed interest without leaving an email.")
-    if not coordination:
-        st.info("No coordination interest recorded yet.")
-
-with diagnostics_tab:
-    strategic_ids = {row.get("participant_uuid") for row in strategies}
-    contact_ids = {row.get("participant_uuid") for row in coordination}
-    st.write(
-        {
-            "storage_mode": repository_mode(),
-            "protocol_version": protocol.version,
-            "strategic_records": len(strategies),
-            "coordination_records": len(coordination),
-            "question_feedback_records": len(feedback),
-            "coordination_without_strategy": len(contact_ids - strategic_ids),
-        }
-    )
-    if st.button("Lock host view"):
-        st.session_state.host_authenticated = False
-        st.rerun()
-
-footer(protocol)

@@ -1,4 +1,5 @@
 from copy import deepcopy
+import json
 from pathlib import Path
 
 import storage.notion as notion_module
@@ -149,3 +150,42 @@ def test_feedback_write_uses_events_without_player_relation(monkeypatch, tmp_pat
     assert properties["event_type"] == {"select": {"name": "question_skipped"}}
     assert "player" not in properties
     assert "email" not in properties
+
+
+def test_question_set_submission_writes_anonymous_bundle_json(
+    monkeypatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(notion_module, "Client", FakeClient)
+    repository = NotionRepository(token="test", manifest_path=_manifest(tmp_path))
+    repository.record_question_set_submission(
+        {
+            "submission_id": "submission-1",
+            "participant_uuid": PARTICIPANT,
+            "participant_alias": "P-ABC123",
+            "campaign_slug": "questioning_commons",
+            "event_slug": "commons_inquiry",
+            "session_code": "commons_pilot_2026",
+            "question_set_id": "capacity_v1",
+            "schema_id": "questionnaire_v1",
+            "version": "v1",
+            "responses": [
+                {
+                    "question_id": "C3",
+                    "field_id": "current_needs",
+                    "question_type": "textarea",
+                    "value": "A shared dataset.",
+                }
+            ],
+            "submitted_at": "2026-07-24T12:00:00+00:00",
+        }
+    )
+
+    properties = FakeClient.instance.created[0]["properties"]  # type: ignore[union-attr]
+    assert properties["text_id"]["rich_text"][0]["text"]["content"] == "capacity_v1"
+    assert properties["question_id"]["rich_text"][0]["text"]["content"] == "capacity_v1"
+    serialized = "".join(
+        item["text"]["content"] for item in properties["value_json"]["rich_text"]
+    )
+    assert json.loads(serialized)["responses"][0]["question_id"] == "C3"
+    assert "email" not in serialized
+    assert "player" not in properties

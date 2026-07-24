@@ -15,7 +15,12 @@ DEFAULT_NOTION_VERSION = "2025-09-03"
 
 
 def _text(content: str) -> list[dict[str, Any]]:
-    return [{"type": "text", "text": {"content": content[:2000]}}]
+    value = str(content)
+    chunks = [value[index : index + 2000] for index in range(0, len(value), 2000)]
+    return [
+        {"type": "text", "text": {"content": chunk}}
+        for chunk in (chunks or [""])
+    ]
 
 
 def _rich(properties: dict[str, Any], name: str) -> str:
@@ -57,6 +62,125 @@ class NotionRepository:
         }
         self._session_page_id = str(manifest["seed_session"]["page_id"])
         self._client = Client(auth=token, notion_version=notion_version)
+
+    @staticmethod
+    def _question_set_submission_from_page(
+        page: dict[str, Any],
+    ) -> dict[str, Any]:
+        properties = page.get("properties") or {}
+        raw = _rich(properties, "value_json")
+        try:
+            submission = json.loads(raw) if raw else {}
+        except json.JSONDecodeError:
+            submission = {}
+        submission["_page_id"] = str(page.get("id") or "")
+        return submission
+
+    def record_question_set_submission(
+        self, submission: dict[str, Any]
+    ) -> dict[str, Any]:
+        participant_uuid = str(submission["participant_uuid"])
+        question_set_id = str(submission["question_set_id"])
+        version = str(submission["version"])
+        pages = self._query_all(
+            "responses",
+            filter_={
+                "and": [
+                    {
+                        "property": "participant_uuid",
+                        "rich_text": {"equals": participant_uuid},
+                    },
+                    {
+                        "property": "text_id",
+                        "rich_text": {"equals": question_set_id},
+                    },
+                    {
+                        "property": "protocol_version",
+                        "rich_text": {"equals": version},
+                    },
+                ]
+            },
+        )
+        existing = next(
+            (
+                page
+                for page in pages
+                if _rich(page.get("properties") or {}, "text_id")
+                == question_set_id
+                and _rich(page.get("properties") or {}, "participant_uuid")
+                == participant_uuid
+            ),
+            None,
+        )
+        if existing:
+            return self._question_set_submission_from_page(existing)
+
+        submission_json = json.dumps(
+            submission,
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+        created = self._client.pages.create(
+            parent={
+                "type": "data_source_id",
+                "data_source_id": self._sources["responses"],
+            },
+            properties={
+                "Name": {
+                    "title": _text(
+                        f"{question_set_id} {submission['participant_alias']}"
+                    )
+                },
+                "session": _relation(self._session_page_id),
+                "participant_uuid": {"rich_text": _text(participant_uuid)},
+                "question_id": {"rich_text": _text(question_set_id)},
+                "item_id": {
+                    "rich_text": _text(str(submission["submission_id"]))
+                },
+                "response_value": {"rich_text": _text(question_set_id)},
+                "value_label": {
+                    "rich_text": _text(
+                        f"{len(submission.get('responses') or [])} responses"
+                    )
+                },
+                "value_json": {"rich_text": _text(submission_json)},
+                "question_type": {"select": {"name": "other"}},
+                "text_id": {"rich_text": _text(question_set_id)},
+                "device_id": {"rich_text": _text(participant_uuid)},
+                "submitted_at": {
+                    "date": {"start": str(submission["submitted_at"])}
+                },
+                "created_at": {
+                    "date": {"start": str(submission["submitted_at"])}
+                },
+                "protocol_version": {"rich_text": _text(version)},
+                "revision": {"number": 1},
+            },
+        )
+        result = dict(submission)
+        result["_page_id"] = str(created["id"])
+        return result
+
+    def list_question_set_submissions(
+        self, question_set_id: str
+    ) -> list[dict[str, Any]]:
+        pages = self._query_all(
+            "responses",
+            filter_={
+                "property": "text_id",
+                "rich_text": {"equals": question_set_id},
+            },
+        )
+        submissions = [
+            self._question_set_submission_from_page(page)
+            for page in pages
+            if _rich(page.get("properties") or {}, "text_id") == question_set_id
+            and _rich(page.get("properties") or {}, "value_json")
+        ]
+        return sorted(
+            submissions,
+            key=lambda row: str(row.get("submitted_at", "")),
+        )
 
     @staticmethod
     def _feedback_from_page(page: dict[str, Any]) -> dict[str, Any]:
@@ -173,7 +297,17 @@ class NotionRepository:
             "responses",
             filter_=self._strategy_filter(participant_uuid, scenario_id, protocol_version),
         )
-        page = next(iter(pages), None)
+        page = next(
+            (
+                candidate
+                for candidate in pages
+                if _rich(
+                    candidate.get("properties") or {},
+                    "strategic_profile_json",
+                )
+            ),
+            None,
+        )
         return self._strategy_from_page(page) if page else None
 
     def integrate_strategic_profile(self, profile: dict[str, Any]) -> dict[str, Any]:
@@ -226,7 +360,11 @@ class NotionRepository:
             "responses",
             filter_={"property": "session", "relation": {"contains": self._session_page_id}},
         )
-        profiles = [self._strategy_from_page(page) for page in pages]
+        profiles = [
+            self._strategy_from_page(page)
+            for page in pages
+            if _rich(page.get("properties") or {}, "strategic_profile_json")
+        ]
         return sorted(profiles, key=lambda row: str(row.get("integrated_at", "")))
 
     @staticmethod
@@ -234,6 +372,7 @@ class NotionRepository:
         properties = page.get("properties") or {}
         return {
             "participant_uuid": _rich(properties, "participant_uuid"),
+            "name": _rich(properties, "nickname") or None,
             "email": _email(properties),
             "coordination_opt_in": bool(
                 (properties.get("coordination_opt_in") or {}).get("checkbox")
@@ -270,13 +409,16 @@ class NotionRepository:
         email: str | None,
         consent_version: str,
         consented_at: str,
+        name: str | None = None,
     ) -> dict[str, Any]:
         normalized_email = (email or "").strip() or None
+        normalized_name = (name or "").strip() or None
         status = "reachable_interest" if normalized_email else "anonymous_interest"
         properties: dict[str, Any] = {
             "Name": {"title": _text(f"Coordination {participant_uuid[:8]}")},
             "session": _relation(self._session_page_id),
             "participant_uuid": {"rich_text": _text(participant_uuid)},
+            "nickname": {"rich_text": _text(normalized_name or "")},
             "coordination_opt_in": {"checkbox": True},
             "coordination_status": {"select": {"name": status}},
             "coordination_consent_version": {"rich_text": _text(consent_version)},

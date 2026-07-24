@@ -1,0 +1,115 @@
+id: capacity
+title: Capacity
+summary: Resources, needs, contributions, time horizon and coordination.
+description: |
+    Reveal what the ecosystem needs, what it can mobilise,
+    and where new collaborations could emerge.
+metadata:
+    campaign_slug: questioning_commons
+    event_slug: commons_inquiry
+    session_code: commons_pilot_2026
+    question_set_id: capacity_v1
+    schema_id: questionnaire_v1
+    version: v1
+    order: 20
+
+questions:
+    - id: C1
+      field: network_utility
+      type: multiselect
+      group: Needs
+      required: false
+      title: What would make this network immediately useful for your work?
+      context: >
+          Coordination begins by understanding what participants hope to gain.
+      options:
+          - Find collaborators
+          - Connect stakeholders
+          - Discover tools
+          - Access data
+          - Compare approaches
+          - Increase visibility
+          - Find funding
+          - Share experience
+          - Build partnerships
+          - Other
+      allow_other: true
+
+    - id: C2
+      field: relevant_domains
+      type: multiselect
+      group: Resources
+      required: false
+      title: Which domains are most relevant to your work?
+      context: >
+          These describe the domains where you currently contribute.
+      options:
+          - Knowledge infrastructure
+          - Data governance
+          - AI systems
+          - Community governance
+          - Policy
+          - Open technology
+          - Education
+          - Research
+          - Other
+      allow_other: true
+
+    - id: C3
+      field: current_needs
+      type: textarea
+      group: Needs
+      required: false
+      title: What do you currently need to move your work forward?
+      placeholder: >
+          Funding, technical expertise, infrastructure,
+          partner introductions, datasets, coordination...
+
+    - id: C4
+      field: time_horizon
+      type: single_choice
+      group: Time horizon
+      required: false
+      title: Which time horizon matters most?
+      options:
+          - Next week
+          - Next month
+          - Next 3 months
+          - Next season
+          - Next year
+          - Next 3 years
+          - Not sure
+          - Other
+
+    - id: C5
+      field: current_contribution
+      type: textarea
+      group: Contributions
+      required: false
+      title: What could you contribute today?
+      placeholder: >
+          One capacity, connection, dataset, method,
+          initiative or question.
+
+    - id: C6
+      field: network_improvement
+      type: textarea
+      group: Coordination
+      required: false
+      title: What single improvement would make this network substantially more useful?
+      placeholder: >
+          Think about coordination, visibility,
+          knowledge sharing or collaboration.
+
+    - id: C7
+      field: coordination_contact
+      type: contact
+      group: Coordination
+      required: false
+      title: Stay connected (optional)
+      context: >
+          Leave your name or username and email if
+          you would like to hear about future collaborations.
+      fields:
+          - Name or username
+          - Email
