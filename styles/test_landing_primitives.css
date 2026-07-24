@@ -1,0 +1,267 @@
+:root {
+  --primitive-ink: #10110f;
+  --primitive-paper: #f4f1e8;
+  --primitive-acid: #c9fa1a;
+  --primitive-ring: rgba(16, 17, 15, .22);
+}
+
+.st-key-primitive-landing-canvas {
+  min-height: calc(100svh - 4rem);
+  overflow: hidden;
+  padding: clamp(1.25rem, 4vw, 4rem);
+  border: 1px solid rgba(16, 17, 15, .12);
+  border-radius: 1.25rem;
+  background: var(--primitive-paper);
+  color: var(--primitive-ink);
+}
+
+.st-key-primitive-landing-canvas > div[data-testid="stVerticalBlock"] {
+  gap: clamp(2.5rem, 7vh, 7rem);
+}
+
+.st-key-primitive-brand {
+  color: var(--primitive-ink);
+  font-family: "DM Mono", monospace;
+  letter-spacing: -.04em;
+  text-transform: uppercase;
+}
+
+.st-key-primitive-brand p {
+  color: inherit;
+  font-size: .78rem;
+  font-weight: 500;
+}
+
+.st-key-primitive-about-action button,
+.st-key-primitive-explore-action a {
+  min-height: auto;
+  padding: .25rem;
+  border: 0;
+  background: transparent;
+  color: var(--primitive-ink);
+  box-shadow: none;
+  font-family: "DM Mono", monospace;
+  font-size: .78rem;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.st-key-primitive-hero-copy {
+  max-width: 39rem;
+  color: var(--primitive-ink);
+}
+
+.st-key-primitive-hero-copy h1 {
+  margin: 0;
+  color: var(--primitive-ink);
+  font-family: "Manrope", sans-serif;
+  font-size: clamp(3.8rem, 7vw, 7rem);
+  font-weight: 600;
+  letter-spacing: -.075em;
+  line-height: .78;
+}
+
+.st-key-primitive-hero-copy p {
+  max-width: 24rem;
+  margin-top: clamp(2.5rem, 6vh, 4.5rem);
+  color: var(--primitive-ink);
+  font-family: "Manrope", sans-serif;
+  font-size: clamp(1rem, 1.5vw, 1.35rem);
+  font-weight: 600;
+  line-height: 1.55;
+}
+
+.st-key-primitive-enter-action {
+  max-width: 24rem;
+  margin-top: clamp(2rem, 5vh, 4rem);
+}
+
+.st-key-primitive-enter-action a {
+  min-height: 3.6rem;
+  padding: .8rem 1.6rem;
+  justify-content: space-between;
+  border: 0;
+  border-radius: 999px;
+  background: var(--primitive-acid);
+  color: var(--primitive-ink);
+  box-shadow: none;
+  font-family: "DM Mono", monospace;
+  font-weight: 600;
+}
+
+.st-key-primitive-orbit-stage {
+  min-height: clamp(24rem, 48vw, 43rem);
+  display: grid;
+  place-items: center;
+}
+
+.st-key-primitive-orbit-stage > div[data-testid="stVerticalBlock"] {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+}
+
+.st-key-primitive-orbit-outer,
+.st-key-primitive-orbit-middle,
+.st-key-primitive-orbit-inner {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  border: 1px dashed var(--primitive-ring);
+  border-radius: 50%;
+}
+
+.st-key-primitive-orbit-outer {
+  width: min(100%, 42rem);
+}
+
+.st-key-primitive-orbit-middle {
+  width: 72%;
+}
+
+.st-key-primitive-orbit-inner {
+  width: 58%;
+}
+
+.st-key-primitive-orbit-outer > div[data-testid="stVerticalBlock"],
+.st-key-primitive-orbit-middle > div[data-testid="stVerticalBlock"],
+.st-key-primitive-orbit-inner > div[data-testid="stVerticalBlock"] {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  display: grid;
+  place-items: center;
+  gap: 0;
+}
+
+.st-key-primitive-dot-outer-top,
+.st-key-primitive-dot-outer-left,
+.st-key-primitive-dot-outer-right,
+.st-key-primitive-dot-middle-top,
+.st-key-primitive-dot-middle-left,
+.st-key-primitive-dot-inner-left,
+.st-key-primitive-dot-inner-right {
+  width: auto;
+  position: absolute;
+  z-index: 3;
+  transform: translate(-50%, -50%);
+}
+
+.st-key-primitive-dot-outer-top {
+  left: 50%;
+  top: 0;
+}
+
+.st-key-primitive-dot-outer-left {
+  left: 6%;
+  top: 72%;
+}
+
+.st-key-primitive-dot-outer-right {
+  left: 84%;
+  top: 90%;
+}
+
+.st-key-primitive-dot-middle-top {
+  left: 50%;
+  top: 0;
+}
+
+.st-key-primitive-dot-middle-left {
+  left: 4%;
+  top: 50%;
+}
+
+.st-key-primitive-dot-inner-left {
+  left: 0;
+  top: 50%;
+}
+
+.st-key-primitive-dot-inner-right {
+  left: 100%;
+  top: 50%;
+}
+
+.st-key-primitive-dot-outer-top p,
+.st-key-primitive-dot-outer-left p,
+.st-key-primitive-dot-outer-right p,
+.st-key-primitive-dot-middle-top p,
+.st-key-primitive-dot-middle-left p,
+.st-key-primitive-dot-inner-left p,
+.st-key-primitive-dot-inner-right p,
+.st-key-primitive-orbit-center p {
+  margin: 0;
+  color: var(--primitive-ink);
+  line-height: 1;
+}
+
+.st-key-primitive-dot-outer-top p {
+  font-size: .45rem;
+}
+
+.st-key-primitive-dot-outer-left p {
+  font-size: 1.45rem;
+}
+
+.st-key-primitive-dot-outer-right p {
+  font-size: 1.6rem;
+}
+
+.st-key-primitive-dot-middle-top p {
+  font-size: 1.15rem;
+}
+
+.st-key-primitive-dot-middle-left p,
+.st-key-primitive-dot-inner-left p,
+.st-key-primitive-dot-inner-right p {
+  font-size: .55rem;
+}
+
+.st-key-primitive-orbit-center p {
+  font-size: 2rem;
+}
+
+.st-key-primitive-about-panel {
+  max-width: 48rem;
+  padding: 1.5rem;
+  border-top: 1px solid var(--primitive-ring);
+  color: var(--primitive-ink);
+}
+
+.st-key-primitive-about-panel h3 {
+  margin: 0 0 .75rem;
+  font-size: 1.4rem;
+}
+
+.st-key-primitive-about-panel p {
+  margin: 0;
+  line-height: 1.65;
+}
+
+@media (max-width: 700px) {
+  .st-key-primitive-landing-canvas {
+    padding: 1rem;
+  }
+
+  .st-key-primitive-landing-canvas > div[data-testid="stVerticalBlock"] {
+    gap: 2.5rem;
+  }
+
+  .st-key-primitive-hero-copy h1 {
+    font-size: clamp(3.8rem, 18vw, 5.4rem);
+  }
+
+  .st-key-primitive-orbit-stage {
+    min-height: min(90vw, 34rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .st-key-primitive-enter-action a,
+  .st-key-primitive-about-action button,
+  .st-key-primitive-explore-action a {
+    transition: none;
+  }
+}

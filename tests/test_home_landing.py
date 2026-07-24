@@ -1,0 +1,43 @@
+from pathlib import Path
+
+
+HOME_VIEW = Path(__file__).parent.parent / "views" / "home_redirect.py"
+
+
+def test_home_uses_a_living_network_instead_of_a_centralized_orbit() -> None:
+    source = HOME_VIEW.read_text(encoding="utf-8")
+
+    assert 'class="living-network"' in source
+    assert 'class="commons-core">[[ commons ]]' in source
+    assert "Array.from({ length: 34 }" in source
+    assert "worldPosition" in source
+    assert "rotate3d" in source
+    assert "context.ellipse" in source
+    assert "unsafe_allow_javascript=True" in source
+    assert 'class="orbit-plane ' not in source
+    assert 'class="orbit-dot"' not in source
+
+
+def test_home_network_connections_are_temporary_and_not_only_proximity_based() -> None:
+    source = HOME_VIEW.read_text(encoding="utf-8")
+
+    assert "const proximity =" in source
+    assert "const affinityBridge =" in source
+    assert "quadraticCurveTo" in source
+    assert "target > current ? .07 : .018" in source
+    assert 'matchMedia("(prefers-reduced-motion: reduce)")' in source
+    assert "if (reducedMotion.matches) draw(38)" in source
+
+
+def test_home_explains_the_simulation_below_the_primary_action() -> None:
+    source = HOME_VIEW.read_text(encoding="utf-8")
+    button_position = source.index('class="landing-enter"')
+    principles_position = source.index('class="landing-principles"')
+
+    assert principles_position > button_position
+    assert "<h3>Many actors</h3>" in source
+    assert "<h3>Connected choices</h3>" in source
+    assert "<h3>Evolving futures</h3>" in source
+    assert "Diverse voices<br>shape the system." in source
+    assert "Actions influence<br>what comes next." in source
+    assert "No fixed path.<br>Multiple possibilities." in source
