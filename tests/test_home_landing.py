@@ -2,6 +2,19 @@ from pathlib import Path
 
 
 HOME_VIEW = Path(__file__).parent.parent / "views" / "home_redirect.py"
+APP_ENTRY = Path(__file__).parent.parent / "app.py"
+
+
+def test_application_root_renders_home_without_redirecting_to_commons() -> None:
+    app_source = APP_ENTRY.read_text(encoding="utf-8")
+    home_source = HOME_VIEW.read_text(encoding="utf-8")
+
+    home_page_registration = app_source.index('"views/home_redirect.py"')
+    default_registration = app_source.index("default=True", home_page_registration)
+
+    assert default_registration > home_page_registration
+    assert "st.switch_page" not in home_source
+    assert 'class="landing-shell"' in home_source
 
 
 def test_home_uses_a_living_network_instead_of_a_centralized_orbit() -> None:
