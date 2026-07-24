@@ -9,6 +9,7 @@ ROOT = Path(__file__).parent.parent
 CAPACITY_PATH = ROOT / "protocol" / "specs" / "capacity_v1.yaml"
 STRATEGY_PATH = ROOT / "protocol" / "specs" / "strategy_v1.yaml"
 APP_ENTRY = ROOT / "app.py"
+COMMONS_VIEW = ROOT / "views" / "commons.py"
 CAPACITY_VIEW = ROOT / "views" / "capacity.py"
 STRATEGY_VIEW = ROOT / "views" / "strategy.py"
 TRACK_UI = ROOT / "track_ui.py"
@@ -110,10 +111,14 @@ def test_strategy_track_resolves_only_declared_runtime_nodes() -> None:
 
 def test_capacity_and_strategy_are_additive_navigation_tracks() -> None:
     app_source = APP_ENTRY.read_text(encoding="utf-8")
+    commons_source = COMMONS_VIEW.read_text(encoding="utf-8")
     capacity_source = CAPACITY_VIEW.read_text(encoding="utf-8")
     strategy_source = STRATEGY_VIEW.read_text(encoding="utf-8")
 
     assert '"views/commons.py"' in app_source
+    assert '"identity_v1.yaml"' in commons_source
+    assert '"views/capacity.py"' in commons_source
+    assert "test_smokegun.py" not in commons_source
     assert '"views/capacity.py"' in app_source
     assert 'url_path="capacity"' in app_source
     assert '"views/strategy.py"' in app_source

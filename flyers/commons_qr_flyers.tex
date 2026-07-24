@@ -1,0 +1,582 @@
+% !TEX TS-program = xelatex
+% Ten editable A6 flyer variants for the Commons Simulator.
+% Build from this directory:
+%   make
+
+\documentclass[10pt]{article}
+
+\usepackage[
+  paperwidth=105mm,
+  paperheight=148mm,
+  margin=0mm,
+  noheadfoot
+]{geometry}
+\usepackage{fontspec}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usepackage{xcolor}
+\usepackage{ragged2e}
+\usetikzlibrary{calc,decorations.pathmorphing}
+\graphicspath{{../qrs/}{qrs/}}
+
+\defaultfontfeatures{Ligatures=TeX}
+\setmainfont{Avenir Next}
+\setsansfont{Avenir Next}
+\setmonofont{Andale Mono}
+
+\definecolor{Ink}{HTML}{101311}
+\definecolor{Paper}{HTML}{F4F1E9}
+\definecolor{PaperCool}{HTML}{F5F5F2}
+\definecolor{Mint}{HTML}{E2F0EA}
+\definecolor{Kraft}{HTML}{CBA977}
+\definecolor{KraftInk}{HTML}{16130E}
+\definecolor{Night}{HTML}{080B09}
+\definecolor{Forest}{HTML}{07130F}
+\definecolor{Lime}{HTML}{C9F500}
+\definecolor{AcidWash}{HTML}{F2FFB8}
+\definecolor{Signal}{HTML}{78CBB6}
+\definecolor{Muted}{HTML}{73756F}
+
+\pagestyle{empty}
+\setlength{\parindent}{0pt}
+
+% ---------------------------------------------------------------------------
+% EDIT COPY AND ROUTE SETTINGS HERE
+% ---------------------------------------------------------------------------
+\newcommand{\QRfile}{ph_commons.png}
+\newcommand{\RoutePath}{/commons}
+\newcommand{\ModuleName}{COMMONS}
+\newcommand{\ProtocolFooter}{EXPERIMENTAL PROTOCOL}
+\newcommand{\PrototypeFooter}{prototype · wikimania 2026}
+
+\newcommand{\CopyOneHeadline}{SMALL MOVE.\\LARGE\\IMPACT.\\HOW?}
+\newcommand{\CopyOneCTA}{HACK THE PROTOCOL}
+
+\newcommand{\CopyTwoHeadline}{WHAT’S YOUR\\FIRST MOVE?}
+\newcommand{\CopyTwoCTA}{PLAY YOUR POSITION}
+
+\newcommand{\CopyThreeHeadline}{\textcolor{Lime}{DEFEND}\\THE\\COMMONS.\\TOGETHER.}
+\newcommand{\CopyThreeCTA}{MAKE YOUR FIRST MOVE}
+
+\newcommand{\CopyFourHeadline}{ONE SITUATION.\\ONE MOVE.\\MANY FUTURES.}
+\newcommand{\CopyFourCTA}{ENTER THE SIMULATION}
+
+\newcommand{\CopyFiveHeadline}{YOU’RE PART OF\\THE SYSTEM.\\HELP SHAPE IT.}
+\newcommand{\CopyFiveCTA}{OPEN THE COMMONS MAP}
+
+\newcommand{\CopySixHeadline}{\textcolor{Lime}{OFFENSIVE}\\COMMONS.\\TOGETHER.}
+\newcommand{\CopySixCTA}{CHOOSE ONE MOVE.}
+\newcommand{\CopySixOutcome}{Reveal the collective strategy.}
+
+\newcommand{\CopySevenHeadline}{SMALL DECISIONS\\SHAPE BIG SYSTEMS.}
+\newcommand{\CopySevenCTA}{SEE THE COLLECTIVE MAP}
+
+\newcommand{\CopyEightHeadline}{EXPLORE. DECIDE.\\STRENGTHEN}
+\newcommand{\CopyEightHighlight}{THE COMMONS.}
+\newcommand{\CopyEightCTA}{ENTER THE SIMULATION}
+
+\newcommand{\CopyNineHeadline}{OFFENSIVE\\\textcolor{Lime}{COMMONS.}\\TOGETHER.}
+\newcommand{\CopyNineCTA}{REVEAL THE COMMONS MAP}
+\newcommand{\CopyNineOutcome}{See how individual moves form a strategy.}
+
+\newcommand{\CopyTenHeadline}{A BETTER INTERNET\\STARTS WITH}
+\newcommand{\CopyTenHighlight}{COLLECTIVE CHOICES.}
+\newcommand{\CopyTenCTA}{DISCOVER THE EXPERIMENT}
+% ---------------------------------------------------------------------------
+
+\newcommand{\UseIntroRoute}{%
+  \renewcommand{\QRfile}{protohackapp.png}%
+  \renewcommand{\RoutePath}{/intro}%
+  \renewcommand{\ModuleName}{INTRO}%
+}
+
+\newcommand{\UseCommonsRoute}{%
+  \renewcommand{\QRfile}{ph_commons.png}%
+  \renewcommand{\RoutePath}{/commons}%
+  \renewcommand{\ModuleName}{ROUTING}%
+}
+
+\newcommand{\UseMappingRoute}{%
+  \renewcommand{\QRfile}{ph_mapping.png}%
+  \renewcommand{\RoutePath}{/mapping}%
+  \renewcommand{\ModuleName}{ROUTING}%
+}
+
+\newcommand{\CardBackground}[1]{%
+  \fill[#1] (current page.south west) rectangle (current page.north east);
+}
+
+\newcommand{\QR}[2]{%
+  \node[inner sep=0pt] at (#1) {\includegraphics[width=#2]{\QRfile}};
+}
+
+\newcommand{\RouteBadge}[2]{%
+  \node[
+    anchor=south east,
+    draw=#1!55!#2,
+    fill=#2,
+    line width=.45pt,
+    rounded corners=1.2pt,
+    inner xsep=2mm,
+    inner ysep=1.2mm,
+    font=\ttfamily\fontsize{9}{10.5}\selectfont,
+    text=#1
+  ] at ([xshift=-10mm,yshift=31.5mm]current page.south east)
+    {\ModuleName\enspace\RoutePath};
+}
+
+\newcommand{\FooterLabel}[3]{%
+  \node[
+    anchor=south west,
+    font=\ttfamily\fontsize{8.5}{10}\selectfont,
+    text=#3
+  ] at ([xshift=10mm,yshift=7mm]current page.south west) {#1};
+  \node[
+    anchor=south east,
+    font=\ttfamily\fontsize{6.2}{7.5}\selectfont,
+    text=#3!58
+  ] at ([xshift=-10mm,yshift=7.5mm]current page.south east) {#2};
+}
+
+\newcommand{\BeginCard}{%
+  \thispagestyle{empty}%
+  \begin{tikzpicture}[remember picture,overlay]
+}
+\newcommand{\EndCard}{%
+  \end{tikzpicture}%
+  \null\newpage
+}
+
+\begin{document}
+
+% 01 - Warm paper / bold invitation
+\BeginCard
+\UseIntroRoute
+\CardBackground{Paper}
+\fill[Lime] (current page.north west)
+rectangle ([xshift=2.2mm]current page.south west);
+
+\node[
+  anchor=north west,
+  align=left,
+  text width=84mm,
+  font=\sffamily\bfseries\fontsize{29}{29}\selectfont,
+  text=Ink
+] at ([xshift=10mm,yshift=-10mm]current page.north west)
+{\CopyOneHeadline};
+
+\node[
+  anchor=south west,
+  font=\ttfamily\fontsize{15.5}{17.5}\selectfont,
+  text=Ink
+] at ([xshift=10mm,yshift=21mm]current page.south west)
+{→ \CopyOneCTA};
+
+\node[
+  draw=Lime,
+  line width=.8pt,
+  rounded corners=3mm,
+  fill=white,
+  inner sep=3mm
+] (oneqr) at ([yshift=-7mm]current page.center)
+{\includegraphics[width=48mm]{\QRfile}};
+
+\RouteBadge{Ink}{Paper}
+\FooterLabel{\ProtocolFooter}{01 · \PrototypeFooter}{Ink}
+\EndCard
+
+% 02 - First move / open brackets
+\BeginCard
+\UseCommonsRoute
+\CardBackground{PaperCool}
+\node[
+  anchor=north west,
+  align=left,
+  text width=84mm,
+  font=\sffamily\bfseries\fontsize{30}{31}\selectfont,
+  text=Ink
+] at ([xshift=10mm,yshift=-10mm]current page.north west)
+{\CopyTwoHeadline};
+
+\coordinate (twoqr) at ([yshift=-9mm]current page.center);
+\QR{twoqr}{48mm}
+\draw[Ink,line width=.75pt]
+($(twoqr)+(-29mm,29mm)$) -- ++(9mm,0)
+($(twoqr)+(-29mm,29mm)$) -- ++(0,-9mm)
+($(twoqr)+(29mm,29mm)$) -- ++(-9mm,0)
+($(twoqr)+(29mm,29mm)$) -- ++(0,-9mm)
+($(twoqr)+(-29mm,-29mm)$) -- ++(9mm,0)
+($(twoqr)+(-29mm,-29mm)$) -- ++(0,9mm)
+($(twoqr)+(29mm,-29mm)$) -- ++(-9mm,0)
+($(twoqr)+(29mm,-29mm)$) -- ++(0,9mm);
+
+\node[
+  anchor=south west,
+  font=\ttfamily\fontsize{15.5}{17.5}\selectfont,
+  text=Ink
+] at ([xshift=10mm,yshift=21mm]current page.south west)
+{→ \CopyTwoCTA};
+\RouteBadge{Ink}{PaperCool}
+\FooterLabel{\ProtocolFooter}{02 · \PrototypeFooter}{Ink}
+\EndCard
+
+% 03 - Black / DEFEND prototype
+\BeginCard
+\UseCommonsRoute
+\CardBackground{Night}
+\shade[
+  inner color=Forest!75!Night,
+  outer color=Night
+] ([yshift=-16mm]current page.center) circle [radius=55mm];
+
+\node[
+  anchor=north west,
+  align=left,
+  text width=86mm,
+  font=\sffamily\bfseries\fontsize{31}{31}\selectfont,
+  text=Paper
+] at ([xshift=10mm,yshift=-9mm]current page.north west)
+{\CopyThreeHeadline};
+
+\coordinate (threeqr) at ([yshift=-9mm]current page.center);
+\node[
+  fill=white,
+  draw=Lime,
+  line width=.65pt,
+  inner sep=2.5mm
+] at (threeqr) {\includegraphics[width=46mm]{\QRfile}};
+\draw[Lime!72,line width=.35pt]
+($(threeqr)+(-28mm,-28mm)$) rectangle ($(threeqr)+(28mm,28mm)$);
+
+\node[
+  anchor=south west,
+  font=\ttfamily\fontsize{15.5}{17.5}\selectfont,
+  text=Lime
+] at ([xshift=10mm,yshift=21mm]current page.south west)
+{→ \CopyThreeCTA};
+\RouteBadge{Paper}{Night}
+\FooterLabel{\ProtocolFooter}{03 · \PrototypeFooter}{Paper}
+\EndCard
+
+% 04 - One situation / clear sequence
+\BeginCard
+\UseCommonsRoute
+\CardBackground{Paper}
+\draw[Ink!13,line width=.35pt]
+([xshift=10mm,yshift=-10mm]current page.north west)
+rectangle ([xshift=-10mm,yshift=10mm]current page.south east);
+
+\node[
+  anchor=north west,
+  align=left,
+  text width=84mm,
+  font=\sffamily\bfseries\fontsize{21}{23}\selectfont,
+  text=Ink
+] at ([xshift=10mm,yshift=-10mm]current page.north west)
+{\CopyFourHeadline};
+
+\QR{[yshift=-8mm]current page.center}{50mm}
+
+\node[
+  anchor=south west,
+  fill=Lime,
+  inner xsep=2mm,
+  inner ysep=1.2mm,
+  font=\ttfamily\fontsize{15.5}{17.5}\selectfont,
+  text=Ink
+] at ([xshift=10mm,yshift=20mm]current page.south west)
+{→ \CopyFourCTA};
+\RouteBadge{Ink}{Paper}
+\FooterLabel{\ProtocolFooter}{04 · \PrototypeFooter}{Ink}
+\EndCard
+
+% 05 - Mint / hand-drawn commons
+\BeginCard
+\UseMappingRoute
+\CardBackground{Mint}
+\shade[
+  inner color=white,
+  outer color=Mint,
+  opacity=.48
+] ([yshift=-5mm]current page.center) circle [radius=57mm];
+
+\node[
+  anchor=north,
+  align=center,
+  text width=88mm,
+  font=\sffamily\bfseries\fontsize{20}{22}\selectfont,
+  text=Ink
+] at ([yshift=-10mm]current page.north)
+{\CopyFiveHeadline};
+\draw[Ink,line width=.55pt]
+([xshift=-32mm,yshift=-42mm]current page.north)
+-- ([xshift=32mm,yshift=-42mm]current page.north);
+
+\coordinate (fiveqr) at ([yshift=-8mm]current page.center);
+\QR{fiveqr}{44mm}
+\draw[
+  Ink!82,
+  line width=.55pt,
+  decorate,
+  decoration={random steps,segment length=4mm,amplitude=.45mm}
+] (fiveqr) ellipse [x radius=31mm,y radius=29mm];
+\draw[
+  Ink!63,
+  line width=.42pt,
+  rotate around={8:(fiveqr)},
+  decorate,
+  decoration={random steps,segment length=5mm,amplitude=.35mm}
+] (fiveqr) ellipse [x radius=34mm,y radius=27mm];
+\fill[Ink] ($(fiveqr)+(-32mm,22mm)$) circle [radius=.75mm];
+
+\node[
+  anchor=south west,
+  font=\ttfamily\fontsize{15.5}{17.5}\selectfont,
+  text=Ink
+] at ([xshift=10mm,yshift=20mm]current page.south west)
+{→ \CopyFiveCTA};
+\RouteBadge{Ink}{Mint}
+\FooterLabel{\ProtocolFooter}{05 · \PrototypeFooter}{Ink}
+\EndCard
+
+% 06 - Black / OFFENSIVE COMMONS prototype
+\BeginCard
+\UseCommonsRoute
+\CardBackground{Night}
+\shade[
+  inner color=Forest!78!Night,
+  outer color=Night
+] ([yshift=-11mm]current page.center) circle [radius=54mm];
+
+\node[
+  anchor=north west,
+  align=left,
+  text width=87mm,
+  font=\sffamily\bfseries\fontsize{34}{33}\selectfont,
+  text=Paper
+] at ([xshift=9mm,yshift=-9mm]current page.north west)
+{\CopySixHeadline};
+
+\coordinate (sixqr) at ([yshift=-8mm]current page.center);
+\node[fill=white,inner sep=0pt] at (sixqr)
+{\includegraphics[width=48mm]{\QRfile}};
+\draw[Lime,line width=.6pt]
+($(sixqr)+(-29mm,29mm)$) -- ++(9mm,0)
+($(sixqr)+(-29mm,29mm)$) -- ++(0,-9mm)
+($(sixqr)+(29mm,29mm)$) -- ++(-9mm,0)
+($(sixqr)+(29mm,29mm)$) -- ++(0,-9mm)
+($(sixqr)+(-29mm,-29mm)$) -- ++(9mm,0)
+($(sixqr)+(-29mm,-29mm)$) -- ++(0,9mm)
+($(sixqr)+(29mm,-29mm)$) -- ++(-9mm,0)
+($(sixqr)+(29mm,-29mm)$) -- ++(0,9mm);
+
+\node[
+  anchor=south west,
+  font=\ttfamily\fontsize{15.5}{17.5}\selectfont,
+  text=Lime
+] at ([xshift=10mm,yshift=24mm]current page.south west)
+{→ \CopySixCTA};
+\node[
+  anchor=south west,
+  font=\ttfamily\fontsize{8.5}{10.5}\selectfont,
+  text=Paper
+] at ([xshift=10mm,yshift=17mm]current page.south west)
+{\CopySixOutcome};
+\RouteBadge{Paper}{Night}
+\FooterLabel{\ProtocolFooter}{06 · \PrototypeFooter}{Paper}
+\EndCard
+
+% 07 - Kraft / tactile and grounded
+\BeginCard
+\UseMappingRoute
+\CardBackground{Kraft}
+\foreach \y in {5,10,...,145}{
+    \draw[KraftInk!5!Kraft,line width=.16pt]
+    ([xshift=0mm,yshift=\y mm]current page.south west)
+    -- ([xshift=105mm,yshift=\y mm]current page.south west);
+  }
+\foreach \x/\y in {
+    8/132,17/116,91/126,76/107,15/83,88/78,27/62,72/51,11/34,94/25,
+    48/139,59/121,38/99,65/89,46/72,54/39,34/19,69/14
+  }{
+    \fill[KraftInk!14!Kraft]
+    ([xshift=\x mm,yshift=\y mm]current page.south west)
+    circle [radius=.35mm];
+  }
+
+\node[
+  anchor=north west,
+  align=left,
+  text width=84mm,
+  font=\sffamily\bfseries\fontsize{22}{23}\selectfont,
+  text=KraftInk
+] at ([xshift=10mm,yshift=-11mm]current page.north west)
+{\CopySevenHeadline};
+
+\QR{[yshift=-8mm]current page.center}{50mm}
+\draw[KraftInk!70,line width=.55pt]
+([xshift=-31mm,yshift=-42mm]current page.north)
+-- ([xshift=31mm,yshift=-42mm]current page.north);
+
+\node[
+  anchor=south west,
+  font=\ttfamily\fontsize{15.5}{17.5}\selectfont,
+  text=KraftInk
+] at ([xshift=10mm,yshift=20mm]current page.south west)
+{→ \CopySevenCTA};
+\RouteBadge{KraftInk}{Kraft}
+\FooterLabel{\ProtocolFooter}{07 · \PrototypeFooter}{KraftInk}
+\EndCard
+
+% 08 - Editorial / highlighted commons
+\BeginCard
+\UseCommonsRoute
+\CardBackground{PaperCool}
+\node[
+  anchor=north west,
+  align=left,
+  text width=84mm,
+  font=\sffamily\bfseries\fontsize{22}{23}\selectfont,
+  text=Ink
+] at ([xshift=10mm,yshift=-10mm]current page.north west)
+{\CopyEightHeadline};
+
+\node[
+  anchor=north west,
+  fill=Lime,
+  inner xsep=1.5mm,
+  inner ysep=1mm,
+  font=\sffamily\bfseries\fontsize{22}{23}\selectfont,
+  text=Ink
+] at ([xshift=9mm,yshift=-39mm]current page.north west)
+{\CopyEightHighlight};
+
+\coordinate (eightqr) at ([yshift=-11mm]current page.center);
+\QR{eightqr}{48mm}
+\draw[Ink,line width=.6pt]
+($(eightqr)+(-29mm,29mm)$) -- ++(9mm,0)
+($(eightqr)+(-29mm,29mm)$) -- ++(0,-9mm)
+($(eightqr)+(29mm,29mm)$) -- ++(-9mm,0)
+($(eightqr)+(29mm,29mm)$) -- ++(0,-9mm)
+($(eightqr)+(-29mm,-29mm)$) -- ++(9mm,0)
+($(eightqr)+(-29mm,-29mm)$) -- ++(0,9mm)
+($(eightqr)+(29mm,-29mm)$) -- ++(-9mm,0)
+($(eightqr)+(29mm,-29mm)$) -- ++(0,9mm);
+
+\node[
+  anchor=south west,
+  font=\ttfamily\fontsize{15.5}{17.5}\selectfont,
+  text=Ink
+] at ([xshift=10mm,yshift=20mm]current page.south west)
+{→ \CopyEightCTA};
+\RouteBadge{Ink}{PaperCool}
+\FooterLabel{\ProtocolFooter}{08 · \PrototypeFooter}{Ink}
+\EndCard
+
+% 09 - Signature orbital / QR nucleus
+\BeginCard
+\UseMappingRoute
+\CardBackground{Night}
+
+\node[
+  anchor=north west,
+  align=left,
+  text width=88mm,
+  font=\sffamily\bfseries\fontsize{31}{30}\selectfont,
+  text=Paper
+] at ([xshift=8mm,yshift=-7mm]current page.north west)
+{\CopyNineHeadline};
+
+\coordinate (nineqr) at ([yshift=-5mm]current page.center);
+\draw[Lime!90,line width=.75pt]
+($(nineqr)+(-51mm,9mm)$)
+.. controls ($(nineqr)+(-39mm,46mm)$) and ($(nineqr)+(43mm,46mm)$)
+.. ($(nineqr)+(51mm,-8mm)$)
+.. controls ($(nineqr)+(31mm,-45mm)$) and ($(nineqr)+(-42mm,-44mm)$)
+.. cycle;
+\draw[Lime!62,line width=.55pt]
+($(nineqr)+(-48mm,29mm)$)
+.. controls ($(nineqr)+(5mm,50mm)$) and ($(nineqr)+(52mm,17mm)$)
+.. ($(nineqr)+(38mm,-33mm)$)
+.. controls ($(nineqr)+(-8mm,-49mm)$) and ($(nineqr)+(-53mm,-18mm)$)
+.. cycle;
+\draw[Lime!38,line width=.45pt]
+($(nineqr)+(-34mm,45mm)$)
+.. controls ($(nineqr)+(43mm,40mm)$) and ($(nineqr)+(54mm,-25mm)$)
+.. ($(nineqr)+(7mm,-48mm)$)
+.. controls ($(nineqr)+(-50mm,-37mm)$) and ($(nineqr)+(-55mm,21mm)$)
+.. cycle;
+
+\fill[Lime] ($(nineqr)+(-47mm,28mm)$) circle [radius=1.1mm];
+\fill[Lime] ($(nineqr)+(-31mm,-38mm)$) circle [radius=1.1mm];
+\fill[Lime] ($(nineqr)+(43mm,31mm)$) circle [radius=1.1mm];
+\fill[Lime] ($(nineqr)+(49mm,-24mm)$) circle [radius=1.1mm];
+\QR{nineqr}{46mm}
+
+\node[
+  anchor=south west,
+  fill=Night,
+  inner sep=1mm,
+  font=\ttfamily\fontsize{15.5}{17.5}\selectfont,
+  text=Lime
+] at ([xshift=9mm,yshift=24mm]current page.south west)
+{→ \CopyNineCTA};
+\node[
+  anchor=south west,
+  fill=Night,
+  inner sep=1mm,
+  font=\ttfamily\fontsize{8.5}{10.5}\selectfont,
+  text=Paper
+] at ([xshift=9mm,yshift=16mm]current page.south west)
+{\CopyNineOutcome};
+\RouteBadge{Paper}{Night}
+\FooterLabel{\ProtocolFooter}{09 · \PrototypeFooter}{Paper}
+\EndCard
+
+% 10 - Acid wash / collective choices
+\BeginCard
+\UseIntroRoute
+\CardBackground{AcidWash}
+\shade[
+  inner color=white,
+  outer color=AcidWash
+] ([yshift=17mm]current page.center) circle [radius=69mm];
+
+\node[
+  anchor=north,
+  align=center,
+  text width=88mm,
+  font=\sffamily\bfseries\fontsize{20}{22}\selectfont,
+  text=Ink
+] at ([yshift=-10mm]current page.north)
+{\CopyTenHeadline};
+\node[
+  anchor=north,
+  align=center,
+  text width=88mm,
+  font=\sffamily\bfseries\fontsize{20}{22}\selectfont,
+  text=Ink
+] at ([yshift=-38mm]current page.north)
+{\CopyTenHighlight};
+\draw[Ink,line width=.6pt]
+([xshift=-38mm,yshift=-49mm]current page.north)
+-- ([xshift=38mm,yshift=-49mm]current page.north);
+
+\node[
+  fill=white,
+  inner sep=2mm,
+  rounded corners=1mm
+] at ([yshift=-8mm]current page.center)
+{\includegraphics[width=48mm]{\QRfile}};
+
+\node[
+  anchor=south west,
+  font=\ttfamily\fontsize{15.5}{17.5}\selectfont,
+  text=Ink
+] at ([xshift=10mm,yshift=20mm]current page.south west)
+{→ \CopyTenCTA};
+\RouteBadge{Ink}{AcidWash}
+\FooterLabel{\ProtocolFooter}{10 · \PrototypeFooter}{Ink}
+\EndCard
+
+\end{document}
