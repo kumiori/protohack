@@ -10,9 +10,37 @@ from typing import Any
 class InMemoryRepository:
     def __init__(self) -> None:
         self._strategies: dict[tuple[str, str, str], dict[str, Any]] = {}
+        self._question_set_submissions: dict[tuple[str, str, str], dict[str, Any]] = {}
         self._coordination: dict[str, dict[str, Any]] = {}
         self._feedback: list[dict[str, Any]] = []
         self._lock = RLock()
+
+    @staticmethod
+    def _submission_key(submission: dict[str, Any]) -> tuple[str, str, str]:
+        return (
+            str(submission["participant_uuid"]),
+            str(submission["question_set_id"]),
+            str(submission["version"]),
+        )
+
+    def record_question_set_submission(
+        self, submission: dict[str, Any]
+    ) -> dict[str, Any]:
+        key = self._submission_key(submission)
+        with self._lock:
+            self._question_set_submissions.setdefault(key, deepcopy(submission))
+            return deepcopy(self._question_set_submissions[key])
+
+    def list_question_set_submissions(
+        self, question_set_id: str
+    ) -> list[dict[str, Any]]:
+        with self._lock:
+            rows = [
+                deepcopy(row)
+                for row in self._question_set_submissions.values()
+                if row.get("question_set_id") == question_set_id
+            ]
+        return sorted(rows, key=lambda row: str(row.get("submitted_at", "")))
 
     def record_question_feedback(self, feedback: dict[str, Any]) -> dict[str, Any]:
         with self._lock:
@@ -68,13 +96,16 @@ class InMemoryRepository:
         email: str | None,
         consent_version: str,
         consented_at: str,
+        name: str | None = None,
     ) -> dict[str, Any]:
         normalized_email = (email or "").strip() or None
+        normalized_name = (name or "").strip() or None
         record = {
             "participant_uuid": participant_uuid,
             "session_code": session_code,
             "coordination_opt_in": True,
             "email": normalized_email,
+            "name": normalized_name,
             "coordination_status": (
                 "reachable_interest" if normalized_email else "anonymous_interest"
             ),

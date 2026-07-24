@@ -35,6 +35,20 @@ navigation = st.navigation(
                 url_path="commons-map",
             ),
         ],
+        "Tracks": [
+            st.Page(
+                "views/capacity.py",
+                title="Capacity",
+                icon="🧩",
+                url_path="capacity",
+            ),
+            st.Page(
+                "views/strategy.py",
+                title="Strategy",
+                icon="♟️",
+                url_path="strategy",
+            ),
+        ],
         "Operations": [
             st.Page(
                 "views/commons_host.py",
