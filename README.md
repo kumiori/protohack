@@ -28,13 +28,15 @@ PROTOHACK_DEMO_MODE=true PROTOHACK_HOST_CODE=demo .venv/bin/streamlit run app.py
 
 ## Surfaces
 
+- `/` — Commons Simulator landing page and entry point;
 - `/commons` — refined participant simulation, review, integration, and optional coordination;
 - `/commons-map` — public strategic distribution and participant-theme graph;
 - `/commons-host` — access-code-protected strategic, coordination, and diagnostic views;
+- `/test-landing-primitives` — landing-page study composed from native Streamlit primitives and scoped styled containers, without authored HTML markup;
 - `/test-smokegun` — preserved first local smoke-test interface, grouped under `Tests` in navigation.
 - `/ui-lab` — functional dark-theme interface study inspired by the Commons Simulator mockup, including a cumulative event-signal timeline; all controls are native Streamlit elements wrapped in scoped styled containers.
 
-The application root redirects to `/commons`. The refined participant page keeps the smoke-test behavior and data contracts while giving the scenario, choice, rationale, and review a quieter visual hierarchy.
+The application root introduces the Commons Simulator and links into `/commons`. The refined participant page keeps the smoke-test behavior and data contracts while giving the scenario, choice, rationale, and review a quieter visual hierarchy.
 
 The host view does not send messages or make introductions. Coordination policy is deliberately marked open pending discussion with Nathalie.
 
