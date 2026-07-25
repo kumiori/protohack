@@ -183,6 +183,162 @@ class NotionRepository:
         )
 
     @staticmethod
+    def _question_set_contact_from_page(
+        page: dict[str, Any],
+    ) -> dict[str, Any]:
+        properties = page.get("properties") or {}
+        return {
+            "record_type": "question_set_contact",
+            "question_set_id": _rich(
+                properties, "coordination_consent_version"
+            ),
+            "participant_uuid": _rich(properties, "participant_uuid"),
+            "access_key": _rich(properties, "participant_uuid"),
+            "name": _rich(properties, "nickname") or None,
+            "email": _email(properties),
+            "communication_consent": bool(
+                (properties.get("coordination_opt_in") or {}).get("checkbox")
+            ),
+            "updated_at": _date(properties, "coordination_consented_at"),
+            "_page_id": str(page.get("id") or ""),
+        }
+
+    def _question_set_contact_page(
+        self,
+        question_set_id: str,
+        participant_uuid: str,
+    ) -> dict[str, Any] | None:
+        pages = self._query_all(
+            "players",
+            filter_={
+                "and": [
+                    {
+                        "property": "participant_uuid",
+                        "rich_text": {"equals": participant_uuid},
+                    },
+                    {
+                        "property": "coordination_consent_version",
+                        "rich_text": {"equals": question_set_id},
+                    },
+                ]
+            },
+        )
+        return next(
+            (
+                page
+                for page in pages
+                if _rich(page.get("properties") or {}, "participant_uuid")
+                == participant_uuid
+                and _rich(
+                    page.get("properties") or {},
+                    "coordination_consent_version",
+                )
+                == question_set_id
+            ),
+            None,
+        )
+
+    def get_question_set_contact(
+        self,
+        question_set_id: str,
+        participant_uuid: str,
+    ) -> dict[str, Any] | None:
+        page = self._question_set_contact_page(
+            question_set_id,
+            participant_uuid,
+        )
+        return self._question_set_contact_from_page(page) if page else None
+
+    def record_question_set_contact(
+        self, contact: dict[str, Any]
+    ) -> dict[str, Any]:
+        question_set_id = str(contact["question_set_id"])
+        participant_uuid = str(contact["participant_uuid"])
+        existing_page = self._question_set_contact_page(
+            question_set_id,
+            participant_uuid,
+        )
+        existing = (
+            self._question_set_contact_from_page(existing_page)
+            if existing_page
+            else {}
+        )
+        merged = {**existing, **contact}
+        normalized_name = str(merged.get("name") or "").strip()
+        normalized_email = str(merged.get("email") or "").strip()
+        consent = merged.get("communication_consent") is True
+        updated_at = str(merged.get("updated_at") or "")
+        properties: dict[str, Any] = {
+            "Name": {
+                "title": _text(
+                    f"{question_set_id} contact {participant_uuid[:8]}"
+                )
+            },
+            "session": _relation(self._session_page_id),
+            "participant_uuid": {"rich_text": _text(participant_uuid)},
+            "access_key": {"rich_text": _text(participant_uuid)},
+            "nickname": {"rich_text": _text(normalized_name)},
+            "email": {"email": normalized_email or None},
+            "coordination_opt_in": {"checkbox": consent},
+            "coordination_status": {
+                "select": {
+                    "name": (
+                        "reachable_interest"
+                        if consent and normalized_email
+                        else "anonymous_interest"
+                    )
+                }
+            },
+            "coordination_consent_version": {
+                "rich_text": _text(question_set_id)
+            },
+            "role": {"select": {"name": "participant"}},
+            "status": {"select": {"name": "active"}},
+            "consented": {"checkbox": consent},
+        }
+        if updated_at:
+            properties["coordination_consented_at"] = {
+                "date": {"start": updated_at}
+            }
+
+        if existing_page:
+            page = self._client.pages.update(
+                page_id=str(existing_page["id"]),
+                properties=properties,
+            )
+        else:
+            page = self._client.pages.create(
+                parent={
+                    "type": "data_source_id",
+                    "data_source_id": self._sources["players"],
+                },
+                properties=properties,
+            )
+        result = dict(merged)
+        result["_page_id"] = str(page.get("id") or "")
+        return result
+
+    def list_question_set_contacts(
+        self, question_set_id: str
+    ) -> list[dict[str, Any]]:
+        pages = self._query_all(
+            "players",
+            filter_={
+                "property": "coordination_consent_version",
+                "rich_text": {"equals": question_set_id},
+            },
+        )
+        return [
+            self._question_set_contact_from_page(page)
+            for page in pages
+            if _rich(
+                page.get("properties") or {},
+                "coordination_consent_version",
+            )
+            == question_set_id
+        ]
+
+    @staticmethod
     def _feedback_from_page(page: dict[str, Any]) -> dict[str, Any]:
         properties = page.get("properties") or {}
         raw = _rich(properties, "metadata_json")

@@ -24,6 +24,20 @@ class Repository(Protocol):
         self, question_set_id: str
     ) -> list[dict[str, Any]]: ...
 
+    def record_question_set_contact(
+        self, contact: dict[str, Any]
+    ) -> dict[str, Any]: ...
+
+    def get_question_set_contact(
+        self,
+        question_set_id: str,
+        participant_uuid: str,
+    ) -> dict[str, Any] | None: ...
+
+    def list_question_set_contacts(
+        self, question_set_id: str
+    ) -> list[dict[str, Any]]: ...
+
     def record_question_feedback(self, feedback: dict[str, Any]) -> dict[str, Any]: ...
 
     def list_question_feedback(self, session_code: str) -> list[dict[str, Any]]: ...

@@ -124,6 +124,11 @@ def _render_statistics(bundle: QuestionSetBundle) -> None:
     columns[3].metric("Multiple choice", bundle.multiple_choice_count)
     columns[4].metric("Open text", bundle.open_text_count)
     columns[5].metric("Estimated time", f"{bundle.estimated_minutes} min")
+    if bundle.disabled_question_count:
+        st.caption(
+            f"{bundle.active_question_count} active · "
+            f"{bundle.disabled_question_count} disabled for this pilot"
+        )
 
 
 def _render_activity(
@@ -169,6 +174,36 @@ def _render_activity(
         st.caption("No participant question events have been recorded yet.")
 
 
+def _render_bundle_records(
+    *,
+    bundle: QuestionSetBundle,
+    submissions: list[dict[str, object]],
+    contacts: list[dict[str, object]],
+) -> None:
+    consent_count = 0
+    for submission in submissions:
+        responses = submission.get("responses")
+        if not isinstance(responses, list):
+            continue
+        if any(
+            isinstance(response, dict)
+            and (
+                response.get("canonical_field") == "consent.coordination"
+                or response.get("field_id") == "mosaic_communication_consent"
+            )
+            and response.get("value") == "yes"
+            for response in responses
+        ):
+            consent_count += 1
+
+    st.markdown("### Bundle records")
+    metrics = st.columns(4)
+    metrics[0].metric("Response records", len(submissions))
+    metrics[1].metric("Conditional fields", bundle.conditional_count)
+    metrics[2].metric("Communication consent", consent_count)
+    metrics[3].metric("Contact records", len(contacts))
+
+
 def _render_question_detail(question: QuestionDefinition) -> None:
     st.markdown("**Context**")
     st.write(question.context or "—")
@@ -180,7 +215,12 @@ def _render_question_detail(question: QuestionDefinition) -> None:
             st.markdown("\n".join(f"- {option}" for option in options))
     elif question.options:
         st.markdown("**Options**")
-        st.markdown("\n".join(f"- {option}" for option in question.options))
+        st.markdown(
+            "\n".join(
+                f"- `{option}` — {question.option_label(option)}"
+                for option in question.options
+            )
+        )
     else:
         st.markdown("**Options**")
         st.write("Resolved by the runtime." if question.dynamic else "—")
@@ -189,7 +229,12 @@ def _render_question_detail(question: QuestionDefinition) -> None:
     with identifiers:
         st.markdown("**Identifiers**")
         st.code(
-            f"yaml_id  = {question.id}\nfield_id = {question.field_id}",
+            (
+                f"yaml_id        = {question.id}\n"
+                f"field_id       = {question.field_id}\n"
+                f"canonical_field = {question.canonical_field or '—'}\n"
+                f"data_scope     = {question.data_scope}"
+            ),
             language="text",
         )
     with authoring:
@@ -199,6 +244,12 @@ def _render_question_detail(question: QuestionDefinition) -> None:
             st.caption(f"Placeholder: {question.placeholder}")
         if question.allow_other:
             st.caption("An authored “Other” response is allowed.")
+        if question.visible_when:
+            field_id, expected = question.visible_when
+            st.caption(f"Visible when `{field_id}` equals `{expected}`.")
+        if question.required_when:
+            field_id, expected = question.required_when
+            st.caption(f"Required when `{field_id}` equals `{expected}`.")
 
 
 def _render_question_list(bundle: QuestionSetBundle) -> None:
@@ -212,7 +263,10 @@ def _render_question_list(bundle: QuestionSetBundle) -> None:
                     unsafe_allow_html=True,
                 )
             with metadata:
-                status = "Required" if question.required else "Optional"
+                if not question.enabled:
+                    status = "Disabled for pilot"
+                else:
+                    status = "Required" if question.required else "Optional"
                 st.markdown(
                     f'<div class="host-question-meta">{html.escape(question.type_label)}<br>'
                     f'{html.escape(question.group)}<br>{status}</div>',
@@ -220,6 +274,39 @@ def _render_question_list(bundle: QuestionSetBundle) -> None:
                 )
             with st.expander("↓ Expand", expanded=False):
                 _render_question_detail(question)
+
+
+def _render_section_structure(bundle: QuestionSetBundle) -> None:
+    st.markdown("### Section structure")
+    by_id = {question.id: question for question in bundle.questions}
+    for section in bundle.sections:
+        st.markdown(f"#### {section.title}")
+        if section.description:
+            st.caption(section.description)
+        for question_id in section.question_ids:
+            question = by_id[question_id]
+            with st.container(border=True):
+                identity, metadata = st.columns([3, 2])
+                with identity:
+                    st.markdown(
+                        f'<div class="host-question-id">{html.escape(question.id)}</div>'
+                        f'<div class="host-question-title">{html.escape(question.title)}</div>',
+                        unsafe_allow_html=True,
+                    )
+                with metadata:
+                    if not question.enabled:
+                        status = "Disabled for pilot"
+                    elif question.required_when:
+                        status = "Conditionally required"
+                    else:
+                        status = "Required" if question.required else "Optional"
+                    st.markdown(
+                        f'<div class="host-question-meta">{html.escape(question.type_label)}<br>'
+                        f'{html.escape(section.title)}<br>{status}</div>',
+                        unsafe_allow_html=True,
+                    )
+                with st.expander("↓ Expand", expanded=False):
+                    _render_question_detail(question)
 
 
 def _render_simulation_flow(bundle: QuestionSetBundle) -> None:
@@ -257,6 +344,8 @@ def render_question_set(
     *,
     events: list[dict[str, object]] | None = None,
     feedback: list[dict[str, object]] | None = None,
+    submissions: list[dict[str, object]] | None = None,
+    contacts: list[dict[str, object]] | None = None,
 ) -> None:
     """Render any validated YAML questionnaire bundle without protocol-specific code."""
 
@@ -283,9 +372,18 @@ def render_question_set(
         events=events or [],
         feedback=feedback or [],
     )
+    _render_bundle_records(
+        bundle=bundle,
+        submissions=submissions or [],
+        contacts=contacts or [],
+    )
 
     if bundle.flow:
         _render_simulation_flow(bundle)
+    elif bundle.sections:
+        st.markdown("### Question statistics")
+        _render_statistics(bundle)
+        _render_section_structure(bundle)
     else:
         st.markdown("### Question statistics")
         _render_statistics(bundle)
@@ -417,11 +515,25 @@ for tab, bundle in zip(tabs[:-1], catalog.bundles):
         try:
             events = repository.list_question_events(bundle.question_set_id)
             feedback = repository.list_question_feedback(bundle.session_code)
+            submissions = repository.list_question_set_submissions(
+                bundle.question_set_id
+            )
+            contacts = repository.list_question_set_contacts(
+                bundle.question_set_id
+            )
         except Exception:
             st.error("Question activity could not be loaded.")
             events = []
             feedback = []
-        render_question_set(bundle, events=events, feedback=feedback)
+            submissions = []
+            contacts = []
+        render_question_set(
+            bundle,
+            events=events,
+            feedback=feedback,
+            submissions=submissions,
+            contacts=contacts,
+        )
 with tabs[-1]:
     _render_diagnostics(catalog)
 

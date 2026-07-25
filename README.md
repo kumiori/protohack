@@ -26,12 +26,16 @@ Without a database token, the app enters preview storage mode. Its records last 
 PROTOHACK_DEMO_MODE=true PROTOHACK_HOST_CODE=demo .venv/bin/streamlit run app.py
 ```
 
+Set `MOSAIC_STATEMENT_URL` to the published Google Doc URL to expose the
+“Read the statement of intent” link inside its question card.
+
 ## Surfaces
 
 - `/` — Commons Simulator landing page and entry point;
 - `/commons` — refined participant simulation, review, integration, and optional coordination;
 - `/capacity` — YAML-driven needs, resources, contributions, time horizon, and coordination track;
 - `/strategy` — YAML-driven scenario, priority, actors, capacities, action, rationale, and review track;
+- `/mosaic` — independent YAML-driven Mosaic contribution and consortium-joining track;
 - `/commons-map` — public strategic distribution and participant-theme graph;
 - `/commons-host` — access-code-protected strategic, coordination, and diagnostic views;
 - `/test-landing-primitives` — landing-page study composed from native Streamlit primitives and scoped styled containers, without authored HTML markup;

@@ -1,0 +1,260 @@
+id: mosaic
+version: '1.0'
+title: Mosaic
+subtitle: Mission for Open Stewardship of AI and the Commons
+description: |
+    Help map the people, work, priorities, and potential contributions
+    that could shape the Mosaic consortium.
+route: /mosaic
+landing:
+    title: MOSAIC
+    subtitle: Mission for Open Stewardship of AI and the Commons
+    body: |
+        We aim to collaboratively reveal the people, activities, priorities,
+        and connections already present in the knowledge commons and AI ecosystem.
+
+        Coordination begins with visibility.
+    note: Many questions allow multiple selections. Choose everything that applies.
+    begin_label: Join the initiative
+metadata:
+    campaign_slug: mosaic
+    event_slug: mosaic_consortium
+    session_code: mosaic_pilot_2026
+    question_set_id: mosaic_v1
+    schema_id: mosaic_schema_v1
+    version: '1.0'
+    order: 40
+completion:
+    access_key: true
+    screenshot_prompt: true
+    show_summary: true
+    title: Contribution integrated into Mosaic
+    body: |
+        Your contribution has been added to the Mosaic network.
+
+        It can now contribute to revealing the people, work, priorities
+        and connections across the consortium.
+    map_label: View Mosaic Map
+    animation: network_balloons
+sections:
+    - id: mosaic_identity
+      title: Who is speaking?
+      description: |
+          Tell us who you are, where you are based,
+          and which organisations or networks you are connected to.
+      questions:
+          - id: MOS_I1_NAME
+            field: mosaic_name
+            canonical_field: person.name
+            data_scope: contact
+            type: text
+            required: false
+            title: What is your name?
+            placeholder: Your name
+            help: You may also use a username or professional name.
+          - id: MOS_I2_ORGANISATION
+            field: mosaic_organisation
+            canonical_field: person.organisation
+            type: text
+            required: false
+            title: Which organisation do you currently work with?
+            placeholder: Organisation, institution, collective, or independent
+            help: Leave blank if you are participating independently.
+          - id: MOS_I3_AFFILIATIONS
+            field: mosaic_affiliations
+            canonical_field: person.affiliations
+            type: tags
+            required: false
+            title: Which other organisations, communities, or networks are you affiliated with?
+            placeholder: Add one or more affiliations
+            help: Include professional, civic, research, technical, or community affiliations.
+          - id: MOS_I4_CITY
+            field: mosaic_city
+            canonical_field: geography.city
+            type: text
+            required: false
+            title: Where are you primarily based?
+            placeholder: City
+            help: Add your main city or local base.
+          - id: MOS_I5_GEOGRAPHIC_SCOPE
+            field: mosaic_geographic_scope
+            canonical_field: geography.scope
+            type: multiselect
+            required: false
+            title: What is the geographic scope of your work?
+            help: Select all regions that are relevant.
+            options:
+                - id: global
+                  label: Global
+                - id: cee
+                  label: Central and Eastern Europe (CEE)
+                - id: eseap
+                  label: East, Southeast Asia and the Pacific (ESEAP)
+                - id: europe
+                  label: Europe
+                - id: lac
+                  label: Latin America and the Caribbean
+                - id: mena
+                  label: Middle East and North Africa (MENA)
+                - id: north_america
+                  label: North America
+                - id: south_asia
+                  label: South Asia
+                - id: sub_saharan_africa
+                  label: Sub-Saharan Africa
+                - id: cross_regional
+                  label: Cross-regional work
+                - id: other
+                  label: Other
+            allow_other: true
+            other_field: mosaic_geographic_scope_other
+            other_label: Specify another region, country, or linguistic area
+    - id: mosaic_contribution
+      title: Your contribution
+      description: |
+          Help us understand what you are already working on
+          and where you could contribute to Mosaic.
+      questions:
+          - id: MOS_C1_CURRENT_WORK
+            field: mosaic_current_work
+            type: textarea
+            required: false
+            title: What work are you currently doing that could contribute to Mosaic's mission?
+            help: |
+                List relevant projects, activities, areas of work, methods,
+                partnerships, tools, or initiatives.
+            placeholder: |
+                Describe the work you are currently doing and how it may connect
+                to open stewardship of AI and the commons.
+          - id: MOS_C2_CONTRIBUTION_AREAS
+            field: mosaic_contribution_areas
+            canonical_field: capacity.offer
+            type: multiselect
+            required: false
+            title: In which areas would you like to contribute?
+            help: Select all areas where you could contribute time, expertise, or resources.
+            options:
+                - id: fundraising
+                  label: Fundraising
+                - id: technical
+                  label: Technical development and infrastructure
+                - id: policy
+                  label: Advocacy, policy, and regulation
+                - id: communication
+                  label: Communication and public engagement
+                - id: education
+                  label: Education and AI literacy
+                - id: coordination
+                  label: Coordination and facilitation
+                - id: administration
+                  label: Administration and operations
+                - id: research
+                  label: Research and analysis
+                - id: partnerships
+                  label: Partnerships and stakeholder engagement
+                - id: other
+                  label: Other
+            allow_other: true
+            other_field: mosaic_contribution_areas_other
+            other_label: Describe another contribution area
+          - id: MOS_C3_CONTRIBUTION_MODE
+            enabled: false
+            field: mosaic_contribution_mode
+            type: multiselect
+            required: false
+            title: How could you contribute?
+            options:
+                - id: personal_time
+                  label: Personal time
+                - id: professional_time
+                  label: Time through my organisation
+                - id: technical_resources
+                  label: Technical resources or infrastructure
+                - id: funding
+                  label: Funding or fundraising support
+                - id: introductions
+                  label: Partner or stakeholder introductions
+                - id: tools_data
+                  label: Access to tools, datasets, or platforms
+                - id: visibility
+                  label: Communication or visibility
+                - id: other
+                  label: Other
+            allow_other: true
+            other_field: mosaic_contribution_mode_other
+            other_label: Describe another contribution mode
+          - id: MOS_C4_SUPPORT_NEEDED
+            enabled: false
+            field: mosaic_support_needed
+            canonical_field: capacity.need
+            type: textarea
+            required: false
+            title: What support would help you contribute?
+            help: |
+                Examples include funding, technical expertise, infrastructure,
+                partner introductions, coordination, access to tools, or access to data.
+            placeholder: What would make your contribution easier or more effective?
+    - id: mosaic_strategy
+      title: Strategy and coordination
+      description: |
+          Share your priorities for Mosaic and tell us
+          how you would like to stay involved.
+      questions:
+          - id: MOS_S1_PRIORITIES
+            field: mosaic_priorities
+            type: textarea
+            required: false
+            title: What should Mosaic prioritise?
+            help: |
+                Name the issues, actions, or outcomes that you believe
+                should guide the consortium.
+            placeholder: What should Mosaic focus on first?
+          - id: MOS_S2_STATEMENT
+            field: mosaic_statement_status
+            type: multiselect
+            required: false
+            title: Have you signed the Mosaic statement of intent?
+            link_label: Read the statement of intent
+            link_env: MOSAIC_STATEMENT_URL
+            options:
+                - id: yes
+                  label: Yes
+                - id: no
+                  label: No
+                - id: need_information
+                  label: I would like more information
+          - id: MOS_S3_COMMUNICATION_CONSENT
+            field: mosaic_communication_consent
+            canonical_field: consent.coordination
+            type: single_choice
+            required: true
+            title: Would you like to join a Mosaic communication channel?
+            help: |
+                If you agree, the Mosaic coordination team may use your email
+                to invite you to the consortium's shared communication space
+                and send relevant coordination updates.
+            options:
+                - id: no
+                  label: No
+                - id: yes
+                  label: Yes
+          - id: MOS_S4_EMAIL
+            field: mosaic_email
+            canonical_field: contact.email
+            data_scope: contact
+            type: email
+            required_when:
+                field: mosaic_communication_consent
+                equals: yes
+            visible_when:
+                field: mosaic_communication_consent
+                equals: yes
+            title: Which email address should we use?
+            placeholder: name@example.org
+            help: Your email will not be displayed publicly.
+          - id: MOS_S5_FINAL_REMARKS
+            field: mosaic_final_remarks
+            type: textarea
+            required: false
+            title: Is there anything else you would like to add?
+            placeholder: Additional remarks, suggestions, questions, or concerns

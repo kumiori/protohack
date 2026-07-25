@@ -12,6 +12,7 @@ class InMemoryRepository:
         self._strategies: dict[tuple[str, str, str], dict[str, Any]] = {}
         self._question_events: dict[tuple[str, str, str], dict[str, Any]] = {}
         self._question_set_submissions: dict[tuple[str, str, str], dict[str, Any]] = {}
+        self._question_set_contacts: dict[tuple[str, str], dict[str, Any]] = {}
         self._coordination: dict[str, dict[str, Any]] = {}
         self._feedback: list[dict[str, Any]] = []
         self._lock = RLock()
@@ -73,6 +74,45 @@ class InMemoryRepository:
                 if row.get("question_set_id") == question_set_id
             ]
         return sorted(rows, key=lambda row: str(row.get("submitted_at", "")))
+
+    @staticmethod
+    def _question_set_contact_key(contact: dict[str, Any]) -> tuple[str, str]:
+        return (
+            str(contact["question_set_id"]),
+            str(contact["participant_uuid"]),
+        )
+
+    def record_question_set_contact(
+        self, contact: dict[str, Any]
+    ) -> dict[str, Any]:
+        key = self._question_set_contact_key(contact)
+        with self._lock:
+            existing = self._question_set_contacts.get(key, {})
+            merged = {**existing, **deepcopy(contact)}
+            self._question_set_contacts[key] = merged
+            return deepcopy(merged)
+
+    def get_question_set_contact(
+        self,
+        question_set_id: str,
+        participant_uuid: str,
+    ) -> dict[str, Any] | None:
+        with self._lock:
+            record = self._question_set_contacts.get(
+                (question_set_id, participant_uuid)
+            )
+            return deepcopy(record) if record else None
+
+    def list_question_set_contacts(
+        self, question_set_id: str
+    ) -> list[dict[str, Any]]:
+        with self._lock:
+            return [
+                deepcopy(row)
+                for (stored_question_set_id, _participant), row
+                in self._question_set_contacts.items()
+                if stored_question_set_id == question_set_id
+            ]
 
     def record_question_feedback(self, feedback: dict[str, Any]) -> dict[str, Any]:
         with self._lock:

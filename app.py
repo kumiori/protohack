@@ -48,6 +48,12 @@ navigation = st.navigation(
                 icon="♟️",
                 url_path="strategy",
             ),
+            st.Page(
+                "views/mosaic.py",
+                title="Mosaic",
+                icon="🧶",
+                url_path="mosaic",
+            ),
         ],
         "Operations": [
             st.Page(

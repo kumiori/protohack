@@ -54,17 +54,35 @@ def build_question_set_submission(
 
     response_rows: list[dict[str, Any]] = []
     for question in bundle.questions:
-        if question.field_id in excluded:
+        if question.field_id in excluded or question.data_scope == "contact":
             continue
         value = answers.get(question.field_id)
         if not _has_answer(value):
             continue
+        response_value = value
+        other_value = ""
+        if isinstance(value, dict) and "selected" in value:
+            response_value = list(value.get("selected") or [])
+            other_value = str(value.get("other") or "").strip()
         response_rows.append(
             {
                 "question_id": question.id,
                 "field_id": question.field_id,
                 "question_type": question.input_type,
-                "value": value,
+                "value": response_value,
+                **(
+                    {"canonical_field": question.canonical_field}
+                    if question.canonical_field
+                    else {}
+                ),
+                **(
+                    {
+                        "other_field_id": question.other_field_id,
+                        "other_value": other_value,
+                    }
+                    if question.other_field_id and other_value
+                    else {}
+                ),
             }
         )
 

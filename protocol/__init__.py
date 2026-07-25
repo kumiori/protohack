@@ -15,6 +15,7 @@ from .question_sets import (
     QuestionDefinition,
     QuestionSetBundle,
     QuestionSetCatalog,
+    QuestionSection,
     load_question_set,
     load_question_set_catalog,
 )
@@ -41,6 +42,7 @@ __all__ = [
     "QuestionDefinition",
     "QuestionSetBundle",
     "QuestionSetCatalog",
+    "QuestionSection",
     "QUESTION_EVENT_STATUSES",
     "FLAG_REASON_LABELS",
     "FLAG_REASON_OPTIONS",
