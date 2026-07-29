@@ -65,6 +65,12 @@ navigation = st.navigation(
         ],
         "Tests": [
             st.Page(
+                "views/test_timeline_game.py",
+                title="Timeline game",
+                icon="〽️",
+                url_path="test-timeline-game",
+            ),
+            st.Page(
                 "views/test_landing_primitives.py",
                 title="Landing primitives",
                 icon="🧱",

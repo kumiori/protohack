@@ -2,4 +2,5 @@ streamlit==1.55.0
 streamlit-extras==1.6.0
 PyYAML==6.0.3
 notion-client==3.0.0
+plotly>=6.0,<7
 pytest>=8.0,<9
