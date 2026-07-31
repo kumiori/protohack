@@ -38,7 +38,9 @@ Set `MOSAIC_STATEMENT_URL` to the published Google Doc URL to expose the
 - `/mosaic` — independent YAML-driven Mosaic contribution and consortium-joining track;
 - `/commons-map` — public strategic distribution and participant-theme graph;
 - `/commons-host` — access-code-protected strategic, coordination, and diagnostic views;
-- `/test-timeline-game` — session-only 3D trajectory sandbox using hard piecewise-Hermite event nodes, a continuous time/date preview slider, Smooth/Kink geometry, separate local uncertainty envelopes that never move the centreline, preserved camera orientation, simulated convergence traces, and a three-move integration gate without record writes;
+- `/test-timeline-benchmarks` — scenario-first onboarding laboratory with eight game-like levels, challenge cards, a hidden impossible benchmark, and sidebar experiment briefs that hand selected horizons into the trajectory game;
+- `/test-timeline-game` — session-only 3D trajectory sandbox using twelve event and planning primitives as hard piecewise-Hermite nodes, a continuous time/date preview slider, Smooth/Kink geometry, separate local uncertainty envelopes that never move the centreline, preserved camera orientation, simulated convergence traces, and a three-move integration gate without record writes;
+- `/test-timeline-style-lab` — visual-only comparison of Instrument, Playground, and Gallery treatments over the exact same trajectory game, with oversized event objects, subtle motion, and a trajectory-first scene;
 - `/test-landing-primitives` — landing-page study composed from native Streamlit primitives and scoped styled containers, without authored HTML markup;
 - `/test-smokegun` — preserved first local smoke-test interface, grouped under `Tests` in navigation.
 - `/ui-lab` — functional dark-theme interface study inspired by the Commons Simulator mockup, including a cumulative event-signal timeline; all controls are native Streamlit elements wrapped in scoped styled containers.

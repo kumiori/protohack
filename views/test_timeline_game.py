@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 import html
 from math import cos, sin
+from textwrap import dedent
 from uuid import uuid4
 
 import plotly.graph_objects as go
@@ -14,7 +15,9 @@ import streamlit.components.v1 as components
 from protocol.timeline import (
     END_POINT,
     EVENT_TYPES,
+    CORE_EVENT_TYPE_KEYS,
     IMPORTANCE_LEVELS,
+    PLANNING_PRIMITIVE_KEYS,
     UNCERTAINTY_STRENGTHS,
     active_events,
     date_for_parameter,
@@ -33,8 +36,25 @@ from protocol.timeline import (
 
 STATE_PREFIX = "timeline_game_"
 MINIMUM_MOVES = 3
+ACTIVE_BENCHMARK_KEY = "timeline_active_benchmark"
+STYLE_LAB_ENABLED = bool(globals().get("TIMELINE_STYLE_LAB", False))
+STYLE_LAB_VARIANTS = ("Instrument", "Playground", "Gallery")
+STYLE_LAB_KEY = "timeline_style_lab_variant"
+style_lab_variant = str(
+    st.session_state.get(STYLE_LAB_KEY) or "Playground"
+)
+if style_lab_variant not in STYLE_LAB_VARIANTS:
+    style_lab_variant = "Playground"
+active_benchmark = st.session_state.get(ACTIVE_BENCHMARK_KEY)
+if not isinstance(active_benchmark, dict):
+    active_benchmark = {}
+benchmark_title = str(active_benchmark.get("title") or "Open trajectory")
+benchmark_horizon = str(
+    active_benchmark.get("horizon_label") or "2-year experimental horizon"
+)
+benchmark_days = max(1, int(active_benchmark.get("horizon_days") or 730))
 ROADMAP_START = date.today()
-ROADMAP_END = ROADMAP_START + timedelta(days=730)
+ROADMAP_END = ROADMAP_START + timedelta(days=benchmark_days)
 CAMERA_STORAGE_KEY = "protocol-hack:timeline-camera-v2"
 
 
@@ -89,6 +109,28 @@ def _request_uncertainty() -> None:
         "uncertainty_strength": "Marked",
         "uncertainty_width": 0.18,
     }
+
+
+def _render_move_row(
+    event_type_keys: tuple[str, ...],
+    pending_type: object,
+) -> None:
+    columns = st.columns(len(event_type_keys), gap="small")
+    for column, event_type in zip(columns, event_type_keys):
+        definition = EVENT_TYPES[event_type]
+        with column:
+            if st.button(
+                f"{definition['glyph']}  {definition['label']}",
+                key=f"timeline_move_{event_type}",
+                type=(
+                    "primary"
+                    if str(pending_type or "") == event_type
+                    else "secondary"
+                ),
+                width="stretch",
+            ):
+                _request_placement(event_type)
+                st.rerun()
 
 
 def _render_camera_persistence_hook(revision: str) -> None:
@@ -577,6 +619,94 @@ def _build_figure(
     return figure
 
 
+def _apply_style_lab_figure(
+    figure: go.Figure,
+    variant: str,
+) -> go.Figure:
+    """Change only the presentation of the shared trajectory figure."""
+
+    presets: dict[str, dict[str, object]] = {
+        "Instrument": {
+            "height": 660,
+            "background": "#020807",
+            "grid": "#182722",
+            "line": "#41534d",
+            "axis": "#a9b9b3",
+            "ticks": "#667b74",
+            "trajectory_width": 9,
+            "show_grid": True,
+        },
+        "Playground": {
+            "height": 700,
+            "background": "#06100e",
+            "grid": "#14241f",
+            "line": "#263b34",
+            "axis": "#9cafa8",
+            "ticks": "#63766f",
+            "trajectory_width": 12,
+            "show_grid": True,
+        },
+        "Gallery": {
+            "height": 735,
+            "background": "#040706",
+            "grid": "rgba(255,255,255,0)",
+            "line": "rgba(255,255,255,0.06)",
+            "axis": "#75847f",
+            "ticks": "#53615c",
+            "trajectory_width": 11,
+            "show_grid": False,
+        },
+    }
+    preset = presets[variant]
+    background = str(preset["background"])
+    grid = str(preset["grid"])
+    line = str(preset["line"])
+    axis = str(preset["axis"])
+    ticks = str(preset["ticks"])
+    show_grid = bool(preset["show_grid"])
+
+    for trace in figure.data:
+        if getattr(trace, "name", None) == "Personal trajectory":
+            trace.line.width = int(preset["trajectory_width"])
+
+    figure.update_layout(
+        height=int(preset["height"]),
+        paper_bgcolor=background,
+        plot_bgcolor=background,
+        hoverlabel={
+            "bgcolor": "#101a17",
+            "bordercolor": "#526b62",
+            "font": {"color": "#f6f7ef", "family": "IBM Plex Mono"},
+        },
+    )
+    figure.update_scenes(
+        bgcolor=background,
+        xaxis={
+            "gridcolor": grid,
+            "linecolor": line,
+            "zerolinecolor": line,
+            "showgrid": show_grid,
+            "title": {"text": "TIME", "font": {"color": axis}},
+            "tickfont": {"color": ticks, "size": 10},
+        },
+        yaxis={
+            "gridcolor": grid,
+            "linecolor": line,
+            "zerolinecolor": line,
+            "showgrid": show_grid,
+            "title": {"text": "ALIGNMENT", "font": {"color": axis}},
+        },
+        zaxis={
+            "gridcolor": grid,
+            "linecolor": line,
+            "zerolinecolor": line,
+            "showgrid": show_grid,
+            "title": {"text": "ENERGY", "font": {"color": axis}},
+        },
+    )
+    return figure
+
+
 def _apply_timeline_theme() -> None:
     st.markdown(
         """
@@ -596,6 +726,7 @@ def _apply_timeline_theme() -> None:
         h1, h2, h3, p, label, .stCaption { color:#e8eee9 !important; }
         [data-testid="stSidebar"] {
           background:#030807; border-right:1px solid #21302c;
+          min-width:23rem !important; width:23rem !important;
         }
         [data-testid="stIconMaterial"] {
           font-family:"Material Symbols Rounded" !important;
@@ -660,8 +791,8 @@ def _apply_timeline_theme() -> None:
           overflow-wrap:anywhere;
         }
         .st-key-timeline_rail {
-          min-height:46rem; background:#030807; border:1px solid #21302c;
-          border-radius:8px; padding:1rem;
+          min-height:0; background:transparent; border-top:1px solid #2d403a;
+          border-radius:0; padding:1rem .15rem 2rem;
         }
         .st-key-timeline_rail [data-testid="stVerticalBlock"] { gap:.8rem; }
         .timeline-confirmation {
@@ -689,6 +820,17 @@ def _apply_timeline_theme() -> None:
           border-color:#dfe875 !important; color:#dfe875 !important;
           transform:translateY(-2px); box-shadow:0 8px 24px rgba(0,0,0,.25) !important;
         }
+        [class*="st-key-timeline_move_"] button:active {
+          transform:translateY(1px) scale(.97) !important;
+          transition-duration:70ms !important;
+        }
+        [class*="st-key-timeline_move_"] button[data-testid="stBaseButton-primary"] {
+          border-color:#dfe875 !important; color:#f5f7c8 !important;
+          background:#101b16 !important;
+          box-shadow:
+            0 0 0 2px rgba(223,232,117,.22),
+            0 10px 28px rgba(0,0,0,.28) !important;
+        }
         button p { color:inherit !important; }
         .st-key-timeline_add_uncertainty button {
           min-height:3rem !important; border:1px dashed #668178 !important;
@@ -714,7 +856,17 @@ def _apply_timeline_theme() -> None:
           border-radius:6px !important; background:transparent !important;
           color:#91a39d !important; box-shadow:none !important;
         }
-        [class*="st-key-timeline_utility_"] button:hover { color:#eef2e8 !important; }
+        [class*="st-key-timeline_move_"] button:not(:disabled) {
+          cursor:pointer !important;
+        }
+        [class*="st-key-timeline_utility_"] button:disabled,
+        .st-key-timeline_remove_uncertainty button:disabled {
+          opacity:.28 !important; cursor:not-allowed !important;
+          border-style:dashed !important; filter:saturate(.25);
+        }
+        [class*="st-key-timeline_utility_"] button:not(:disabled):hover {
+          color:#eef2e8 !important;
+        }
         [class*="st-key-timeline_utility_integrate"] button:not(:disabled) {
           border-color:#dfe875 !important; color:#dfe875 !important;
         }
@@ -775,7 +927,409 @@ def _apply_timeline_theme() -> None:
     )
 
 
+def _apply_style_lab_theme(variant: str) -> None:
+    """Layer one visual prototype over the unchanged timeline interaction."""
+
+    common = """
+    <style>
+    [data-testid="stSidebar"] {
+      min-width:22rem !important; width:22rem !important;
+      border-right-color:rgba(191,218,208,.08) !important;
+    }
+    [data-testid="stSidebarNav"] { display:none !important; }
+    .style-lab-nav {
+      display:grid; gap:.38rem; padding:.35rem 0 1rem;
+      border-bottom:1px solid rgba(191,218,208,.10);
+    }
+    .style-lab-nav a {
+      display:flex; align-items:center; gap:.9rem; min-height:3rem;
+      padding:.45rem .7rem; border-radius:16px; color:#98aaa3 !important;
+      text-decoration:none !important; font-size:.76rem; letter-spacing:.02em;
+      transition:background 150ms ease, color 150ms ease, transform 150ms ease;
+    }
+    .style-lab-nav a:hover {
+      background:rgba(222,240,232,.06); color:#eef4ef !important;
+      transform:translateX(3px);
+    }
+    .style-lab-nav a b {
+      display:grid; place-items:center; min-width:2rem; color:#dfe875;
+      font-size:1.6rem; line-height:1; font-weight:400;
+    }
+    .style-lab-head {
+      padding:.8rem 0 1rem; margin-bottom:.45rem;
+      border-bottom:1px solid rgba(191,218,208,.10);
+    }
+    .style-lab-head small {
+      color:#dfe875; font-size:.6rem; letter-spacing:.16em;
+      text-transform:uppercase;
+    }
+    .style-lab-head h2 {
+      margin:.45rem 0 .25rem !important; font-size:1.25rem !important;
+      letter-spacing:-.025em !important;
+    }
+    .style-lab-head p {
+      color:#7f918a !important; font-size:.67rem; line-height:1.5;
+      margin:0 !important;
+    }
+    .st-key-timeline_style_lab_selector [data-testid="stButtonGroup"] button {
+      min-height:2.75rem !important; border-radius:999px !important;
+      font-size:.66rem !important; letter-spacing:.02em !important;
+      text-transform:none !important;
+    }
+    .timeline-hud { border-bottom-color:rgba(190,220,208,.10) !important; }
+    .timeline-hud small, .timeline-readout small, .timeline-field-note,
+    .timeline-dock-label {
+      color:#62746d !important;
+    }
+    [data-testid="stPlotlyChart"] {
+      position:relative; z-index:1; border-color:transparent !important;
+      overflow:hidden; transition:border-radius 180ms ease, box-shadow 180ms ease;
+    }
+    .timeline-dock-label {
+      position:relative; z-index:5; pointer-events:none;
+    }
+    .timeline-dock-label.timeline-planning-label {
+      margin-top:1rem !important; height:auto; overflow:visible; opacity:1;
+      padding-left:.2rem;
+    }
+    [class*="st-key-timeline_move_"] {
+      position:relative; z-index:6;
+    }
+    [class*="st-key-timeline_move_"] button {
+      transition:
+        transform 150ms ease,
+        background 150ms ease,
+        box-shadow 150ms ease,
+        border-color 150ms ease !important;
+    }
+    [class*="st-key-timeline_move_"] button p {
+      display:flex !important; flex-direction:column; align-items:center;
+      justify-content:center; gap:.48rem; font-size:0 !important;
+      line-height:1 !important;
+    }
+    [class*="st-key-timeline_move_"] button p::before {
+      display:block; line-height:1; font-size:var(--object-size);
+      transition:transform 150ms ease, filter 150ms ease;
+      filter:drop-shadow(0 7px 10px rgba(0,0,0,.16));
+    }
+    [class*="st-key-timeline_move_"] button p::after {
+      display:block; font-size:var(--object-label-size); line-height:1;
+      letter-spacing:.06em; color:var(--object-label);
+      transition:opacity 150ms ease, transform 150ms ease;
+    }
+    [class*="st-key-timeline_move_"] button:hover p::before {
+      filter:
+        brightness(1.18)
+        drop-shadow(0 0 18px color-mix(in srgb, currentColor 48%, transparent));
+    }
+    [class*="st-key-timeline_move_"] button:active {
+      transform:translateY(1px) scale(.965) !important;
+      transition-duration:70ms !important;
+    }
+    [class*="st-key-timeline_move_"] button[data-testid="stBaseButton-primary"] {
+      outline:3px solid rgba(223,232,117,.42) !important;
+      outline-offset:3px;
+    }
+    [class*="st-key-timeline_move_"] button[data-testid="stBaseButton-primary"] p::before {
+      filter:
+        brightness(1.22)
+        drop-shadow(0 0 20px color-mix(in srgb, currentColor 55%, transparent));
+    }
+    [class*="st-key-timeline_move_"] button[data-testid="stBaseButton-primary"] p::after {
+      opacity:1 !important; transform:translateY(0) !important;
+      color:#f5f7ef !important;
+    }
+    .st-key-timeline_move_release button p::before {
+      content:"★"; color:#f6d365;
+    }
+    .st-key-timeline_move_release button p::after { content:"Release"; }
+    .st-key-timeline_move_event button p::before {
+      content:"●"; color:#80d6c3;
+    }
+    .st-key-timeline_move_event button p::after { content:"Event"; }
+    .st-key-timeline_move_gateway button p::before {
+      content:"◈"; color:#d6a8ff;
+    }
+    .st-key-timeline_move_gateway button p::after { content:"Gateway"; }
+    .st-key-timeline_move_action button p::before {
+      content:"▲"; color:#ff8b69;
+    }
+    .st-key-timeline_move_action button p::after { content:"Action"; }
+    .st-key-timeline_move_update button p::before {
+      content:"■"; color:#9ca8ff;
+    }
+    .st-key-timeline_move_update button p::after { content:"Update"; }
+    .st-key-timeline_move_milestone button p::before {
+      content:"▼"; color:#e8f27c;
+    }
+    .st-key-timeline_move_milestone button p::after { content:"Milestone"; }
+    .st-key-timeline_move_merge button p::before {
+      content:"⋈"; color:#f3a6c8;
+    }
+    .st-key-timeline_move_merge button p::after { content:"Merge"; }
+    .st-key-timeline_move_share_resources button p::before {
+      content:"⇄"; color:#82c7ff;
+    }
+    .st-key-timeline_move_share_resources button p::after {
+      content:"Share resources";
+    }
+    .st-key-timeline_move_wait button p::before {
+      content:"◷"; color:#aab4bd;
+    }
+    .st-key-timeline_move_wait button p::after { content:"Wait"; }
+    .st-key-timeline_move_prepare button p::before {
+      content:"◒"; color:#ffbd78;
+    }
+    .st-key-timeline_move_prepare button p::after { content:"Prepare"; }
+    .st-key-timeline_move_get_intelligence button p::before {
+      content:"⌾"; color:#a8e6cf;
+    }
+    .st-key-timeline_move_get_intelligence button p::after {
+      content:"Get intelligence";
+    }
+    .st-key-timeline_move_synchronise button p::before {
+      content:"⟳"; color:#c8b6ff;
+    }
+    .st-key-timeline_move_synchronise button p::after {
+      content:"Synchronise";
+    }
+    @keyframes timeline-star-pulse {
+      0%,100% { transform:scale(1); }
+      50% { transform:scale(1.1); }
+    }
+    .st-key-timeline_move_release button:hover p::before {
+      animation:timeline-star-pulse 900ms ease-in-out infinite;
+    }
+    .st-key-timeline_move_event button:hover p::before {
+      transform:scale(1.12);
+    }
+    .st-key-timeline_move_gateway button:hover p::before {
+      transform:scale(1.12) rotate(45deg);
+    }
+    .st-key-timeline_move_action button:hover p::before {
+      transform:translateY(-4px);
+    }
+    .st-key-timeline_move_update button:hover p::before {
+      transform:rotate(6deg);
+    }
+    .st-key-timeline_move_milestone button:hover p::before {
+      transform:rotate(-8deg);
+    }
+    .st-key-timeline_move_merge button:hover p::before {
+      transform:scaleX(.78) scaleY(1.1);
+    }
+    .st-key-timeline_move_share_resources button:hover p::before {
+      transform:scale(1.14);
+    }
+    .st-key-timeline_move_wait button:hover p::before {
+      transform:rotate(-18deg);
+    }
+    .st-key-timeline_move_prepare button:hover p::before {
+      transform:rotate(18deg);
+    }
+    .st-key-timeline_move_get_intelligence button:hover p::before {
+      transform:scale(1.14);
+    }
+    .st-key-timeline_move_synchronise button:hover p::before {
+      transform:rotate(28deg);
+    }
+    .st-key-timeline_add_uncertainty button,
+    [class*="st-key-timeline_utility_"] button {
+      transition:background 150ms ease, color 150ms ease, opacity 150ms ease !important;
+    }
+    @media(max-width:900px) {
+      [data-testid="stSidebar"] {
+        min-width:19rem !important; width:19rem !important;
+      }
+      [class*="st-key-timeline_move_"] button {
+        min-height:5.2rem !important;
+      }
+    }
+    </style>
+    """
+    variants = {
+        "Instrument": """
+        <style>
+        :root {
+          --object-size:2.65rem;
+          --object-label-size:.62rem;
+          --object-label:#8fa29b;
+        }
+        .stApp {
+          background:
+            radial-gradient(circle at 72% 4%, rgba(69,133,117,.10), transparent 34rem),
+            #020706 !important;
+        }
+        .block-container { max-width:1560px; padding:1.25rem 1.6rem 3rem; }
+        [data-testid="stPlotlyChart"] {
+          border-radius:20px !important;
+          box-shadow:0 24px 80px rgba(0,0,0,.22) !important;
+        }
+        .timeline-dock-label { margin-top:-3.7rem !important; }
+        [class*="st-key-timeline_move_"] button {
+          min-height:5.5rem !important; border-radius:20px !important;
+          border-color:rgba(167,197,187,.14) !important;
+          background:rgba(5,17,14,.88) !important;
+          box-shadow:0 10px 28px rgba(0,0,0,.18) !important;
+        }
+        .st-key-timeline_core_moves [class*="st-key-timeline_move_"] {
+          margin-top:-4.2rem; margin-bottom:4.2rem;
+        }
+        [class*="st-key-timeline_move_"] button:hover {
+          border-color:rgba(223,232,117,.45) !important;
+          transform:translateY(-3px);
+        }
+        .st-key-timeline_add_uncertainty button,
+        [class*="st-key-timeline_utility_"] button {
+          border-radius:18px !important;
+          border-color:rgba(167,197,187,.12) !important;
+        }
+        </style>
+        """,
+        "Playground": """
+        <style>
+        :root {
+          --object-size:4.2rem;
+          --object-label-size:.72rem;
+          --object-label:#dbe6df;
+        }
+        .stApp {
+          background:
+            radial-gradient(circle at 75% -5%, rgba(110,155,142,.22), transparent 34rem),
+            radial-gradient(circle at 28% 105%, rgba(156,168,255,.10), transparent 30rem),
+            #030806 !important;
+        }
+        .block-container { max-width:1600px; padding:1rem 1.5rem 3rem; }
+        [data-testid="stPlotlyChart"] {
+          border-radius:34px !important;
+          box-shadow:0 34px 100px rgba(0,0,0,.30) !important;
+        }
+        .timeline-hud {
+          padding:.5rem .65rem 1rem !important; border-bottom:0 !important;
+        }
+        .timeline-dock-label { margin-top:-5.1rem !important; padding-left:1.25rem; }
+        [class*="st-key-timeline_move_"] button {
+          min-height:7.3rem !important; border:0 !important;
+          border-radius:30px !important; color:#f5f7ef !important;
+          box-shadow:
+            0 16px 0 rgba(0,0,0,.12),
+            0 24px 52px rgba(0,0,0,.25) !important;
+        }
+        .st-key-timeline_core_moves [class*="st-key-timeline_move_"] {
+          margin-top:-5.2rem; margin-bottom:5.2rem;
+        }
+        .st-key-timeline_move_release button {
+          background:linear-gradient(155deg,rgba(246,211,101,.22),#0c1612 70%) !important;
+        }
+        .st-key-timeline_move_event button {
+          background:linear-gradient(155deg,rgba(128,214,195,.20),#0b1512 70%) !important;
+        }
+        .st-key-timeline_move_gateway button {
+          background:linear-gradient(155deg,rgba(214,168,255,.20),#111017 70%) !important;
+        }
+        .st-key-timeline_move_action button {
+          background:linear-gradient(155deg,rgba(255,139,105,.20),#121411 70%) !important;
+        }
+        .st-key-timeline_move_update button {
+          background:linear-gradient(155deg,rgba(156,168,255,.20),#0e1315 70%) !important;
+        }
+        .st-key-timeline_move_milestone button {
+          background:linear-gradient(155deg,rgba(232,242,124,.20),#101510 70%) !important;
+        }
+        .st-key-timeline_move_merge button {
+          background:linear-gradient(155deg,rgba(243,166,200,.20),#161015 70%) !important;
+        }
+        .st-key-timeline_move_share_resources button {
+          background:linear-gradient(155deg,rgba(130,199,255,.20),#0c1419 70%) !important;
+        }
+        .st-key-timeline_move_wait button {
+          background:linear-gradient(155deg,rgba(170,180,189,.16),#101414 70%) !important;
+        }
+        .st-key-timeline_move_prepare button {
+          background:linear-gradient(155deg,rgba(255,189,120,.20),#17130e 70%) !important;
+        }
+        .st-key-timeline_move_get_intelligence button {
+          background:linear-gradient(155deg,rgba(168,230,207,.20),#0d1613 70%) !important;
+        }
+        .st-key-timeline_move_synchronise button {
+          background:linear-gradient(155deg,rgba(200,182,255,.20),#121017 70%) !important;
+        }
+        [class*="st-key-timeline_move_"] button:hover {
+          transform:translateY(-7px) scale(1.018);
+          box-shadow:
+            0 18px 0 rgba(0,0,0,.10),
+            0 30px 64px rgba(0,0,0,.32) !important;
+        }
+        .st-key-timeline_add_uncertainty button {
+          min-height:3.8rem !important; border:0 !important;
+          border-radius:999px !important;
+          background:rgba(128,214,195,.10) !important;
+        }
+        [class*="st-key-timeline_utility_"] button {
+          border:0 !important; border-radius:999px !important;
+          background:rgba(255,255,255,.035) !important;
+        }
+        </style>
+        """,
+        "Gallery": """
+        <style>
+        :root {
+          --object-size:4rem;
+          --object-label-size:.68rem;
+          --object-label:#e8eee9;
+        }
+        .stApp { background:#040706 !important; }
+        .block-container { max-width:1640px; padding:.7rem 1.25rem 2.5rem; }
+        [data-testid="stPlotlyChart"] {
+          border-radius:0 !important; box-shadow:none !important;
+        }
+        .timeline-hud {
+          opacity:.58; border-bottom:0 !important; padding-bottom:.25rem !important;
+        }
+        .timeline-field-note { opacity:.42; }
+        .timeline-dock-label {
+          height:0; overflow:hidden; margin-top:-6.1rem !important;
+          opacity:0;
+        }
+        [class*="st-key-timeline_move_"] button {
+          min-height:6.2rem !important; border:0 !important;
+          border-radius:999px !important; background:transparent !important;
+          box-shadow:none !important;
+        }
+        .st-key-timeline_core_moves [class*="st-key-timeline_move_"] {
+          margin-top:-5.5rem; margin-bottom:5.5rem;
+        }
+        [class*="st-key-timeline_move_"] button p::after {
+          opacity:0; transform:translateY(-4px);
+        }
+        [class*="st-key-timeline_move_"] button:hover {
+          background:rgba(235,243,238,.065) !important;
+          transform:translateY(-3px);
+        }
+        [class*="st-key-timeline_move_"] button:hover p::after {
+          opacity:1; transform:translateY(0);
+        }
+        .st-key-timeline_add_uncertainty button,
+        [class*="st-key-timeline_utility_"] button {
+          border:0 !important; border-radius:999px !important;
+          background:transparent !important; opacity:.52;
+        }
+        .st-key-timeline_add_uncertainty button:hover,
+        [class*="st-key-timeline_utility_"] button:not(:disabled):hover {
+          background:rgba(235,243,238,.05) !important; opacity:1;
+        }
+        </style>
+        """,
+    }
+    st.markdown(
+        dedent(common) + dedent(variants[variant]),
+        unsafe_allow_html=True,
+    )
+
+
 _apply_timeline_theme()
+if STYLE_LAB_ENABLED:
+    _apply_style_lab_theme(style_lab_variant)
 _apply_pending_widget_reset()
 
 events = _state("events", [])
@@ -803,19 +1357,19 @@ top_left, top_toggle = st.columns([3, 1], vertical_alignment="bottom")
 with top_toggle:
     layer = st.segmented_control(
         "Field layer",
-        options=("Personal", "Convergence"),
+        options=("Personal", "Convergence · simulated"),
         default="Personal",
         key=_widget_key("layer"),
         label_visibility="collapsed",
         width="stretch",
     )
-show_collective = layer == "Convergence"
+show_collective = layer == "Convergence · simulated"
 
 with top_left:
     st.markdown(
         f"""
         <div class="timeline-hud">
-          <div><small>Protocol test 02</small><strong>Trajectory field</strong></div>
+          <div><small>Protocol test 02 · {html.escape(benchmark_horizon)}</small><strong>{html.escape(benchmark_title)}</strong></div>
           <div class="timeline-readout"><small>Phase</small><b>PATH BUILDING</b></div>
           <div class="timeline-readout"><small>Moves</small><b>{len(placed_events):02d}</b></div>
           <div class="timeline-readout"><small>Uncertainty</small><b>{len(uncertainties):02d}</b></div>
@@ -837,15 +1391,64 @@ if isinstance(confirmation, dict):
         unsafe_allow_html=True,
     )
 
-rail_column, stage_column = st.columns(
-    [1.05, 3.55],
-    gap="large",
-    vertical_alignment="top",
-)
-
 preview_parameter: float | None = None
 uncertainty_preview: dict[str, object] | None = None
-with rail_column:
+with st.sidebar:
+    if STYLE_LAB_ENABLED:
+        st.markdown(
+            """
+            <nav class="style-lab-nav" aria-label="Style Lab navigation">
+              <a href="./commons" target="_self"><b>◎</b><span>Commons</span></a>
+              <a href="./capacity" target="_self"><b>⬢</b><span>Tracks</span></a>
+              <a href="./commons-host" target="_self"><b>◉</b><span>Operations</span></a>
+              <a href="./test-timeline-benchmarks" target="_self"><b>◌</b><span>Experiments</span></a>
+            </nav>
+            <div class="style-lab-head">
+              <small>Experiment · visual system only</small>
+              <h2>Trajectory Style Lab</h2>
+              <p>Same geometry and interaction. Three different ways for the trajectory to command the room.</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        with st.container(key="timeline_style_lab_selector"):
+            selected_style_lab_variant = st.segmented_control(
+                "Visual direction",
+                options=STYLE_LAB_VARIANTS,
+                default="Playground",
+                key=STYLE_LAB_KEY,
+                width="stretch",
+                label_visibility="collapsed",
+            )
+            if selected_style_lab_variant in STYLE_LAB_VARIANTS:
+                style_lab_variant = str(selected_style_lab_variant)
+            else:
+                style_lab_variant = "Playground"
+        st.caption(
+            {
+                "Instrument": "Soft terminal · precise, spacious, quietly technical.",
+                "Playground": "Big toy · oversized objects with physical feedback.",
+                "Gallery": "Minimal museum · the controls almost disappear.",
+            }[style_lab_variant]
+        )
+    if active_benchmark:
+        st.markdown(
+            f"""
+            <div class="timeline-sidebar-head">
+              <span class="timeline-experimental-badge">Active benchmark</span>
+              <h3>{html.escape(benchmark_title)}</h3>
+              <p>{html.escape(str(active_benchmark.get('prompt') or 'Draw the trajectory you imagine.'))}</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        if st.button(
+            "← Choose another benchmark",
+            key="timeline_choose_benchmark",
+            icon="🧭",
+            width="stretch",
+        ):
+            st.switch_page("views/test_timeline_benchmarks.py")
     with st.container(key="timeline_rail"):
         with st.expander("Roadmap geometry", expanded=False):
             st.caption(
@@ -1007,6 +1610,8 @@ with rail_column:
             )
         else:
             definition = EVENT_TYPES[str(pending_type)]
+            if definition.get("description"):
+                st.caption(str(definition["description"]))
             preview_parameter = st.slider(
                 "When",
                 min_value=0.02,
@@ -1146,7 +1751,7 @@ with rail_column:
                 "They remain stored and have not been deleted."
             )
 
-with stage_column:
+with st.container(key="timeline_stage"):
     st.markdown(
         f"""
         <div class="timeline-field-note">
@@ -1185,17 +1790,24 @@ with stage_column:
         st.session_state[_widget_key("bounds")] = expanded
         bounds = expanded
 
+    trajectory_figure = _build_figure(
+        events,
+        uncertainties,
+        show_collective=show_collective,
+        landing_mode=landing_mode,
+        preview_parameter=preview_parameter,
+        preview_type=str(pending_type) if pending_type else None,
+        uncertainty_preview=uncertainty_preview,
+        bounds=bounds,
+    )
+    if STYLE_LAB_ENABLED:
+        trajectory_figure = _apply_style_lab_figure(
+            trajectory_figure,
+            style_lab_variant,
+        )
+
     st.plotly_chart(
-        _build_figure(
-            events,
-            uncertainties,
-            show_collective=show_collective,
-            landing_mode=landing_mode,
-            preview_parameter=preview_parameter,
-            preview_type=str(pending_type) if pending_type else None,
-            uncertainty_preview=uncertainty_preview,
-            bounds=bounds,
-        ),
+        trajectory_figure,
         width="stretch",
         config={
             "displaylogo": False,
@@ -1216,19 +1828,18 @@ with stage_column:
         '<div class="timeline-dock-label">Place a move</div>',
         unsafe_allow_html=True,
     )
-    move_columns = st.columns(5, gap="small")
-    for column, (event_type, definition) in zip(
-        move_columns,
-        EVENT_TYPES.items(),
-    ):
-        with column:
-            if st.button(
-                f"{definition['glyph']}  {definition['label']}",
-                key=f"timeline_move_{event_type}",
-                width="stretch",
-            ):
-                _request_placement(event_type)
-                st.rerun()
+    with st.container(key="timeline_core_moves"):
+        _render_move_row(CORE_EVENT_TYPE_KEYS, pending_type)
+
+    st.markdown(
+        (
+            '<div class="timeline-dock-label timeline-planning-label">'
+            "Planning primitives</div>"
+        ),
+        unsafe_allow_html=True,
+    )
+    with st.container(key="timeline_planning_moves"):
+        _render_move_row(PLANNING_PRIMITIVE_KEYS, pending_type)
 
     uncertainty_column, remove_uncertainty_column = st.columns([2.3, 1])
     with uncertainty_column:
@@ -1305,59 +1916,61 @@ with stage_column:
         )
 
     if show_inspector and placed_events:
-        selected_id = st.selectbox(
-            "Inspect move",
-            options=[str(event["id"]) for event in placed_events],
-            format_func=lambda event_id: _event_label(
-                next(
-                    event
-                    for event in placed_events
-                    if str(event["id"]) == event_id
-                )
-            ),
-            key=_widget_key("selected_event"),
-        )
-        selected_event = next(
-            event
-            for event in placed_events
-            if str(event["id"]) == str(selected_id)
-        )
-        selected_definition = EVENT_TYPES[str(selected_event["type"])]
-        st.markdown(
-            f"""
-            <div class="timeline-inspector">
-              <b>{html.escape(selected_definition['glyph'])} {html.escape(str(selected_event['title']))}</b><br>
-              {html.escape(selected_definition['label'])} ·
-              s={float(selected_event['time_parameter']):.2f} ·
-              {date.fromisoformat(str(selected_event['date_value'])).strftime('%d %b %Y')} ·
-              {html.escape(str(selected_event['importance']))} ·
-              {html.escape(str(selected_event['node_mode']).title())}
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-        edit_column, remove_column = st.columns(2)
-        with edit_column:
-            if st.button(
-                "Edit selected move",
-                key="timeline_utility_edit",
-                width="stretch",
-            ):
-                _request_placement(
-                    str(selected_event["type"]),
-                    event=selected_event,
-                )
-                st.rerun()
-        with remove_column:
-            if st.button(
-                "Remove selected move",
-                key="timeline_utility_remove",
-                width="stretch",
-            ):
-                events[:] = [
-                    event
-                    for event in events
-                    if str(event["id"]) != str(selected_event["id"])
-                ]
-                st.session_state[_widget_key("integrated")] = False
-                st.rerun()
+        with st.sidebar:
+            st.divider()
+            selected_id = st.selectbox(
+                "Inspect move",
+                options=[str(event["id"]) for event in placed_events],
+                format_func=lambda event_id: _event_label(
+                    next(
+                        event
+                        for event in placed_events
+                        if str(event["id"]) == event_id
+                    )
+                ),
+                key=_widget_key("selected_event"),
+            )
+            selected_event = next(
+                event
+                for event in placed_events
+                if str(event["id"]) == str(selected_id)
+            )
+            selected_definition = EVENT_TYPES[str(selected_event["type"])]
+            st.markdown(
+                f"""
+                <div class="timeline-inspector">
+                  <b>{html.escape(selected_definition['glyph'])} {html.escape(str(selected_event['title']))}</b><br>
+                  {html.escape(selected_definition['label'])} ·
+                  s={float(selected_event['time_parameter']):.2f} ·
+                  {date.fromisoformat(str(selected_event['date_value'])).strftime('%d %b %Y')} ·
+                  {html.escape(str(selected_event['importance']))} ·
+                  {html.escape(str(selected_event['node_mode']).title())}
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            edit_column, remove_column = st.columns(2)
+            with edit_column:
+                if st.button(
+                    "Edit selected move",
+                    key="timeline_utility_edit",
+                    width="stretch",
+                ):
+                    _request_placement(
+                        str(selected_event["type"]),
+                        event=selected_event,
+                    )
+                    st.rerun()
+            with remove_column:
+                if st.button(
+                    "Remove selected move",
+                    key="timeline_utility_remove",
+                    width="stretch",
+                ):
+                    events[:] = [
+                        event
+                        for event in events
+                        if str(event["id"]) != str(selected_event["id"])
+                    ]
+                    st.session_state[_widget_key("integrated")] = False
+                    st.rerun()

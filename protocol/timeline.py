@@ -24,10 +24,69 @@ PLANNED_END_TANGENT: Slope = (0.0, 0.0)
 EVENT_TYPES: dict[str, dict[str, str]] = {
     "release": {"label": "Release", "glyph": "★", "color": "#f6d365"},
     "event": {"label": "Event", "glyph": "●", "color": "#80d6c3"},
+    "gateway": {
+        "label": "Information gateway",
+        "glyph": "◈",
+        "color": "#d6a8ff",
+        "description": "A moment when information is exchanged.",
+    },
     "action": {"label": "Action", "glyph": "▲", "color": "#ff8b69"},
     "update": {"label": "Update", "glyph": "■", "color": "#9ca8ff"},
     "milestone": {"label": "Milestone", "glyph": "▼", "color": "#e8f27c"},
+    "merge": {
+        "label": "Merge",
+        "glyph": "⋈",
+        "color": "#f3a6c8",
+        "description": "Bring two workstreams or trajectories together.",
+    },
+    "share_resources": {
+        "label": "Share resources",
+        "glyph": "⇄",
+        "color": "#82c7ff",
+        "description": "Exchange capacity, time, materials or access.",
+    },
+    "wait": {
+        "label": "Wait",
+        "glyph": "◷",
+        "color": "#aab4bd",
+        "description": "Hold position until conditions change.",
+    },
+    "prepare": {
+        "label": "Prepare",
+        "glyph": "◒",
+        "color": "#ffbd78",
+        "description": "Build readiness for a later move.",
+    },
+    "get_intelligence": {
+        "label": "Get intelligence",
+        "glyph": "⌾",
+        "color": "#a8e6cf",
+        "description": "Gather information before deciding what comes next.",
+    },
+    "synchronise": {
+        "label": "Synchronise",
+        "glyph": "⟳",
+        "color": "#c8b6ff",
+        "description": "Align timing or state across actors.",
+    },
 }
+
+CORE_EVENT_TYPE_KEYS = (
+    "release",
+    "event",
+    "gateway",
+    "action",
+    "update",
+    "milestone",
+)
+PLANNING_PRIMITIVE_KEYS = (
+    "merge",
+    "share_resources",
+    "wait",
+    "prepare",
+    "get_intelligence",
+    "synchronise",
+)
 
 IMPORTANCE_LEVELS: dict[str, dict[str, float]] = {
     "Signal": {"energy_offset": 0.14, "influence_width": 0.08},

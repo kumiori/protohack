@@ -5,8 +5,10 @@ import pytest
 from streamlit.testing.v1 import AppTest
 
 from protocol.timeline import (
+    CORE_EVENT_TYPE_KEYS,
     EVENT_TYPES,
     IMPORTANCE_LEVELS,
+    PLANNING_PRIMITIVE_KEYS,
     UNCERTAINTY_STRENGTHS,
     active_events,
     control_nodes,
@@ -285,10 +287,33 @@ def test_shapes_carry_the_event_vocabulary() -> None:
     } == {
         "release": "★",
         "event": "●",
+        "gateway": "◈",
         "action": "▲",
         "update": "■",
         "milestone": "▼",
+        "merge": "⋈",
+        "share_resources": "⇄",
+        "wait": "◷",
+        "prepare": "◒",
+        "get_intelligence": "⌾",
+        "synchronise": "⟳",
     }
+    assert CORE_EVENT_TYPE_KEYS == (
+        "release",
+        "event",
+        "gateway",
+        "action",
+        "update",
+        "milestone",
+    )
+    assert PLANNING_PRIMITIVE_KEYS == (
+        "merge",
+        "share_resources",
+        "wait",
+        "prepare",
+        "get_intelligence",
+        "synchronise",
+    )
     assert tuple(IMPORTANCE_LEVELS) == ("Signal", "Lever", "Threshold")
 
 
@@ -326,7 +351,11 @@ def test_first_move_appears_without_a_second_click() -> None:
     placed = app.session_state["timeline_game_events"][0]
     assert placed["title"] == "Open the field"
     assert placed["time_parameter"] == pytest.approx(0.32)
-    assert placed["date_value"] == "2027-03-20"
+    assert placed["date_value"] == date_for_parameter(
+        0.32,
+        start_date=date.today(),
+        end_date=date.today() + timedelta(days=730),
+    ).isoformat()
     assert placed["node_mode"] == "smooth"
     assert placed["alignment_offset"] == 0.0
     assert button(app, "↶ Undo last").disabled is False

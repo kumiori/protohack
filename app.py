@@ -9,7 +9,7 @@ st.set_page_config(
     page_title="Protocol Hack · Commons",
     page_icon="🧭",
     layout="wide",
-    initial_sidebar_state="collapsed",
+    initial_sidebar_state="expanded",
 )
 apply_theme()
 
@@ -65,10 +65,22 @@ navigation = st.navigation(
         ],
         "Tests": [
             st.Page(
+                "views/test_timeline_benchmarks.py",
+                title="Timeline benchmarks",
+                icon="🧭",
+                url_path="test-timeline-benchmarks",
+            ),
+            st.Page(
                 "views/test_timeline_game.py",
                 title="Timeline game",
                 icon="〽️",
                 url_path="test-timeline-game",
+            ),
+            st.Page(
+                "views/test_timeline_style_lab.py",
+                title="Trajectory Style Lab",
+                icon="🎨",
+                url_path="test-timeline-style-lab",
             ),
             st.Page(
                 "views/test_landing_primitives.py",
