@@ -338,6 +338,34 @@ def test_timeline_is_an_isolated_registered_test_surface() -> None:
         view_source
     )
     assert "No record has been saved." in view_source
+    assert "How much does this change the journey?" in view_source
+    assert "Does this bend the path…" in view_source
+    assert '"Signal": "Small influence"' in view_source
+    assert '"Kink": "Bifurcation"' in view_source
+    assert "Try rotating the view" in view_source
+
+
+def test_guided_benchmark_dates_and_destination_drive_the_scene() -> None:
+    app = AppTest.from_file(str(VIEW), default_timeout=10)
+    app.session_state["timeline_active_benchmark"] = {
+        "title": "Cook dinner for friends",
+        "horizon_label": "2 hours",
+        "horizon_days": 1,
+        "start_date": "2026-08-02",
+        "end_date": "2026-08-03",
+        "destination_label": "Dinner served",
+        "guided_setup": True,
+        "suggested_moves": ("Action · buy ingredients",),
+    }
+    app.run()
+
+    assert not app.exception
+    rendered = "\n".join(markdown.value for markdown in app.markdown)
+    captions = "\n".join(caption.value for caption in app.caption)
+    assert "02 Aug 2026 → 03 Aug 2026" in captions
+    assert "Add a move" in rendered
+    assert "Your path exists. Now shape it." in rendered
+    assert button(app, "▲  buy ingredients")
 
 
 def test_first_move_appears_without_a_second_click() -> None:

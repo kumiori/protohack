@@ -53,9 +53,38 @@ benchmark_horizon = str(
     active_benchmark.get("horizon_label") or "2-year experimental horizon"
 )
 benchmark_days = max(1, int(active_benchmark.get("horizon_days") or 730))
-ROADMAP_START = date.today()
-ROADMAP_END = ROADMAP_START + timedelta(days=benchmark_days)
+try:
+    ROADMAP_START = date.fromisoformat(
+        str(active_benchmark.get("start_date") or "")
+    )
+except ValueError:
+    ROADMAP_START = date.today()
+try:
+    ROADMAP_END = date.fromisoformat(
+        str(active_benchmark.get("end_date") or "")
+    )
+except ValueError:
+    ROADMAP_END = ROADMAP_START + timedelta(days=benchmark_days)
+if ROADMAP_END <= ROADMAP_START:
+    ROADMAP_END = ROADMAP_START + timedelta(days=benchmark_days)
+destination_label = str(
+    active_benchmark.get("destination_label") or ""
+).strip()
 CAMERA_STORAGE_KEY = "protocol-hack:timeline-camera-v2"
+IMPORTANCE_COPY = {
+    "Signal": "Small influence",
+    "Lever": "Changes direction",
+    "Threshold": "Unfolding depends on this",
+}
+NODE_MODE_COPY = {
+    "Smooth": "Gradually",
+    "Kink": "Bifurcation",
+}
+LANDING_COPY = {
+    "Open": "Find the way",
+    "Guided": "Arrive in a zone",
+    "Planned": "Follow a plan",
+}
 
 
 def _state(name: str, default: object) -> object:
@@ -83,6 +112,7 @@ def _request_placement(
     event_type: str,
     *,
     event: dict[str, object] | None = None,
+    title: str = "",
 ) -> None:
     st.session_state[_widget_key("pending_type")] = event_type
     st.session_state[_widget_key("pending_uncertainty")] = False
@@ -91,13 +121,63 @@ def _request_placement(
     )
     st.session_state[_widget_key("placement_reset")] = {
         "time_slider": float(event["time_parameter"]) if event else 0.22,
-        "form_title": str(event["title"]) if event else "",
+        "form_title": str(event["title"]) if event else title,
         "importance": str(event["importance"]) if event else "Signal",
         "node_mode": (
             str(event["node_mode"]).title() if event else "Smooth"
         ),
     }
     st.session_state[_widget_key("integrated")] = False
+
+
+def _render_journey_progress(move_count: int) -> None:
+    if not active_benchmark.get("guided_setup"):
+        return
+    labels = (
+        "Benchmark",
+        "Horizon",
+        "Destination",
+        "Trajectory",
+        "Add a move",
+        "Observe",
+        "Continue",
+        "Compare",
+    )
+    if move_count == 0:
+        current = 4
+    elif move_count == 1:
+        current = 5
+    elif move_count == 2:
+        current = 6
+    else:
+        current = 7
+    items: list[str] = []
+    for index, label in enumerate(labels):
+        if index < current:
+            marker, state = "✓", "done"
+        elif index == current:
+            marker, state = "→", "current"
+        else:
+            marker, state = "○", "pending"
+        items.append(
+            f'<div class="timeline-journey-step {state}"><b>{marker}</b>'
+            f"<span>{html.escape(label)}</span></div>"
+        )
+    st.markdown(
+        f'<div class="timeline-journey-steps">{"".join(items)}</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def _suggested_move_parts(suggestion: object) -> tuple[str, str] | None:
+    text = str(suggestion)
+    label, separator, title = text.partition(" · ")
+    if not separator or not title.strip():
+        return None
+    for key, definition in EVENT_TYPES.items():
+        if str(definition["label"]).casefold() == label.strip().casefold():
+            return key, title.strip()
+    return None
 
 
 def _request_uncertainty() -> None:
@@ -407,6 +487,11 @@ def _build_figure(
         "guided": "GUIDED LANDING",
         "planned": "PLANNED LANDING",
     }
+    landing_text = (
+        destination_label.upper()
+        if destination_label
+        else landing_labels[landing_mode]
+    )
     figure.add_trace(
         go.Scatter3d(
             x=[END_POINT[0]],
@@ -419,7 +504,7 @@ def _build_figure(
                 "color": "#8fa39c",
                 "line": {"color": "#8fa39c", "width": 2},
             },
-            text=[landing_labels[landing_mode]],
+            text=[landing_text],
             textposition="top center",
             textfont={"color": "#71827d", "size": 10},
             hoverinfo="skip",
@@ -469,16 +554,22 @@ def _build_figure(
                         date.fromisoformat(str(event["date_value"])).strftime(
                             "%d %b %Y"
                         ),
-                        str(event["importance"]),
-                        str(event["node_mode"]).title(),
+                        IMPORTANCE_COPY.get(
+                            str(event["importance"]),
+                            str(event["importance"]),
+                        ),
+                        NODE_MODE_COPY.get(
+                            str(event["node_mode"]).title(),
+                            str(event["node_mode"]).title(),
+                        ),
                     ]
                     for event in placed
                 ],
                 hovertemplate=(
                     "<b>%{customdata[0]}</b><br>"
                     "%{customdata[1]} · s=%{customdata[2]} / %{customdata[3]}"
-                    "<br>Importance: %{customdata[4]}"
-                    "<br>Geometry: %{customdata[5]}<extra></extra>"
+                    "<br>Journey effect: %{customdata[4]}"
+                    "<br>Path: %{customdata[5]}<extra></extra>"
                 ),
                 showlegend=False,
                 name="Placed events",
@@ -751,6 +842,31 @@ def _apply_timeline_theme() -> None:
           font-size:.68rem; letter-spacing:.08em; text-transform:uppercase;
           margin:.6rem 0 -.25rem;
         }
+        .timeline-journey-steps {
+          display:grid; grid-template-columns:repeat(8,1fr); gap:.32rem;
+          margin:.8rem 0 .55rem;
+        }
+        .timeline-journey-step {
+          display:flex; align-items:center; gap:.42rem; min-width:0;
+          padding:.48rem .5rem; border-bottom:2px solid #263732;
+          color:#60716b; font-size:.58rem; letter-spacing:.025em;
+        }
+        .timeline-journey-step b { font-size:.72rem; font-weight:500; }
+        .timeline-journey-step.done { color:#8ea39b; border-color:#45655a; }
+        .timeline-journey-step.done b { color:#78d6a7; }
+        .timeline-journey-step.current {
+          color:#edf2ed; border-color:#dfe875; background:#07110f;
+        }
+        .timeline-journey-step.current b { color:#dfe875; }
+        .timeline-first-instruction {
+          display:flex; align-items:center; justify-content:space-between;
+          gap:1rem; margin:.7rem 0 .35rem; padding:.72rem .85rem;
+          border-left:2px solid #dfe875; background:#07110f;
+        }
+        .timeline-first-instruction b {
+          color:#edf2ed; font-size:.76rem; font-weight:500;
+        }
+        .timeline-first-instruction span { color:#82958e; font-size:.65rem; }
         [data-testid="stPlotlyChart"] {
           border:1px solid #1d2b27; border-radius:8px; overflow:hidden;
           box-shadow:0 0 60px rgba(80,138,124,.07);
@@ -845,6 +961,23 @@ def _apply_timeline_theme() -> None:
           border-radius:6px !important; background:#dfe875 !important;
           color:#11160e !important; box-shadow:none !important;
         }
+        .st-key-timeline_choose_benchmark button,
+        [class*="st-key-timeline_suggested_move_"] button {
+          min-height:2.7rem !important; border:1px solid #30423d !important;
+          border-radius:6px !important; background:#06100e !important;
+          color:#a8b9b3 !important; box-shadow:none !important;
+          transition:transform 100ms ease, border-color 140ms ease,
+            color 140ms ease !important;
+        }
+        .st-key-timeline_choose_benchmark button:hover,
+        [class*="st-key-timeline_suggested_move_"] button:hover {
+          border-color:#82978f !important; color:#edf2ed !important;
+          transform:translateY(-1px);
+        }
+        .st-key-timeline_choose_benchmark button:active,
+        [class*="st-key-timeline_suggested_move_"] button:active {
+          transform:scale(.97) !important; transition-duration:70ms !important;
+        }
         .st-key-timeline_cancel_uncertainty button,
         .st-key-timeline_remove_uncertainty button {
           min-height:2.6rem !important; border:1px solid #30423d !important;
@@ -865,7 +998,14 @@ def _apply_timeline_theme() -> None:
           border-style:dashed !important; filter:saturate(.25);
         }
         [class*="st-key-timeline_utility_"] button:not(:disabled):hover {
-          color:#eef2e8 !important;
+          color:#eef2e8 !important; background:#0a1512 !important;
+          transform:translateY(-1px);
+        }
+        [class*="st-key-timeline_utility_"] button:not(:disabled):active,
+        .st-key-timeline_add_uncertainty button:active,
+        .st-key-timeline_anchor_uncertainty button:active,
+        [data-testid="stFormSubmitButton"] button:active {
+          transform:scale(.97) !important; transition-duration:70ms !important;
         }
         [class*="st-key-timeline_utility_integrate"] button:not(:disabled) {
           border-color:#dfe875 !important; color:#dfe875 !important;
@@ -890,10 +1030,22 @@ def _apply_timeline_theme() -> None:
         [data-testid="stButtonGroup"] button {
           background:#020807 !important; border-color:#344640 !important;
           color:#aab8b3 !important; border-radius:4px !important;
+          transition:background 140ms ease, border-color 140ms ease,
+            color 140ms ease, transform 100ms ease !important;
         }
-        button[data-testid="stBaseButton-pillsActive"] {
+        [data-testid="stButtonGroup"] button:hover {
+          background:#0a1512 !important; border-color:#8da099 !important;
+          color:#edf2ed !important; transform:translateY(-1px);
+        }
+        [data-testid="stButtonGroup"] button:active {
+          transform:scale(.96) !important; transition-duration:70ms !important;
+        }
+        button[data-testid="stBaseButton-pillsActive"],
+        button[data-testid="stBaseButton-segmented_controlActive"] {
           background:#dfe875 !important; color:#11160e !important;
           border-color:#dfe875 !important;
+          box-shadow:inset 0 -3px 0 rgba(17,22,14,.18),
+            0 0 0 2px rgba(223,232,117,.12) !important;
         }
         [data-testid="stSlider"] [role="slider"] {
           background:#dfe875 !important; border-color:#dfe875 !important;
@@ -902,6 +1054,10 @@ def _apply_timeline_theme() -> None:
           min-height:3rem; width:100%; background:#dfe875 !important;
           color:#11160e !important; border:0 !important; border-radius:5px !important;
           box-shadow:none !important; text-transform:uppercase; letter-spacing:.08em;
+          transition:transform 100ms ease, filter 140ms ease !important;
+        }
+        [data-testid="stFormSubmitButton"] button:hover {
+          filter:brightness(1.08); transform:translateY(-1px);
         }
         [data-testid="stFormSubmitButton"] button p {
           color:#11160e !important;
@@ -920,6 +1076,7 @@ def _apply_timeline_theme() -> None:
           .timeline-readout { text-align:left; min-width:0; }
           .timeline-confirmation { left:1rem; right:1rem; top:4rem; }
           [data-testid="stPlotlyChart"] { min-height:470px; }
+          .timeline-journey-steps { grid-template-columns:repeat(4,1fr); }
         }
         </style>
         """,
@@ -1379,10 +1536,24 @@ with top_left:
         unsafe_allow_html=True,
     )
 
+_render_journey_progress(len(placed_events))
+
 confirmation = st.session_state.pop(_widget_key("confirmation"), None)
 if isinstance(confirmation, dict):
     st.markdown(
         f"""
+        <style>
+        @keyframes timeline-settle {{
+          0% {{ transform:translateX(0); filter:none; }}
+          22% {{ transform:translateX(-2px); filter:brightness(1.08); }}
+          44% {{ transform:translateX(2px); }}
+          68% {{ transform:translateX(-1px); }}
+          100% {{ transform:translateX(0); filter:none; }}
+        }}
+        [data-testid="stPlotlyChart"] {{
+          animation:timeline-settle 520ms cubic-bezier(.2,.8,.2,1);
+        }}
+        </style>
         <div class="timeline-confirmation">
           <b>{html.escape(str(confirmation['title']))}</b>
           <span>{html.escape(str(confirmation['detail']))}</span>
@@ -1435,7 +1606,7 @@ with st.sidebar:
         st.markdown(
             f"""
             <div class="timeline-sidebar-head">
-              <span class="timeline-experimental-badge">Active benchmark</span>
+              <span class="timeline-experimental-badge">Experiment</span>
               <h3>{html.escape(benchmark_title)}</h3>
               <p>{html.escape(str(active_benchmark.get('prompt') or 'Draw the trajectory you imagine.'))}</p>
             </div>
@@ -1450,43 +1621,42 @@ with st.sidebar:
         ):
             st.switch_page("views/test_timeline_benchmarks.py")
     with st.container(key="timeline_rail"):
-        with st.expander("Roadmap geometry", expanded=False):
+        with st.expander("Trajectory", expanded=False):
             st.caption(
                 f"{ROADMAP_START.strftime('%d %b %Y')} → "
                 f"{ROADMAP_END.strftime('%d %b %Y')}"
             )
             landing_label = st.segmented_control(
-                "Landing plan",
+                "How should the path arrive?",
                 options=("Open", "Guided", "Planned"),
                 default="Open",
                 key=_widget_key("landing_mode"),
+                format_func=lambda value: LANDING_COPY[str(value)],
                 width="stretch",
             )
             st.caption(
                 {
-                    "Open": "Destination fixed; arrival direction inferred.",
-                    "Guided": (
-                        "Destination fixed; arrival flattens into a landing plane."
-                    ),
-                    "Planned": "Destination and final orientation fixed.",
+                    "Open": "We know the destination, but not yet how to arrive.",
+                    "Guided": "Arrival can settle within a broad landing condition.",
+                    "Planned": "The destination and arrival direction are defined.",
                 }[str(landing_label)]
             )
         landing_mode = str(landing_label).lower()
 
         rail_title = (
-            "Uncertainty modifier"
+            "Thicken an uncertain stretch"
             if pending_uncertainty
-            else "Event placement"
+            else "Shape the journey"
         )
         rail_description = (
             "Thicken a local interval without moving the current best estimate."
             if pending_uncertainty
-            else "Time is authored here. Alignment and energy are generated from the event semantics."
+            else "Choose an object below, then decide when and how strongly it changes the path."
         )
         st.markdown(
             f"""
             <div class="timeline-sidebar-head">
-              <span class="timeline-experimental-badge">Experimental</span>
+              <span class="timeline-experimental-badge">Moves</span>
               <h3>{rail_title}</h3>
               <p>{rail_description}</p>
             </div>
@@ -1606,8 +1776,33 @@ with st.sidebar:
 
         elif pending_type is None:
             st.caption(
-                "Select a move type, or add a local uncertainty modifier."
+                "Choose a move object below, or thicken one uncertain stretch."
             )
+            suggestions = tuple(active_benchmark.get("suggested_moves") or ())
+            parsed_suggestions = tuple(
+                parsed
+                for suggestion in suggestions
+                if (parsed := _suggested_move_parts(suggestion)) is not None
+            )
+            if parsed_suggestions:
+                with st.expander("Try a possible move", expanded=True):
+                    st.caption(
+                        "Choose one to open it on the trajectory. You can rename it."
+                    )
+                    for index, (suggested_type, suggested_title) in enumerate(
+                        parsed_suggestions
+                    ):
+                        suggested_definition = EVENT_TYPES[suggested_type]
+                        if st.button(
+                            f"{suggested_definition['glyph']}  {suggested_title}",
+                            key=f"timeline_suggested_move_{index}",
+                            width="stretch",
+                        ):
+                            _request_placement(
+                                suggested_type,
+                                title=suggested_title,
+                            )
+                            st.rerun()
         else:
             definition = EVENT_TYPES[str(pending_type)]
             if definition.get("description"):
@@ -1649,15 +1844,17 @@ with st.sidebar:
                     key=_widget_key("form_title"),
                 )
                 importance = st.segmented_control(
-                    "Importance",
+                    "How much does this change the journey?",
                     options=tuple(IMPORTANCE_LEVELS),
                     key=_widget_key("importance"),
+                    format_func=lambda value: IMPORTANCE_COPY[str(value)],
                     width="stretch",
                 )
                 node_mode_label = st.segmented_control(
-                    "Geometry",
+                    "Does this bend the path…",
                     options=("Smooth", "Kink"),
                     key=_widget_key("node_mode"),
+                    format_func=lambda value: NODE_MODE_COPY[str(value)],
                     width="stretch",
                 )
                 with st.expander("Details · optional", expanded=False):
@@ -1737,9 +1934,9 @@ with st.sidebar:
                     st.session_state[_widget_key("editing_id")] = None
                     st.session_state[_widget_key("integrated")] = False
                     st.session_state[_widget_key("confirmation")] = {
-                        "title": "Trajectory updated",
+                        "title": "Future reshaped",
                         "detail": (
-                            f"{definition['label']} anchored at "
+                            f"{definition['label']} settled into the path at "
                             f"s={preview_parameter:.2f}"
                         ),
                     }
@@ -1752,10 +1949,30 @@ with st.sidebar:
             )
 
 with st.container(key="timeline_stage"):
+    if not placed_events:
+        st.markdown(
+            """
+            <div class="timeline-first-instruction">
+              <b>Your path exists. Now shape it.</b>
+              <span>Try rotating the view, then choose your first move below.</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    elif len(placed_events) == 1:
+        st.markdown(
+            """
+            <div class="timeline-first-instruction">
+              <b>You changed the future.</b>
+              <span>Notice how the path settled, then choose what happens next.</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
     st.markdown(
         f"""
         <div class="timeline-field-note">
-          <span>Build your path · drag to orbit · scroll to zoom</span>
+          <span>Drag to orbit · scroll to zoom</span>
           <span>{'simulated collective traces' if show_collective else 'personal alignment neutral'}</span>
         </div>
         """,
@@ -1825,7 +2042,7 @@ with st.container(key="timeline_stage"):
     )
 
     st.markdown(
-        '<div class="timeline-dock-label">Place a move</div>',
+        '<div class="timeline-dock-label">Choose what happens next</div>',
         unsafe_allow_html=True,
     )
     with st.container(key="timeline_core_moves"):
@@ -1918,8 +2135,12 @@ with st.container(key="timeline_stage"):
     if show_inspector and placed_events:
         with st.sidebar:
             st.divider()
+            st.markdown(
+                '<div class="timeline-sidebar-kicker">Observations</div>',
+                unsafe_allow_html=True,
+            )
             selected_id = st.selectbox(
-                "Inspect move",
+                "Inspect a move",
                 options=[str(event["id"]) for event in placed_events],
                 format_func=lambda event_id: _event_label(
                     next(
@@ -1943,8 +2164,8 @@ with st.container(key="timeline_stage"):
                   {html.escape(selected_definition['label'])} ·
                   s={float(selected_event['time_parameter']):.2f} ·
                   {date.fromisoformat(str(selected_event['date_value'])).strftime('%d %b %Y')} ·
-                  {html.escape(str(selected_event['importance']))} ·
-                  {html.escape(str(selected_event['node_mode']).title())}
+                  {html.escape(IMPORTANCE_COPY.get(str(selected_event['importance']), str(selected_event['importance'])))} ·
+                  {html.escape(NODE_MODE_COPY.get(str(selected_event['node_mode']).title(), str(selected_event['node_mode']).title()))}
                 </div>
                 """,
                 unsafe_allow_html=True,

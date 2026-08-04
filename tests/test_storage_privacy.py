@@ -83,3 +83,34 @@ def test_question_feedback_is_separate_from_strategy_and_contact() -> None:
     assert rows == [feedback]
     assert repository.list_strategic_profiles("commons_pilot_2026") == []
     assert repository.list_coordination_interests("commons_pilot_2026") == []
+
+
+def test_mosaic_contact_store_is_separate_from_analytical_responses() -> None:
+    repository = InMemoryRepository()
+    repository.record_question_set_contact(
+        {
+            "record_type": "mosaic_contacts",
+            "question_set_id": "mosaic_v1",
+            "participant_uuid": PARTICIPANT,
+            "access_key": PARTICIPANT,
+            "name": "Participant",
+        }
+    )
+    repository.record_question_set_contact(
+        {
+            "record_type": "mosaic_contacts",
+            "question_set_id": "mosaic_v1",
+            "participant_uuid": PARTICIPANT,
+            "access_key": PARTICIPANT,
+            "email": "participant@example.org",
+            "communication_consent": True,
+        }
+    )
+
+    contact = repository.get_question_set_contact("mosaic_v1", PARTICIPANT)
+    assert contact is not None
+    assert contact["name"] == "Participant"
+    assert contact["email"] == "participant@example.org"
+    assert contact["communication_consent"] is True
+    assert repository.list_question_set_submissions("mosaic_v1") == []
+    assert repository.list_question_set_contacts("mosaic_v1") == [contact]

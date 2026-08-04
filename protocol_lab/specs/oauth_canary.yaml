@@ -1,0 +1,45 @@
+schema_version: protocol_lab_experiment_v1
+id: canary_oauth
+version: 0.1.0-canary
+status: canary
+experiment_number: 0
+title: OAuth Authorisation
+experience_title: Delegated Permission
+atlas_functions: [Identity, Delegation]
+question: How do I authorise an action without giving away my password?
+human_question: How can one party let another act on its behalf without handing over its primary secret?
+situation: [One party needs help acting across a boundary., Its primary secret should remain private.]
+need: Delegate limited authority across services while keeping primary credentials with their owner.
+north_star: Protocols make invisible negotiations executable.
+shippable: false
+completion_status: complete
+completion:
+  all:
+    - {participant_state: {participant: owner, equals: CONSENTED}}
+    - {participant_state: {participant: client, equals: AUTHORIZED}}
+protocol: {id: oauth, name: OAuth authorisation, source_label: RFC 6749, source_url: "https://www.rfc-editor.org/rfc/rfc6749.html", critical_reflection: Delegated authority is not the same as identity or informed consent.}
+archaeology:
+  - {id: oauth_need, text: Password sharing gave third-party applications excessive and poorly revocable power., provenance: historical_claim, source_label: RFC 6749, source_url: "https://www.rfc-editor.org/rfc/rfc6749.html"}
+evolution:
+  - {year: "2012", title: OAuth 2.0, description: An authorisation framework for limited third-party access., source_label: RFC 6749, source_url: "https://www.rfc-editor.org/rfc/rfc6749.html"}
+participants:
+  - {id: owner, label: Resource owner, initial_state: ASKED, states: [ASKED, CONSENTED]}
+  - {id: client, label: Client, initial_state: REQUESTING, states: [REQUESTING, AUTHORIZED]}
+messages:
+  - {id: consent, label: Consent, sender: owner, receiver: client, technical: A scoped authorisation decision., expanded: ["Owner: You may do this specific thing, for this purpose."]}
+transitions:
+  - {id: grant, actor: owner, from: ASKED, to: CONSENTED, trigger: command, command: grant, emit: [consent]}
+  - {id: accept_grant, actor: client, from: REQUESTING, to: AUTHORIZED, trigger: message, on_message: consent}
+invariants:
+  - {id: password_stays, kind: interpretive, description: The password never leaves its owner., assert: {states_are_declared: true}}
+failure_scenarios:
+  - {id: oauth_replay, family: adversary, label: Token replay, description: Reuse delegated authority outside its intended moment., operation: replay, applicable_messages: [consent]}
+hidden_state_rules:
+  - {id: oauth_agency, dimension: Agency, trigger_event: message_emitted:consent, level: mixed, actor: owner, observation: Consent delegates power and may narrow later choices., provenance: interpretive_hypothesis}
+reflection_prompts:
+  - {id: oauth_scope, trigger_event: "message_delivered:consent", question: "Did the owner understand the authority they delegated?", provenance: interpretive_hypothesis}
+field_note_prompts:
+  - {id: observation, note_type: observation, prompt: "What happened during authorisation?"}
+  - {id: interpretation, note_type: interpretation, prompt: "What might the result mean about delegated authority?"}
+  - {id: critique, note_type: critique, prompt: "What remains opaque or problematic?"}
+  - {id: amendment, note_type: amendment, prompt: "What should change about the protocol or experiment?"}

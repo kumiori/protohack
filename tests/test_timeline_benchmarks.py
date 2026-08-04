@@ -91,7 +91,7 @@ def test_payload_carries_the_selected_horizon_into_the_game() -> None:
     assert challenge_payload["horizon_days"] == 1825
 
 
-def test_benchmark_page_is_registered_and_sidebar_first() -> None:
+def test_benchmark_page_is_registered_and_guided_in_the_main_scene() -> None:
     app_source = APP.read_text(encoding="utf-8")
     view_source = VIEW.read_text(encoding="utf-8")
     game_source = GAME_VIEW.read_text(encoding="utf-8")
@@ -99,16 +99,18 @@ def test_benchmark_page_is_registered_and_sidebar_first() -> None:
     assert '"views/test_timeline_benchmarks.py"' in app_source
     assert 'url_path="test-timeline-benchmarks"' in app_source
     assert 'initial_sidebar_state="expanded"' in app_source
-    assert "with st.sidebar:" in view_source
-    assert "Experiment brief" in view_source
-    assert "Start drawing" in view_source
+    assert "with st.sidebar:" not in view_source
+    assert "Where are you starting?" in view_source
+    assert "Where do you plan to arrive?" in view_source
+    assert "Let’s imagine the journey." in view_source
+    assert "Draw the trajectory" in view_source
     assert "Shape reading" in view_source
     assert "with st.sidebar:" in game_source
     assert "rail_column" not in game_source
     assert 'with st.container(key="timeline_stage"):' in game_source
 
 
-def test_selecting_a_benchmark_updates_the_sidebar_brief() -> None:
+def test_selecting_a_benchmark_begins_the_guided_horizon_step() -> None:
     app = AppTest.from_file(str(VIEW), default_timeout=10).run()
 
     keyed_button(app, "choose_benchmark_bicycle-puncture").click().run()
@@ -118,9 +120,29 @@ def test_selecting_a_benchmark_updates_the_sidebar_brief() -> None:
         app.session_state["timeline_benchmarks_selected_id"]
         == "bicycle-puncture"
     )
+    assert app.session_state["timeline_benchmarks_setup_stage"] == "horizon"
     rendered = "\n".join(markdown.value for markdown in app.markdown)
     assert "Fix a bicycle puncture" in rendered
     assert "30–60 minutes" in rendered
+    assert "Where are you starting?" in rendered
+
+
+def test_horizon_and_destination_are_carried_into_the_experiment() -> None:
+    app = AppTest.from_file(str(VIEW), default_timeout=10).run()
+
+    keyed_button(app, "choose_benchmark_cook-dinner").click().run()
+    keyed_button(app, "benchmark_setup_horizon_next").click().run()
+
+    assert not app.exception
+    assert app.session_state["timeline_benchmarks_setup_stage"] == "destination"
+
+    keyed_button(app, "benchmark_setup_destination_next").click().run()
+
+    assert not app.exception
+    assert app.session_state["timeline_benchmarks_setup_stage"] == "ready"
+    rendered = "\n".join(markdown.value for markdown in app.markdown)
+    assert "Dinner served" in rendered
+    assert "Your endpoints exist." in rendered
 
 
 def test_game_uses_selected_benchmark_without_prefilling_moves() -> None:

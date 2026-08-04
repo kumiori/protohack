@@ -1,0 +1,45 @@
+schema_version: protocol_lab_experiment_v1
+id: canary_git
+version: 0.1.0-canary
+status: canary
+experiment_number: 0
+title: Git Collaboration
+experience_title: The Shared History
+atlas_functions: [Memory, Synchronisation]
+question: How do many people modify the same object without losing history?
+human_question: How can people work apart, preserve what each changed, and later reconcile their work?
+situation: [Two people have changed a shared object independently., Neither change should disappear without explanation.]
+need: Preserve reproducible history while independent work diverges and later converges.
+north_star: Protocols make invisible negotiations executable.
+shippable: false
+completion_status: complete
+completion:
+  all:
+    - {participant_state: {participant: author, equals: SHARED}}
+    - {participant_state: {participant: maintainer, equals: RECEIVED}}
+protocol: {id: git, name: Git object exchange, source_label: Git documentation, source_url: "https://git-scm.com/docs", critical_reflection: Reproducible history does not decide whose version should prevail.}
+archaeology:
+  - {id: git_need, text: Distributed development needed local history and reliable exchange without one continuously available coordinator., provenance: historical_claim, source_label: Git documentation, source_url: "https://git-scm.com/docs"}
+evolution:
+  - {year: "2005", title: Git begins, description: A distributed version-control system designed for Linux kernel development., source_label: Git project, source_url: "https://git-scm.com/about"}
+participants:
+  - {id: author, label: Author, initial_state: DIVERGED, states: [DIVERGED, SHARED]}
+  - {id: maintainer, label: Maintainer, initial_state: WAITING, states: [WAITING, RECEIVED]}
+messages:
+  - {id: commit, label: Commit, sender: author, receiver: maintainer, technical: A content-addressed history object., expanded: ["Author: Here is my change and the history it claims to extend."]}
+transitions:
+  - {id: share, actor: author, from: DIVERGED, to: SHARED, trigger: command, command: share, emit: [commit]}
+  - {id: receive, actor: maintainer, from: WAITING, to: RECEIVED, trigger: message, on_message: commit}
+invariants:
+  - {id: reproducible_history, kind: interpretive, description: Shared history remains reproducible from addressed objects., assert: {messages_are_declared: true}}
+failure_scenarios:
+  - {id: git_manipulation, family: adversary, label: History substitution, description: Replace the claimed object before receipt., operation: manipulate, message: commit, applicable_messages: [commit]}
+hidden_state_rules:
+  - {id: git_opacity, dimension: Opacity, trigger_event: message_emitted:commit, level: partial, actor: maintainer, observation: The object proves content identity but not the social legitimacy of the change., provenance: interpretive_hypothesis}
+reflection_prompts:
+  - {id: git_power, trigger_event: "message_delivered:commit", question: "Who decides whether reproducible history becomes accepted history?", provenance: interpretive_hypothesis}
+field_note_prompts:
+  - {id: observation, note_type: observation, prompt: "What happened as the history was shared?"}
+  - {id: interpretation, note_type: interpretation, prompt: "What might the preserved history mean?"}
+  - {id: critique, note_type: critique, prompt: "What does the history omit or make problematic?"}
+  - {id: amendment, note_type: amendment, prompt: "What should change about the protocol or experiment?"}

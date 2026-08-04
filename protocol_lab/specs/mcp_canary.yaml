@@ -1,0 +1,45 @@
+schema_version: protocol_lab_experiment_v1
+id: canary_mcp
+version: 0.1.0-canary
+status: canary
+experiment_number: 0
+title: Model Context Protocol
+experience_title: The Capability Exchange
+atlas_functions: [Delegation, Agency]
+question: How does an AI system discover and use capabilities it does not own?
+human_question: How can one system learn what another can do and decide what it may ask for?
+situation: [One system needs capabilities held by another., Neither side should assume authority that was not declared.]
+need: Negotiate available tools, resources, and permissions across a stable boundary.
+north_star: Protocols make invisible negotiations executable.
+shippable: false
+completion_status: complete
+completion:
+  all:
+    - {participant_state: {participant: host, equals: READY}}
+    - {participant_state: {participant: server, equals: DECLARED}}
+protocol: {id: mcp, name: Model Context Protocol, source_label: MCP specification, source_url: "https://modelcontextprotocol.io/specification", critical_reflection: Capability discovery can expand agency while obscuring responsibility.}
+archaeology:
+  - {id: mcp_need, text: AI applications needed a shared boundary for discovering contextual resources and callable tools., provenance: historical_claim, source_label: MCP specification, source_url: "https://modelcontextprotocol.io/specification"}
+evolution:
+  - {year: "2024", title: MCP introduced, description: A protocol for connecting AI applications to external context and capabilities., source_label: MCP specification, source_url: "https://modelcontextprotocol.io/specification"}
+participants:
+  - {id: host, label: Host, initial_state: DISCOVERING, states: [DISCOVERING, READY]}
+  - {id: server, label: Server, initial_state: AVAILABLE, states: [AVAILABLE, DECLARED]}
+messages:
+  - {id: capabilities, label: Capabilities, sender: server, receiver: host, technical: A declaration of supported protocol features., expanded: ["Server: These are the actions and resources I can expose."]}
+transitions:
+  - {id: declare, actor: server, from: AVAILABLE, to: DECLARED, trigger: command, command: declare, emit: [capabilities]}
+  - {id: accept, actor: host, from: DISCOVERING, to: READY, trigger: message, on_message: capabilities}
+invariants:
+  - {id: declared_capability, kind: interpretive, description: A capability must be declared before it is invoked., assert: {messages_are_declared: true}}
+failure_scenarios:
+  - {id: mcp_forgery, family: adversary, label: Forged capability, description: Advertise authority the server does not possess., operation: forge, message: capabilities, sender: server, receiver: host}
+hidden_state_rules:
+  - {id: mcp_agency, dimension: Agency, trigger_event: message_delivered:capabilities, level: high, actor: host, observation: Discovery expands available action while shifting responsibility for tool choice., provenance: interpretive_hypothesis}
+reflection_prompts:
+  - {id: mcp_responsibility, trigger_event: "message_delivered:capabilities", question: "Who is responsible when a declared capability causes harm?", provenance: interpretive_hypothesis}
+field_note_prompts:
+  - {id: observation, note_type: observation, prompt: "What happened as capabilities were declared?"}
+  - {id: interpretation, note_type: interpretation, prompt: "What might discovery mean for agency and responsibility?"}
+  - {id: critique, note_type: critique, prompt: "What should remain undiscoverable or constrained?"}
+  - {id: amendment, note_type: amendment, prompt: "What should change about the protocol or experiment?"}

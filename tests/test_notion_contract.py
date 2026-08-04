@@ -152,6 +152,41 @@ def test_feedback_write_uses_events_without_player_relation(monkeypatch, tmp_pat
     assert "email" not in properties
 
 
+def test_question_event_write_uses_immutable_event_metadata(
+    monkeypatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(notion_module, "Client", FakeClient)
+    repository = NotionRepository(token="test", manifest_path=_manifest(tmp_path))
+    repository.record_question_event(
+        {
+            "event_id": "event-1",
+            "event_type": "question_event",
+            "status": "skipped",
+            "participant_id": PARTICIPANT,
+            "participant_uuid": PARTICIPANT,
+            "participant_alias": "P-ABC123",
+            "session_code": "commons_pilot_2026",
+            "track_id": "capacity_v1",
+            "question_id": "C3",
+            "question_prompt": "What do you currently need?",
+            "reason_code": "prefer_not_to_answer",
+            "reason_text": "",
+            "timestamp": "2026-07-24T12:00:00+00:00",
+            "created_at": "2026-07-24T12:00:00+00:00",
+        }
+    )
+
+    properties = FakeClient.instance.created[0]["properties"]  # type: ignore[union-attr]
+    assert properties["event_type"] == {"select": {"name": "question_event"}}
+    assert properties["status"] == {"select": {"name": "skipped"}}
+    assert properties["page"]["rich_text"][0]["text"]["content"] == "capacity_v1"
+    serialized = "".join(
+        item["text"]["content"] for item in properties["metadata_json"]["rich_text"]
+    )
+    assert json.loads(serialized)["reason_code"] == "prefer_not_to_answer"
+    assert "answer" not in json.loads(serialized)
+
+
 def test_question_set_submission_writes_anonymous_bundle_json(
     monkeypatch, tmp_path: Path
 ) -> None:
@@ -189,3 +224,33 @@ def test_question_set_submission_writes_anonymous_bundle_json(
     assert json.loads(serialized)["responses"][0]["question_id"] == "C3"
     assert "email" not in serialized
     assert "player" not in properties
+
+
+def test_mosaic_contact_uses_players_not_analytical_responses(
+    monkeypatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(notion_module, "Client", FakeClient)
+    repository = NotionRepository(token="test", manifest_path=_manifest(tmp_path))
+    repository.record_question_set_contact(
+        {
+            "record_type": "mosaic_contacts",
+            "question_set_id": "mosaic_v1",
+            "participant_uuid": PARTICIPANT,
+            "access_key": PARTICIPANT,
+            "name": "Participant",
+            "email": "participant@example.org",
+            "communication_consent": True,
+            "updated_at": "2026-07-25T10:00:00+00:00",
+        }
+    )
+
+    client = FakeClient.instance
+    assert client is not None
+    assert len(client.created) == 1
+    properties = client.created[0]["properties"]
+    assert properties["email"] == {"email": "participant@example.org"}
+    assert properties["coordination_consent_version"]["rich_text"][0]["text"][
+        "content"
+    ] == "mosaic_v1"
+    assert properties["coordination_opt_in"] == {"checkbox": True}
+    assert client.responses == []

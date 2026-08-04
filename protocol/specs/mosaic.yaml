@@ -84,10 +84,10 @@ sections:
             title: What is the geographic scope of your work?
             help: Select all regions that are relevant.
             options:
-                - id: global
-                  label: Global
                 - id: cee
                   label: Central and Eastern Europe (CEE)
+                - id: global
+                  label: Global / cross-regional work
                 - id: eseap
                   label: East, Southeast Asia and the Pacific (ESEAP)
                 - id: europe
@@ -102,8 +102,6 @@ sections:
                   label: South Asia
                 - id: sub_saharan_africa
                   label: Sub-Saharan Africa
-                - id: cross_regional
-                  label: Cross-regional work
                 - id: other
                   label: Other
             allow_other: true

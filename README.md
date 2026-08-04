@@ -1,4 +1,15 @@
-# Protocol Hack · Questioning the Commons
+# Protocol Laboratory · Questioning the Commons
+
+This repository houses two deliberately separate research instruments. The
+Protocol Laboratory makes invisible negotiations inspectable; the Commons
+questionnaire continues to map strategic choices without becoming a protocol
+engine.
+
+The laboratory's founding experiment is **Experiment 01 · Connection: TCP
+Handshake**. TCP is content inside the fixed laboratory grammar—not the product
+architecture. Experiment definitions, deterministic execution, rendering,
+scenarios, reflection, replay, and Field Notes live in the independent
+[`protocol_lab`](protocol_lab) package.
 
 Protocol Hack is a one-scenario strategic mapping experiment. The pilot asks a participant to make one first move, explain it in one sentence, review it, save a return key, and explicitly integrate the resulting anonymous trajectory into a Commons Map.
 
@@ -31,6 +42,8 @@ Set `MOSAIC_STATEMENT_URL` to the published Google Doc URL to expose the
 
 ## Surfaces
 
+- `/protocol-lab` — Atlas landing and the fixed Question → Need → Archaeology → Observe → Expand → Execute → Break → Understand → Field Notes → Join Us laboratory;
+- `/protocol-lab-host` — access-code-protected contract, provenance, saved-note, and diagnostics console;
 - `/` — Commons Simulator landing page and entry point;
 - `/commons` — refined participant simulation, review, integration, and optional coordination;
 - `/capacity` — YAML-driven needs, resources, contributions, time horizon, and coordination track;
@@ -51,6 +64,11 @@ The host view does not send messages or make introductions. Coordination policy 
 
 ## Content contract
 
+Protocol Laboratory definitions live in [`protocol_lab/specs`](protocol_lab/specs).
+The loader validates the same versioned contract for the playable TCP experiment
+and non-playable OAuth, Git, and MCP canaries. Adding a protocol begins with a
+definition rather than a new application branch.
+
 The provisional smoke scenario and initial interaction contract live in [`protocol/specs/commons_smoke_v1.yaml`](protocol/specs/commons_smoke_v1.yaml). The contract requires Continue/Flag/Skip, reasoned skipping, confirmation before integration, a complete textual return key and verification hash, and balloons after successful integration. Replace scenario wording and authored action tags there; no application code change is required. The app does not automatically classify the rationale.
 
 ## Privacy boundary
@@ -58,6 +76,7 @@ The provisional smoke scenario and initial interaction contract live in [`protoc
 - `protohack_Responses` stores anonymous strategic profiles.
 - `protohack_Players` stores explicit coordination interest and optional email.
 - `protohack_Events` stores anonymous question flags and skips.
+- Protocol Laboratory Field Notes use the events boundary and store an access-key owner hash, replay evidence, authored observations, and interpretation challenges—never a raw access key or email.
 - `participant_uuid` is the only bridge.
 - There is a database relation from a strategic response to a player/contact row.
 - Contact deletion trashes only the coordination row; the anonymous strategic profile remains.

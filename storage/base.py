@@ -6,6 +6,14 @@ from typing import Any, Protocol
 
 
 class Repository(Protocol):
+    def record_protocol_lab_field_note(
+        self, note: dict[str, Any]
+    ) -> dict[str, Any]: ...
+
+    def list_protocol_lab_field_notes(
+        self, owner_key_hash: str | None = None
+    ) -> list[dict[str, Any]]: ...
+
     def record_question_event(
         self, event: dict[str, Any]
     ) -> dict[str, Any]: ...

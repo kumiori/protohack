@@ -15,7 +15,28 @@ class InMemoryRepository:
         self._question_set_contacts: dict[tuple[str, str], dict[str, Any]] = {}
         self._coordination: dict[str, dict[str, Any]] = {}
         self._feedback: list[dict[str, Any]] = []
+        self._protocol_lab_field_notes: dict[str, dict[str, Any]] = {}
         self._lock = RLock()
+
+    def record_protocol_lab_field_note(
+        self, note: dict[str, Any]
+    ) -> dict[str, Any]:
+        note_id = str(note["note_id"])
+        with self._lock:
+            self._protocol_lab_field_notes.setdefault(note_id, deepcopy(note))
+            return deepcopy(self._protocol_lab_field_notes[note_id])
+
+    def list_protocol_lab_field_notes(
+        self, owner_key_hash: str | None = None
+    ) -> list[dict[str, Any]]:
+        with self._lock:
+            rows = [
+                deepcopy(note)
+                for note in self._protocol_lab_field_notes.values()
+                if owner_key_hash is None
+                or note.get("owner_key_hash") == owner_key_hash
+            ]
+        return sorted(rows, key=lambda note: str(note.get("created_at", "")))
 
     @staticmethod
     def _question_event_key(event: dict[str, Any]) -> tuple[str, str, str]:

@@ -1,0 +1,485 @@
+schema_version: protocol_lab_experiment_v1
+id: experiment_01_tcp_handshake
+version: 1.0.0-pilot
+status: pilot
+experiment_number: 1
+title: TCP Handshake
+experience_title: The Handshake
+atlas_functions:
+  - Connection
+  - Synchronisation
+question: How do two endpoints establish compatible connection state before exchanging a reliable byte stream?
+human_question: How do two parties establish enough shared state to begin communicating?
+situation:
+  - Two parties want to communicate.
+  - Neither knows whether the other is ready.
+need: Synchronize a shared connection despite delay, loss, duplication, and uncertainty.
+north_star: Protocol Lab is an interactive laboratory for reconstructing, executing, breaking and redesigning the negotiations that modern infrastructures compress into milliseconds.
+shippable: true
+completion_status: established
+completion:
+  all_participants_state: ESTABLISHED
+
+protocol:
+  id: tcp_handshake
+  name: TCP three-way handshake
+  source_label: RFC 9293 · Transmission Control Protocol
+  source_url: https://www.rfc-editor.org/rfc/rfc9293.html
+  critical_reflection: Compatible connection state supports a reliable, in-order byte stream. It does not establish identity or confidentiality, and it does not inherently include liveness detection. Connection state should not be mistaken for trust.
+
+archaeology:
+  - id: tcp_problem
+    provenance: historical_claim
+    text: Packet-switched networks needed endpoints to distinguish new connection attempts from delayed duplicates and to synchronise sequence-number state.
+    source_label: RFC 9293 · Section 3.5
+    source_url: https://www.rfc-editor.org/rfc/rfc9293.html#section-3.5
+  - id: tcp_predecessor
+    provenance: historical_claim
+    text: TCP emerged from early internetworking work that separated reliable transport from the underlying packet network.
+    source_label: RFC 8200 · Internet Protocol overview
+    source_url: https://www.rfc-editor.org/rfc/rfc8200.html
+  - id: tcp_surviving_assumption
+    provenance: technical_fact
+    text: The network may delay, lose, duplicate, or reorder segments, so endpoints must retain state and use acknowledgements and retransmission.
+    source_label: RFC 9293
+    source_url: https://www.rfc-editor.org/rfc/rfc9293.html
+  - id: tcp_broken_assumption
+    provenance: interpretive_hypothesis
+    text: A synchronised transport connection is often treated socially as evidence of a trustworthy counterpart even though TCP authenticates neither identity nor intent.
+
+evolution:
+  - year: "1974"
+    title: A protocol for packet-network intercommunication
+    description: Cerf and Kahn described the internetworking problem and a host-to-host transmission-control design.
+    source_label: IEEE Transactions on Communications
+    source_url: https://doi.org/10.1109/TCOM.1974.1092259
+  - year: "1981"
+    title: TCP standardized in RFC 793
+    description: The core state machine and three-way handshake were published as an Internet standard.
+    source_label: RFC 793
+    source_url: https://www.rfc-editor.org/rfc/rfc793.html
+  - year: "2003"
+    title: Requirements consolidated
+    description: RFC 1122-era requirements and accumulated corrections shaped implementation expectations.
+    source_label: RFC 1122
+    source_url: https://www.rfc-editor.org/rfc/rfc1122.html
+  - year: "2022"
+    title: TCP specification consolidated
+    description: RFC 9293 replaced RFC 793 and incorporated decades of updates and clarifications.
+    source_label: RFC 9293
+    source_url: https://www.rfc-editor.org/rfc/rfc9293.html
+  - year: today
+    title: A living infrastructure
+    description: TCP remains deployed while extensions, security mitigations, and alternative transports continue to evolve.
+    source_label: IETF TCPM working group
+    source_url: https://datatracker.ietf.org/wg/tcpm/about/
+
+participants:
+  - id: client
+    label: Client
+    initial_state: CLOSED
+    states: [CLOSED, SYN-SENT, SYN-RECEIVED, ESTABLISHED, REFUSED]
+  - id: server
+    label: Server
+    initial_state: LISTEN
+    states: [LISTEN, SYN-SENT, SYN-RECEIVED, ESTABLISHED, REFUSED]
+
+messages:
+  - id: syn
+    label: SYN
+    sender: client
+    receiver: server
+    technical: Synchronises the client's initial sequence number and proposes the beginning of its sequence space.
+    expanded:
+      - "You: I want to begin. Here is where my sequence starts."
+    metadata:
+      flags: SYN
+      sequence: "100"
+  - id: syn_ack
+    label: SYN–ACK
+    sender: server
+    receiver: client
+    technical: Acknowledges the client's next expected sequence number and synchronises the server's initial sequence number.
+    expanded:
+      - "Other side: I heard your beginning. Here is mine."
+    metadata:
+      flags: SYN,ACK
+      sequence: "300"
+      acknowledgement: "101"
+  - id: ack
+    label: ACK
+    sender: client
+    receiver: server
+    technical: Acknowledges the server's next expected sequence number, completing compatible connection state.
+    expanded:
+      - "You: I heard yours. We are ready to begin."
+    metadata:
+      flags: ACK
+      sequence: "101"
+      acknowledgement: "301"
+  - id: server_syn
+    label: SYN
+    sender: server
+    receiver: client
+    technical: A simultaneous active open from the server side.
+    baseline: false
+    expanded:
+      - "Server: I also tried to begin before hearing you."
+      - "Server: Can our two requests converge?"
+    metadata:
+      flags: SYN
+      sequence: "300"
+  - id: client_syn_ack
+    label: SYN–ACK
+    sender: client
+    receiver: server
+    technical: Acknowledges a simultaneous open while retaining the client's initial sequence.
+    baseline: false
+    expanded:
+      - "Client: I heard that you also initiated."
+      - "Client: My own opening request still stands."
+    metadata:
+      flags: SYN,ACK
+      sequence: "100"
+      acknowledgement: "301"
+  - id: rst
+    label: RST
+    sender: server
+    receiver: client
+    technical: Refuses or resets the attempted connection.
+    baseline: false
+    expanded:
+      - "Server: I will not continue this negotiation."
+      - "Server: Discard the state you inferred from this attempt."
+    metadata:
+      flags: RST
+
+transitions:
+  - id: client_active_open
+    actor: client
+    from: CLOSED
+    to: SYN-SENT
+    trigger: command
+    command: open
+    emit: [syn]
+    start_timers:
+      - id: client_syn_rto
+        owner: client
+        after_ticks: 3
+    note: The client commits first and begins waiting.
+  - id: server_active_open
+    actor: server
+    from: LISTEN
+    to: SYN-SENT
+    trigger: command
+    command: simultaneous_open
+    emit: [server_syn]
+    start_timers:
+      - id: server_syn_rto
+        owner: server
+        after_ticks: 3
+    note: Both peers may actively open at the same time.
+  - id: server_receives_syn
+    actor: server
+    from: LISTEN
+    to: SYN-RECEIVED
+    trigger: message
+    on_message: syn
+    emit: [syn_ack]
+    start_timers:
+      - id: server_syn_ack_rto
+        owner: server
+        after_ticks: 3
+  - id: client_receives_syn_ack
+    actor: client
+    from: SYN-SENT
+    to: ESTABLISHED
+    trigger: message
+    on_message: syn_ack
+    emit: [ack]
+    cancel_timers: [client_syn_rto]
+  - id: server_receives_ack
+    actor: server
+    from: SYN-RECEIVED
+    to: ESTABLISHED
+    trigger: message
+    on_message: ack
+    cancel_timers: [server_syn_ack_rto]
+  - id: client_receives_simultaneous_syn
+    actor: client
+    from: SYN-SENT
+    to: SYN-RECEIVED
+    trigger: message
+    on_message: server_syn
+    emit: [client_syn_ack]
+  - id: server_receives_simultaneous_syn
+    actor: server
+    from: SYN-SENT
+    to: SYN-RECEIVED
+    trigger: message
+    on_message: syn
+    emit: [syn_ack]
+  - id: server_completes_simultaneous_open
+    actor: server
+    from: SYN-RECEIVED
+    to: ESTABLISHED
+    trigger: message
+    on_message: client_syn_ack
+    emit: [syn_ack]
+    cancel_timers: [server_syn_rto]
+  - id: client_completes_simultaneous_open
+    actor: client
+    from: SYN-RECEIVED
+    to: ESTABLISHED
+    trigger: message
+    on_message: syn_ack
+    cancel_timers: [client_syn_rto]
+  - id: client_retransmits_syn
+    actor: client
+    from: SYN-SENT
+    to: SYN-SENT
+    trigger: timer
+    on_timer: client_syn_rto
+    emit: [syn]
+    start_timers:
+      - id: client_syn_rto
+        owner: client
+        after_ticks: 3
+    note: The timer converts silence into a retry.
+  - id: server_retransmits_syn_ack
+    actor: server
+    from: SYN-RECEIVED
+    to: SYN-RECEIVED
+    trigger: timer
+    on_timer: server_syn_ack_rto
+    emit: [syn_ack]
+    start_timers:
+      - id: server_syn_ack_rto
+        owner: server
+        after_ticks: 3
+  - id: client_receives_reset
+    actor: client
+    from: SYN-SENT
+    to: REFUSED
+    trigger: message
+    on_message: rst
+    cancel_timers: [client_syn_rto]
+  - id: server_refuses
+    actor: server
+    from: LISTEN
+    to: LISTEN
+    trigger: command
+    command: refuse
+    emit: [rst]
+
+invariants:
+  - id: declared_state_only
+    kind: mechanical
+    description: Every participant remains in a state declared by this experiment.
+    assert:
+      states_are_declared: true
+  - id: declared_message_only
+    kind: mechanical
+    description: Every queued message is declared by this experiment.
+    assert:
+      messages_are_declared: true
+  - id: compatible_establishment
+    kind: interpretive
+    description: If one peer appears established, the other peer must either be established or have the final acknowledgement pending.
+    assert:
+      implies:
+        if:
+          any_participant_state: ESTABLISHED
+        then:
+          any:
+            - all_participants_state: ESTABLISHED
+            - pending_message: ack
+            - pending_message: syn_ack
+  - id: progress_is_visible
+    kind: interpretive
+    description: An unfinished opening remains visibly retryable, pending, or refused rather than silently succeeding.
+    assert:
+      any:
+        - all_participants_state: ESTABLISHED
+        - any_pending_message: true
+        - any_active_timer: true
+        - participant_state:
+            participant: client
+            equals: CLOSED
+        - participant_state:
+            participant: client
+            equals: REFUSED
+
+failure_scenarios:
+  - id: natural_loss
+    family: natural
+    label: Packet loss
+    description: Remove one pending segment before it is delivered.
+    operation: drop
+    applicable_messages: [syn, syn_ack, ack]
+    response: A retransmission timer may turn silence into another attempt.
+  - id: natural_delay
+    family: natural
+    label: Delay
+    description: Hold one pending segment for two logical ticks.
+    operation: delay
+    delay_ticks: 2
+    applicable_messages: [syn, syn_ack, ack]
+    response: Waiting creates cost and may overlap with a retry.
+  - id: natural_duplicate
+    family: natural
+    label: Duplication
+    description: Place an additional copy of a pending segment in the network.
+    operation: duplicate
+    applicable_messages: [syn, syn_ack, ack]
+    response: Sequence and state checks should prevent a duplicate from creating a second connection.
+  - id: natural_reorder
+    family: natural
+    label: Reordering
+    description: Move a pending segment behind another pending segment.
+    operation: reorder
+    applicable_messages: [syn, syn_ack, ack]
+    response: Arrival order and protocol state decide whether the message is meaningful.
+  - id: adversary_replay
+    family: adversary
+    label: Replay
+    description: Reintroduce a previously emitted opening segment.
+    operation: replay
+    applicable_messages: [syn]
+    response: Old duplicates are why connection establishment needs sequence state and reset behaviour.
+  - id: adversary_forgery
+    family: adversary
+    label: Forged acknowledgement
+    description: Invent an acknowledgement that did not come from the expected negotiation.
+    operation: forge
+    message: ack
+    sender: client
+    receiver: server
+    response: A believable-looking message is not necessarily valid in the receiver's current state.
+  - id: adversary_manipulation
+    family: adversary
+    label: Manipulated reply
+    description: Replace a pending reply with a reset.
+    operation: manipulate
+    message: rst
+    applicable_messages: [syn_ack]
+    response: The client must distinguish establishment from refusal.
+  - id: institution_timeout
+    family: protocol_response
+    label: Timeout and retransmission
+    description: Advance the logical clock until the protocol's retry mechanism responds to silence.
+    operation: wait
+    delay_ticks: 3
+    response: A timeout converts indefinite waiting into a bounded decision.
+  - id: institution_refusal
+    family: institutional_policy
+    label: Refusal
+    description: The listening side explicitly refuses the opening attempt.
+    operation: transition
+    transition: server_refuses
+    response: Refusal preserves agency by making non-participation visible.
+
+hidden_state_rules:
+  - id: symmetry_active_open
+    dimension: Symmetry
+    trigger_event: transition:client_active_open
+    level: asymmetric
+    actor: both
+    observation: The active opener allocates connection state and waits first; the passive opener begins by listening and may respond or refuse.
+    provenance: interpretive_hypothesis
+  - id: symmetry_role_reversal
+    dimension: Symmetry
+    trigger_event: transition:server_active_open
+    level: reversible
+    actor: both
+    observation: The roles can reverse or converge through simultaneous open, even though active and passive open are not the same position.
+    provenance: interpretive_hypothesis
+  - id: agency_open
+    dimension: Agency
+    trigger_event: transition:client_active_open
+    level: mixed
+    actor: client
+    observation: The initiator chooses to begin, then becomes dependent on a reply or timeout.
+    provenance: interpretive_hypothesis
+  - id: commitment_syn
+    dimension: Commitment
+    trigger_event: message_emitted:syn
+    level: high
+    actor: client
+    observation: The initiator commits first by allocating local state and waiting.
+    provenance: interpretive_hypothesis
+  - id: opacity_syn
+    dimension: Opacity
+    trigger_event: message_emitted:syn
+    level: high
+    actor: client
+    observation: The initiator cannot yet know whether the other side exists, consents, or can reply.
+    provenance: interpretive_hypothesis
+  - id: trust_syn_ack
+    dimension: Trust
+    trigger_event: message_delivered:syn_ack
+    level: partial
+    actor: client
+    observation: The reply shows that both sides can refer to the same opening, not authenticated identity or intent.
+    provenance: interpretive_hypothesis
+  - id: risk_timeout
+    dimension: Risk
+    trigger_event: timer_expired
+    level: high
+    actor: client
+    observation: Silence transfers computation, attention, and waiting cost to the initiator.
+    provenance: interpretive_hypothesis
+  - id: agency_refusal
+    dimension: Agency
+    trigger_event: message_delivered:rst
+    level: high
+    actor: server
+    observation: Explicit refusal makes the server's choice visible instead of simulating consent.
+    provenance: interpretive_hypothesis
+  - id: trust_established
+    dimension: Trust
+    trigger_event: status:established
+    level: bounded
+    actor: both
+    observation: Both peers share connection state, while identity and confidentiality remain unresolved.
+    provenance: interpretive_hypothesis
+
+reflection_prompts:
+  - id: reflect_commitment
+    trigger_event: message_emitted:syn
+    question: Who committed first, and what resources are now tied up while they wait?
+    provenance: interpretive_hypothesis
+  - id: reflect_compression
+    trigger_event: message_delivered:syn_ack
+    question: Which parts of the expanded negotiation disappear when this becomes SYN–ACK?
+    provenance: interpretive_hypothesis
+  - id: reflect_timeout
+    trigger_event: timer_expired
+    question: Should waiting always be finite, and who gets to choose the timeout?
+    provenance: interpretive_hypothesis
+  - id: reflect_invariant
+    trigger_event: invariant_violated
+    question: What false agreement would become possible if this invariant were removed?
+    provenance: interpretive_hypothesis
+  - id: reflect_trust
+    trigger_event: status:established
+    question: What has actually been established here—and what remains impossible to know?
+    provenance: interpretive_hypothesis
+  - id: reflect_symmetry
+    trigger_event: transition:client_active_open
+    question: The messages look balanced, but who initiates, waits, and carries state first?
+    provenance: interpretive_hypothesis
+
+field_note_prompts:
+  - id: observation
+    note_type: observation
+    prompt: What happened in this run that you want to preserve as evidence?
+  - id: interpretation
+    note_type: interpretation
+    prompt: What might the evidence mean about connection, agency, opacity, or symmetry?
+  - id: critique
+    note_type: critique
+    prompt: What is technically, socially, or pedagogically problematic here?
+  - id: amendment
+    note_type: amendment
+    prompt: What should change in the protocol, the experiment, or its interpretation?

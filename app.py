@@ -1,4 +1,4 @@
-"""Protocol Hack — a smoke simulation for questioning the commons."""
+"""Protocol Laboratory and Commons research interfaces."""
 
 import streamlit as st
 
@@ -6,8 +6,8 @@ from ui import apply_theme
 
 
 st.set_page_config(
-    page_title="Protocol Hack · Commons",
-    page_icon="🧭",
+    page_title="Protocol Laboratory · Commons",
+    page_icon="🧬",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -15,6 +15,14 @@ apply_theme()
 
 navigation = st.navigation(
     {
+        "Laboratory": [
+            st.Page(
+                "views/protocol_lab.py",
+                title="Protocol Laboratory",
+                icon="🧬",
+                url_path="protocol-lab",
+            ),
+        ],
         "Commons": [
             st.Page(
                 "views/home_redirect.py",
@@ -61,7 +69,13 @@ navigation = st.navigation(
                 title="Host",
                 icon="🔐",
                 url_path="commons-host",
-            )
+            ),
+            st.Page(
+                "views/protocol_lab_host.py",
+                title="Protocol Lab Host",
+                icon="🔬",
+                url_path="protocol-lab-host",
+            ),
         ],
         "Tests": [
             st.Page(

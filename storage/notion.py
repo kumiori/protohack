@@ -64,6 +64,103 @@ class NotionRepository:
         self._client = Client(auth=token, notion_version=notion_version)
 
     @staticmethod
+    def _protocol_lab_field_note_from_page(
+        page: dict[str, Any],
+    ) -> dict[str, Any]:
+        properties = page.get("properties") or {}
+        raw = _rich(properties, "metadata_json")
+        try:
+            note = json.loads(raw) if raw else {}
+        except json.JSONDecodeError:
+            note = {}
+        note.setdefault("note_id", _rich(properties, "item_id"))
+        note.setdefault("experiment_id", _rich(properties, "page"))
+        note.setdefault("owner_key_hash", _rich(properties, "device_id"))
+        note.setdefault("created_at", _date(properties, "timestamp"))
+        note["_page_id"] = str(page.get("id") or "")
+        return note
+
+    def record_protocol_lab_field_note(
+        self, note: dict[str, Any]
+    ) -> dict[str, Any]:
+        existing = next(
+            (
+                row
+                for row in self.list_protocol_lab_field_notes(
+                    str(note["owner_key_hash"])
+                )
+                if row.get("note_id") == note.get("note_id")
+            ),
+            None,
+        )
+        if existing:
+            return existing
+        metadata_json = json.dumps(note, ensure_ascii=False, separators=(",", ":"))
+        created = self._client.pages.create(
+            parent={
+                "type": "data_source_id",
+                "data_source_id": self._sources["events"],
+            },
+            properties={
+                "Name": {
+                    "title": _text(
+                        f"Field note {note['participant_alias']} · "
+                        f"{str(note['note_id'])[-8:]}"
+                    )
+                },
+                "session": _relation(self._session_page_id),
+                "timestamp": {"date": {"start": str(note["created_at"])}},
+                "event_type": {"select": {"name": "protocol_lab_field_note"}},
+                "item_id": {"rich_text": _text(str(note["note_id"]))},
+                "page": {"rich_text": _text(str(note["experiment_id"]))},
+                "value_label": {
+                    "rich_text": _text(str(note["participant_alias"]))
+                },
+                "metadata_json": {"rich_text": _text(metadata_json)},
+                "device_id": {
+                    "rich_text": _text(str(note["owner_key_hash"]))
+                },
+                "status": {"select": {"name": "saved"}},
+            },
+        )
+        result = dict(note)
+        result["_page_id"] = str(created["id"])
+        return result
+
+    def list_protocol_lab_field_notes(
+        self, owner_key_hash: str | None = None
+    ) -> list[dict[str, Any]]:
+        clauses: list[dict[str, Any]] = [
+            {
+                "property": "event_type",
+                "select": {"equals": "protocol_lab_field_note"},
+            }
+        ]
+        if owner_key_hash is not None:
+            clauses.append(
+                {
+                    "property": "device_id",
+                    "rich_text": {"equals": owner_key_hash},
+                }
+            )
+        pages = self._query_all(
+            "events",
+            filter_={"and": clauses},
+        )
+        notes = [
+            self._protocol_lab_field_note_from_page(page)
+            for page in pages
+            if _select(page.get("properties") or {}, "event_type")
+            == "protocol_lab_field_note"
+            and (
+                owner_key_hash is None
+                or _rich(page.get("properties") or {}, "device_id")
+                == owner_key_hash
+            )
+        ]
+        return sorted(notes, key=lambda note: str(note.get("created_at", "")))
+
+    @staticmethod
     def _question_set_submission_from_page(
         page: dict[str, Any],
     ) -> dict[str, Any]:
