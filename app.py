@@ -79,6 +79,12 @@ navigation = st.navigation(
         ],
         "Tests": [
             st.Page(
+                "views/test_sketch_plan.py",
+                title="Sketch a new plan",
+                icon="✨",
+                url_path="test-sketch-plan",
+            ),
+            st.Page(
                 "views/test_timeline_benchmarks.py",
                 title="Timeline benchmarks",
                 icon="🧭",

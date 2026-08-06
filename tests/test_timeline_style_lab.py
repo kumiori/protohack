@@ -58,7 +58,7 @@ def test_gallery_changes_presentation_without_changing_gameplay() -> None:
     assert app.session_state["timeline_style_lab_variant"] == "Gallery"
     assert "height:0; overflow:hidden" in rendered_markdown(app)
 
-    button(app, "★  Release").click().run()
+    button(app, "Release").click().run()
 
     assert not app.exception
     assert app.session_state["timeline_game_pending_type"] == "release"
@@ -67,7 +67,7 @@ def test_gallery_changes_presentation_without_changing_gameplay() -> None:
 def test_information_gateway_uses_the_shared_event_flow() -> None:
     app = AppTest.from_file(str(STYLE_VIEW), default_timeout=10).run()
 
-    button(app, "◈  Information gateway").click().run()
+    button(app, "Information gateway").click().run()
 
     assert not app.exception
     assert app.session_state["timeline_game_pending_type"] == "gateway"
@@ -82,16 +82,18 @@ def test_extended_planning_primitives_are_live_objects() -> None:
     app = AppTest.from_file(str(STYLE_VIEW), default_timeout=10).run()
 
     for label in (
-        "⋈  Merge",
-        "⇄  Share resources",
-        "◷  Wait",
-        "◒  Prepare",
-        "⌾  Get intelligence",
-        "⟳  Synchronise",
+        "Merge",
+        "Share resources",
+        "Acquire resources",
+        "Delegate",
+        "Wait",
+        "Prepare",
+        "Get intelligence",
+        "Synchronise",
     ):
         assert button(app, label)
 
-    button(app, "⟳  Synchronise").click().run()
+    button(app, "Synchronise").click().run()
 
     assert not app.exception
     assert app.session_state["timeline_game_pending_type"] == "synchronise"
@@ -113,6 +115,8 @@ def test_event_objects_have_shape_first_hover_motion() -> None:
     assert 'content:"▼"' in source
     assert 'content:"⋈"' in source
     assert 'content:"⇄"' in source
+    assert 'content:"⇣"' in source
+    assert 'content:"↱"' in source
     assert 'content:"◷"' in source
     assert 'content:"◒"' in source
     assert 'content:"⌾"' in source

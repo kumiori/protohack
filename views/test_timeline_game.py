@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 import html
+import json
 from math import cos, sin
 from textwrap import dedent
 from uuid import uuid4
@@ -16,21 +17,38 @@ from protocol.timeline import (
     END_POINT,
     EVENT_TYPES,
     CORE_EVENT_TYPE_KEYS,
-    IMPORTANCE_LEVELS,
+    INFLUENCE_SCALES,
+    LEGACY_INFLUENCE_SCALES,
     PLANNING_PRIMITIVE_KEYS,
     UNCERTAINTY_STRENGTHS,
     active_events,
+    binary_branch_stems,
     date_for_parameter,
+    directional_mode,
     event_points,
     expanded_bounds,
-    geometry_for_importance,
+    geometry_for_influence,
     kink_indicators,
+    primitive_plot_label,
     reconcile_event_dates,
     relative_time_label,
     sample_trajectory,
+    topology_mode,
     trajectory_point,
-    uncertainty_envelope_points,
     uncertainty_geometry,
+    uncertainty_tube_mesh,
+)
+from protocol.timeline_plan import (
+    QUALITATIVE_TIME_ANCHORS,
+    linear_time_ticks,
+    qualitative_time_label,
+)
+from protocol.trajectory_schema import (
+    DEFAULT_CAMERA,
+    LOCAL_STORAGE_LATEST_KEY,
+    LOCAL_STORAGE_PREFIX,
+    build_trajectory_document,
+    trajectory_yaml,
 )
 
 
@@ -48,6 +66,10 @@ if style_lab_variant not in STYLE_LAB_VARIANTS:
 active_benchmark = st.session_state.get(ACTIVE_BENCHMARK_KEY)
 if not isinstance(active_benchmark, dict):
     active_benchmark = {}
+source_kind = str(active_benchmark.get("source_kind") or "benchmark")
+is_new_plan = source_kind == "plan"
+temporal_mode = str(active_benchmark.get("temporal_mode") or "linear")
+axis_y_label = str(active_benchmark.get("axis_y_label") or "Alignment")
 benchmark_title = str(active_benchmark.get("title") or "Open trajectory")
 benchmark_horizon = str(
     active_benchmark.get("horizon_label") or "2-year experimental horizon"
@@ -70,15 +92,21 @@ if ROADMAP_END <= ROADMAP_START:
 destination_label = str(
     active_benchmark.get("destination_label") or ""
 ).strip()
+initial_landing_label = {
+    "open": "Open",
+    "guided": "Guided",
+    "planned": "Planned",
+}.get(str(active_benchmark.get("landing_mode") or "open"), "Open")
 CAMERA_STORAGE_KEY = "protocol-hack:timeline-camera-v2"
-IMPORTANCE_COPY = {
-    "Signal": "Small influence",
-    "Lever": "Changes direction",
-    "Threshold": "Unfolding depends on this",
+INFLUENCE_COPY = {
+    "Local": "Local effect",
+    "Structural": "Structural effect",
+    "Dominant": "Dominant effect",
 }
-NODE_MODE_COPY = {
-    "Smooth": "Gradually",
-    "Kink": "Bifurcation",
+INFLUENCE_HELP = {
+    "Local": "Changes the path near this moment.",
+    "Structural": "Changes the path at the scale of the whole plan.",
+    "Dominant": "Reorganises what follows and may outweigh several moves.",
 }
 LANDING_COPY = {
     "Open": "Find the way",
@@ -94,6 +122,31 @@ def _state(name: str, default: object) -> object:
 def _event_label(event: dict[str, object]) -> str:
     definition = EVENT_TYPES[str(event["type"])]
     return f"{definition['glyph']} {event['title']}"
+
+
+def _event_influence(event: dict[str, object]) -> str:
+    authored = str(event.get("influence_scale") or "")
+    return LEGACY_INFLUENCE_SCALES.get(authored, authored) or LEGACY_INFLUENCE_SCALES.get(
+        str(event.get("importance") or ""),
+        "Structural",
+    )
+
+
+def _branch_label_values(event: dict[str, object] | None) -> tuple[str, str]:
+    values: list[str] = []
+    if event:
+        raw_labels = event.get("branch_labels") or ()
+        if isinstance(raw_labels, (list, tuple)):
+            for item in raw_labels[:2]:
+                values.append(
+                    str(item.get("label") or "")
+                    if isinstance(item, dict)
+                    else str(item)
+                )
+    return (
+        values[0] if values else "Option A",
+        values[1] if len(values) > 1 else "Option B",
+    )
 
 
 def _widget_key(name: str) -> str:
@@ -119,13 +172,22 @@ def _request_placement(
     st.session_state[_widget_key("editing_id")] = (
         str(event["id"]) if event else None
     )
+    branch_a, branch_b = _branch_label_values(event)
     st.session_state[_widget_key("placement_reset")] = {
         "time_slider": float(event["time_parameter"]) if event else 0.22,
         "form_title": str(event["title"]) if event else title,
-        "importance": str(event["importance"]) if event else "Signal",
-        "node_mode": (
-            str(event["node_mode"]).title() if event else "Smooth"
+        "influence_scale": _event_influence(event) if event else "Structural",
+        "directional_mode": (
+            directional_mode(event).title() if event else "Gradually"
         ),
+        "topology_mode": (
+            "Bifurcation"
+            if event and topology_mode(event) == "branching"
+            else "Continuation"
+        ),
+        "branch_label_a": branch_a,
+        "branch_label_b": branch_b,
+        "description": str(event.get("description") or "") if event else "",
     }
     st.session_state[_widget_key("integrated")] = False
 
@@ -134,16 +196,31 @@ def _render_journey_progress(move_count: int) -> None:
     if not active_benchmark.get("guided_setup"):
         return
     labels = (
-        "Benchmark",
-        "Horizon",
-        "Destination",
-        "Trajectory",
-        "Add a move",
-        "Observe",
-        "Continue",
-        "Compare",
+        (
+            "Plan",
+            "Now",
+            "Goal",
+            "Landing",
+            "Time",
+            "Trajectory",
+            "Shape",
+            "Observe",
+        )
+        if is_new_plan
+        else (
+            "Benchmark",
+            "Horizon",
+            "Destination",
+            "Trajectory",
+            "Add a move",
+            "Observe",
+            "Continue",
+            "Compare",
+        )
     )
-    if move_count == 0:
+    if is_new_plan:
+        current = 6 if move_count == 0 else 7
+    elif move_count == 0:
         current = 4
     elif move_count == 1:
         current = 5
@@ -180,14 +257,54 @@ def _suggested_move_parts(suggestion: object) -> tuple[str, str] | None:
     return None
 
 
+def _time_language_label(parameter: float) -> str:
+    if temporal_mode == "qualitative":
+        return qualitative_time_label(parameter)
+    return relative_time_label(
+        parameter,
+        start_date=ROADMAP_START,
+        end_date=ROADMAP_END,
+    )
+
+
+def _time_readout(
+    parameter: float,
+    value_date: date,
+    current_landing_mode: str,
+) -> str:
+    if temporal_mode == "qualitative":
+        return f"""
+        <div class="timeline-time-readout">
+          <div><small>Horizon</small><b>{html.escape(_time_language_label(parameter))}</b></div>
+          <div><small>Language</small><b>Qualitative</b></div>
+          <div><small>Landing</small><b>Goal</b></div>
+        </div>
+        """
+    if current_landing_mode != "planned":
+        return f"""
+        <div class="timeline-time-readout">
+          <div><small>Horizon</small><b>{html.escape(_time_language_label(parameter))}</b></div>
+          <div><small>Unit</small><b>{html.escape(str(active_benchmark.get('time_unit') or 'Relative'))}</b></div>
+          <div><small>Landing</small><b>{html.escape(benchmark_horizon)}</b></div>
+        </div>
+        """
+    return f"""
+    <div class="timeline-time-readout">
+      <div><small>Position</small><b>s={parameter:.2f}</b></div>
+      <div><small>Relative</small><b>{html.escape(_time_language_label(parameter))}</b></div>
+      <div><small>Date</small><b>{value_date.strftime('%d %b %Y')}</b></div>
+    </div>
+    """
+
+
 def _request_uncertainty() -> None:
     st.session_state[_widget_key("pending_type")] = None
     st.session_state[_widget_key("editing_id")] = None
     st.session_state[_widget_key("pending_uncertainty")] = True
     st.session_state[_widget_key("placement_reset")] = {
-        "uncertainty_center": 0.42,
+        "uncertainty_interval": (0.30, 0.54),
         "uncertainty_strength": "Marked",
-        "uncertainty_width": 0.18,
+        "uncertainty_profile_mode": "Balanced",
     }
 
 
@@ -200,7 +317,7 @@ def _render_move_row(
         definition = EVENT_TYPES[event_type]
         with column:
             if st.button(
-                f"{definition['glyph']}  {definition['label']}",
+                str(definition["label"]),
                 key=f"timeline_move_{event_type}",
                 type=(
                     "primary"
@@ -295,6 +412,167 @@ def _render_camera_persistence_hook(revision: str) -> None:
     )
 
 
+def _filename_for_plan(plan: dict[str, object]) -> str:
+    title = "".join(
+        character.lower() if character.isalnum() else "-"
+        for character in str(plan.get("title") or "trajectory-plan")
+    )
+    return f"{'-'.join(part for part in title.split('-') if part) or 'trajectory-plan'}.yaml"
+
+
+def _mark_exported() -> None:
+    st.session_state[_widget_key("save_status")] = "Exported"
+
+
+def _render_local_autosave(document: dict[str, object]) -> None:
+    """Keep the current editable draft on this device after every rerun."""
+
+    document_json = json.dumps(document, ensure_ascii=False)
+    plan_id = str(document["plan"].get("id") or "draft")
+    components.html(
+        f"""
+        <script>
+        (() => {{
+          const document = {document_json};
+          const cameraRaw = window.parent.sessionStorage.getItem(
+            {CAMERA_STORAGE_KEY!r}
+          );
+          if (cameraRaw) {{
+            try {{ document.view.camera = JSON.parse(cameraRaw); }}
+            catch (_error) {{ /* keep the schema default */ }}
+          }}
+          document.saved_at = new Date().toISOString();
+          const encoded = JSON.stringify(document);
+          window.parent.localStorage.setItem(
+            {LOCAL_STORAGE_PREFIX!r} + {plan_id!r}, encoded
+          );
+          window.parent.localStorage.setItem(
+            {LOCAL_STORAGE_LATEST_KEY!r}, encoded
+          );
+        }})();
+        </script>
+        """,
+        height=0,
+        width=0,
+    )
+
+
+def _restore_imported_camera(camera: dict[str, object]) -> None:
+    components.html(
+        f"""
+        <script>
+        window.parent.sessionStorage.setItem(
+          {CAMERA_STORAGE_KEY!r}, {json.dumps(camera)!r}
+        );
+        </script>
+        """,
+        height=0,
+        width=0,
+    )
+
+
+def _start_another_plan() -> None:
+    for key in tuple(st.session_state):
+        if str(key).startswith(STATE_PREFIX):
+            del st.session_state[key]
+    st.session_state.pop(ACTIVE_BENCHMARK_KEY, None)
+    st.session_state["sketch_plan_stage"] = "entrance"
+    st.switch_page("views/test_sketch_plan.py")
+
+
+def _edit_plan_stage(stage: str) -> None:
+    """Re-enter onboarding without discarding the trajectory vocabulary."""
+
+    field_map = {
+        "title": "title",
+        "description": "description",
+        "initial_condition": "initial_condition",
+        "goal_statement": "goal_statement",
+        "goal_conditions": "goal_conditions",
+        "landing_mode": "landing_mode",
+        "guided_horizon": "guided_horizon",
+        "guided_value": "guided_value",
+        "guided_unit": "guided_unit",
+        "fixed_kind": "fixed_kind",
+        "fixed_value": "fixed_value",
+        "fixed_unit": "fixed_unit",
+        "fixed_date": "fixed_date",
+        "temporal_mode": "temporal_mode",
+        "linear_unit": "linear_unit",
+    }
+    for source, target in field_map.items():
+        value = active_benchmark.get(source)
+        if value is not None:
+            if source == "landing_mode":
+                value = {
+                    "open": "Open",
+                    "guided": "Guided",
+                    "planned": "Fixed",
+                }.get(str(value).lower(), str(value).title())
+            elif source == "temporal_mode":
+                value = str(value).title()
+            st.session_state[f"sketch_plan_value_{target}"] = value
+    st.session_state["sketch_plan_created_at"] = str(
+        active_benchmark.get("created_at") or ""
+    )
+    st.session_state["sketch_plan_plan_id"] = str(
+        active_benchmark.get("id") or uuid4().hex
+    )
+    st.session_state["sketch_plan_stage"] = stage
+    st.session_state["sketch_plan_preserve_trajectory"] = True
+    st.switch_page("views/test_sketch_plan.py")
+
+
+def _discard_local_plan(plan_id: str) -> None:
+    components.html(
+        f"""
+        <a id="discard-plan" href="/test-sketch-plan" target="_blank" rel="noopener">Discard this draft ↗</a>
+        <script>
+        document.getElementById("discard-plan").addEventListener("click", () => {{
+          window.parent.localStorage.removeItem({LOCAL_STORAGE_PREFIX!r} + {plan_id!r});
+          window.parent.localStorage.removeItem({LOCAL_STORAGE_LATEST_KEY!r});
+        }});
+        </script>
+        <style>
+        html,body {{ margin:0; background:transparent; font-family:"IBM Plex Mono",monospace; }}
+        a {{
+          box-sizing:border-box; display:flex; align-items:center; justify-content:center;
+          width:100%; min-height:42px; border-radius:999px; text-decoration:none;
+          background:#211f16; color:#f0eee5; border:1px solid #4e4b38;
+        }}
+        a:hover {{ background:#2a2719; border-color:#89815a; }}
+        a:active {{ transform:scale(.98); }}
+        </style>
+        """,
+        height=46,
+    )
+
+
+@st.dialog("Start another plan?")
+def _confirm_start_another(
+    document: dict[str, object],
+    yaml_text: str,
+) -> None:
+    st.write(
+        "Your current trajectory is autosaved on this device. Choose what "
+        "should happen before opening a blank plan."
+    )
+    if st.button("Save and continue", width="stretch", type="primary"):
+        _start_another_plan()
+    exported = st.download_button(
+        "Export YAML and continue",
+        data=yaml_text,
+        file_name=_filename_for_plan(dict(document["plan"])),
+        mime="application/yaml",
+        width="stretch",
+    )
+    if exported:
+        _start_another_plan()
+    _discard_local_plan(str(document["plan"].get("id") or "draft"))
+    if st.button("Cancel", width="stretch"):
+        st.rerun()
+
+
 def _add_uncertainty_chunk(
     figure: go.Figure,
     x: list[float],
@@ -309,37 +587,33 @@ def _add_uncertainty_chunk(
     color = "#dfe875" if preview else "#8fc9c0"
     base_opacity = float(chunk["opacity"])
     shells = (
-        (0.30, 8, base_opacity),
-        (0.62, 6, base_opacity * 0.72),
-        (1.00, 4, base_opacity * 0.42),
+        (0.38, base_opacity * 0.86),
+        (0.70, base_opacity * 0.58),
+        (1.00, base_opacity * 0.36),
     )
-    directions_per_shell = 4
-    for shell_index, (radius_fraction, line_width, opacity) in enumerate(
-        shells
-    ):
-        for direction in range(directions_per_shell):
-            angle_fraction = (
-                direction / directions_per_shell
-                + (shell_index * 0.125)
-            )
-            trace_x, trace_y, trace_z = uncertainty_envelope_points(
-                x,
-                y,
-                z,
-                chunk,
-                radial_fraction=radius_fraction,
-                angle_fraction=angle_fraction,
-            )
+    for radius_fraction, opacity in shells:
+        mesh = uncertainty_tube_mesh(
+            x,
+            y,
+            z,
+            chunk,
+            radial_fraction=radius_fraction,
+            directions=14,
+        )
+        if mesh["x"]:
             figure.add_trace(
-                go.Scatter3d(
-                    x=trace_x,
-                    y=trace_y,
-                    z=trace_z,
-                    mode="lines",
-                    line={"color": color, "width": line_width},
+                go.Mesh3d(
+                    x=mesh["x"],
+                    y=mesh["y"],
+                    z=mesh["z"],
+                    i=mesh["i"],
+                    j=mesh["j"],
+                    k=mesh["k"],
+                    color=color,
                     opacity=opacity,
                     hoverinfo="skip",
                     showlegend=False,
+                    flatshading=False,
                 )
             )
 
@@ -387,6 +661,10 @@ def _build_figure(
         events,
         landing_mode=landing_mode,
         samples_per_segment=72,
+    )
+    branch_stems = binary_branch_stems(
+        events,
+        landing_mode=landing_mode,
     )
     figure = go.Figure()
 
@@ -449,11 +727,23 @@ def _build_figure(
             preview=True,
         )
 
+    centreline_x, centreline_y, centreline_z = x, y, z
+    if branch_stems:
+        branch_start = float(branch_stems[0]["x"][0])
+        incoming = [
+            index
+            for index, parameter in enumerate(x)
+            if float(parameter) <= branch_start + 1e-9
+        ]
+        centreline_x = [x[index] for index in incoming]
+        centreline_y = [y[index] for index in incoming]
+        centreline_z = [z[index] for index in incoming]
+
     figure.add_trace(
         go.Scatter3d(
-            x=x,
-            y=y,
-            z=z,
+            x=centreline_x,
+            y=centreline_y,
+            z=centreline_z,
             mode="lines",
             line={"color": "#ecf7ef", "width": 8},
             hoverinfo="skip",
@@ -461,6 +751,27 @@ def _build_figure(
             name="Personal trajectory",
         )
     )
+
+    for index, stem in enumerate(branch_stems):
+        branch_color = ("#80d6c3", "#d6a8ff")[index]
+        figure.add_trace(
+            go.Scatter3d(
+                x=stem["x"],
+                y=stem["y"],
+                z=stem["z"],
+                mode="lines+text",
+                line={"color": branch_color, "width": 7},
+                text=[""] * (len(stem["x"]) - 1) + [str(stem["label"])],
+                textposition="top center",
+                textfont={"color": branch_color, "size": 11},
+                hovertemplate=(
+                    f"<b>{html.escape(str(stem['label']))}</b>"
+                    "<br>Branch future<extra></extra>"
+                ),
+                showlegend=False,
+                name=str(stem["label"]),
+            )
+        )
 
     now_point = trajectory_point(0.0, events, landing_mode=landing_mode)
     figure.add_trace(
@@ -522,7 +833,10 @@ def _build_figure(
                 mode="markers+text",
                 marker={
                     "size": [
-                        9 if str(event["node_mode"]) == "kink" else 6
+                        9
+                        if directional_mode(event) == "abruptly"
+                        or topology_mode(event) == "branching"
+                        else 6
                         for event in placed
                     ],
                     "color": [
@@ -531,20 +845,17 @@ def _build_figure(
                     ],
                     "opacity": 0.72,
                 },
-                text=[
-                    EVENT_TYPES[str(event["type"])]["glyph"]
-                    for event in placed
+                text=[primitive_plot_label(event) for event in placed],
+                textposition=[
+                    "top center" if index % 2 == 0 else "bottom center"
+                    for index, _ in enumerate(placed)
                 ],
-                textposition="middle center",
                 textfont={
                     "color": [
                         EVENT_TYPES[str(event["type"])]["color"]
                         for event in placed
                     ],
-                    "size": [
-                        28 if str(event["node_mode"]) == "kink" else 24
-                        for event in placed
-                    ],
+                    "size": 13,
                 },
                 customdata=[
                     [
@@ -554,14 +865,9 @@ def _build_figure(
                         date.fromisoformat(str(event["date_value"])).strftime(
                             "%d %b %Y"
                         ),
-                        IMPORTANCE_COPY.get(
-                            str(event["importance"]),
-                            str(event["importance"]),
-                        ),
-                        NODE_MODE_COPY.get(
-                            str(event["node_mode"]).title(),
-                            str(event["node_mode"]).title(),
-                        ),
+                        INFLUENCE_COPY[_event_influence(event)],
+                        directional_mode(event).title(),
+                        topology_mode(event).title(),
                     ]
                     for event in placed
                 ],
@@ -569,7 +875,8 @@ def _build_figure(
                     "<b>%{customdata[0]}</b><br>"
                     "%{customdata[1]} · s=%{customdata[2]} / %{customdata[3]}"
                     "<br>Journey effect: %{customdata[4]}"
-                    "<br>Path: %{customdata[5]}<extra></extra>"
+                    "<br>Direction: %{customdata[5]}"
+                    "<br>Topology: %{customdata[6]}<extra></extra>"
                 ),
                 showlegend=False,
                 name="Placed events",
@@ -641,15 +948,19 @@ def _build_figure(
             )
         )
 
-    tick_values = [0.0, 0.25, 0.5, 0.75, 1.0]
-    tick_text = [
-        relative_time_label(
-            value,
+    if temporal_mode == "qualitative":
+        tick_values = [value for _, value in QUALITATIVE_TIME_ANCHORS]
+        tick_text = [
+            label.upper() for label, _ in QUALITATIVE_TIME_ANCHORS
+        ]
+    else:
+        linear_ticks = linear_time_ticks(
             start_date=ROADMAP_START,
             end_date=ROADMAP_END,
-        ).upper()
-        for value in tick_values
-    ]
+            unit=str(active_benchmark.get("time_unit") or "Days"),
+        )
+        tick_values = [position for position, _ in linear_ticks]
+        tick_text = [label for _, label in linear_ticks]
     figure.update_layout(
         height=620,
         margin={"l": 0, "r": 0, "t": 8, "b": 0},
@@ -663,26 +974,33 @@ def _build_figure(
         transition={"duration": 360, "easing": "cubic-in-out"},
         scene={
             "bgcolor": "#020707",
-            "camera": {"eye": {"x": 1.55, "y": -1.45, "z": 1.05}},
+            "camera": DEFAULT_CAMERA,
             "uirevision": "timeline-camera-v2",
             "aspectmode": "manual",
-            "aspectratio": {"x": 1.75, "y": 1.0, "z": 1.0},
+            "aspectratio": {"x": 2.35, "y": 0.66, "z": 1.0},
             "xaxis": {
-                "title": {"text": "TIME", "font": {"color": "#c2d0cb"}},
+                "title": {
+                    "text": (
+                        "HORIZON"
+                        if temporal_mode == "qualitative"
+                        else "TIME"
+                    ),
+                    "font": {"color": "#c2d0cb", "size": 14},
+                },
                 "range": [0, 1],
                 "tickvals": tick_values,
                 "ticktext": tick_text,
                 "gridcolor": "#13201d",
                 "linecolor": "#43534e",
                 "zerolinecolor": "#43534e",
-                "tickfont": {"color": "#7f918b", "size": 10},
+                "tickfont": {"color": "#9aaca5", "size": 12},
                 "showbackground": False,
                 "showspikes": False,
             },
             "yaxis": {
                 "title": {
-                    "text": "ALIGNMENT",
-                    "font": {"color": "#c2d0cb"},
+                    "text": axis_y_label.upper(),
+                    "font": {"color": "#c2d0cb", "size": 14},
                 },
                 "range": bounds["y"],
                 "nticks": 4,
@@ -694,7 +1012,10 @@ def _build_figure(
                 "showspikes": False,
             },
             "zaxis": {
-                "title": {"text": "ENERGY", "font": {"color": "#c2d0cb"}},
+                "title": {
+                    "text": "ENERGY",
+                    "font": {"color": "#c2d0cb", "size": 14},
+                },
                 "range": bounds["z"],
                 "nticks": 4,
                 "gridcolor": "#13201d",
@@ -777,7 +1098,14 @@ def _apply_style_lab_figure(
             "linecolor": line,
             "zerolinecolor": line,
             "showgrid": show_grid,
-            "title": {"text": "TIME", "font": {"color": axis}},
+            "title": {
+                "text": (
+                    "HORIZON"
+                    if temporal_mode == "qualitative"
+                    else "TIME"
+                ),
+                "font": {"color": axis},
+            },
             "tickfont": {"color": ticks, "size": 10},
         },
         yaxis={
@@ -785,7 +1113,7 @@ def _apply_style_lab_figure(
             "linecolor": line,
             "zerolinecolor": line,
             "showgrid": show_grid,
-            "title": {"text": "ALIGNMENT", "font": {"color": axis}},
+            "title": {"text": axis_y_label.upper(), "font": {"color": axis}},
         },
         zaxis={
             "gridcolor": grid,
@@ -803,6 +1131,22 @@ def _apply_timeline_theme() -> None:
         """
         <style>
         @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+        :root {
+          --type-hero:clamp(42px,5.2vw,72px);
+          --type-page-title:clamp(32px,3.5vw,48px);
+          --type-section:clamp(24px,2.2vw,32px);
+          --type-control:20px;
+          --type-button:17px;
+          --type-body:clamp(15px,1.1vw,17px);
+          --type-helper:14px;
+          --type-option:13px;
+          --type-meta:12px;
+          --timeline-action:#c7d66d;
+          --timeline-action-hover:#d4e47b;
+          --timeline-action-text:#11160e;
+          --timeline-control:#07110f;
+          --timeline-control-hover:#0d1a16;
+        }
         .stApp {
           background:
             radial-gradient(circle at 70% 0%, rgba(77,127,116,.10), transparent 30rem),
@@ -817,7 +1161,6 @@ def _apply_timeline_theme() -> None:
         h1, h2, h3, p, label, .stCaption { color:#e8eee9 !important; }
         [data-testid="stSidebar"] {
           background:#030807; border-right:1px solid #21302c;
-          min-width:23rem !important; width:23rem !important;
         }
         [data-testid="stIconMaterial"] {
           font-family:"Material Symbols Rounded" !important;
@@ -837,6 +1180,19 @@ def _apply_timeline_theme() -> None:
         .timeline-hud strong { font-size:1rem; letter-spacing:.02em; }
         .timeline-hud b { color:#dfe875; font-size:.85rem; font-weight:500; }
         .timeline-readout { min-width:8rem; text-align:right; }
+        .timeline-plan-mode {
+          min-height:3.3rem; display:flex; flex-direction:column;
+          justify-content:center; align-items:flex-end; padding:.45rem .7rem;
+          border:1px solid #30443d; background:#06100e;
+        }
+        .timeline-plan-mode small {
+          color:#71827d; font-size:.58rem; letter-spacing:.12em;
+          text-transform:uppercase;
+        }
+        .timeline-plan-mode b {
+          color:#dfe875; font-size:.72rem; font-weight:500;
+          letter-spacing:.06em;
+        }
         .timeline-field-note {
           display:flex; justify-content:space-between; gap:1rem; color:#71827d;
           font-size:.68rem; letter-spacing:.08em; text-transform:uppercase;
@@ -906,6 +1262,19 @@ def _apply_timeline_theme() -> None:
           color:#dce7e1; display:block; font-size:.67rem; font-weight:500;
           overflow-wrap:anywhere;
         }
+        .timeline-save-state, .timeline-integration-card {
+          display:flex; flex-direction:column; gap:.28rem;
+          border:1px solid #3c574e; background:#07110f;
+          padding:.8rem .9rem; border-radius:8px;
+        }
+        .timeline-save-state b, .timeline-integration-card b {
+          color:#8ee0b3; font-size:.78rem; font-weight:500;
+        }
+        .timeline-save-state span, .timeline-integration-card span {
+          color:#a0b0aa; font-size:.72rem; line-height:1.5;
+        }
+        .timeline-integration-card { margin:.85rem 0; border-color:#60766f; }
+        .timeline-integration-card b { color:#dfe875; font-size:.9rem; }
         .st-key-timeline_rail {
           min-height:0; background:transparent; border-top:1px solid #2d403a;
           border-radius:0; padding:1rem .15rem 2rem;
@@ -947,7 +1316,52 @@ def _apply_timeline_theme() -> None:
             0 0 0 2px rgba(223,232,117,.22),
             0 10px 28px rgba(0,0,0,.28) !important;
         }
-        button p { color:inherit !important; }
+        .stButton button,
+        [data-testid="stDownloadButton"] button {
+          min-height:52px;
+          font-size:var(--type-button) !important;
+          background:var(--timeline-control) !important;
+          color:#dce7e1 !important;
+          border:1px solid #40554d !important;
+          box-shadow:none !important;
+        }
+        .stButton button:not(:disabled):hover,
+        [data-testid="stDownloadButton"] button:not(:disabled):hover {
+          background:var(--timeline-control-hover) !important;
+          border-color:#82978f !important;
+          color:#f1f5ef !important;
+        }
+        .stButton button[data-testid="stBaseButton-primary"] {
+          background:var(--timeline-action) !important;
+          color:var(--timeline-action-text) !important;
+          border-color:var(--timeline-action) !important;
+        }
+        .stButton button[data-testid="stBaseButton-primary"]:hover {
+          background:var(--timeline-action-hover) !important;
+          color:var(--timeline-action-text) !important;
+        }
+        .stButton button:disabled,
+        [data-testid="stDownloadButton"] button:disabled {
+          opacity:1 !important;
+          background:#141a17 !important;
+          color:#77837d !important;
+          border:1px dashed #4e5a54 !important;
+          cursor:not-allowed !important;
+        }
+        button p,
+        [data-testid="stDownloadButton"] button p,
+        .stButton button[data-testid="stBaseButton-primary"] p {
+          color:inherit !important;
+        }
+        .stButton button[data-testid="stBaseButton-primary"] p,
+        .st-key-timeline_anchor_uncertainty button p,
+        button[data-testid="stBaseButton-pillsActive"] p,
+        button[data-testid="stBaseButton-segmented_controlActive"] p,
+        [data-testid="stFormSubmitButton"] button p {
+          color:var(--timeline-action-text) !important;
+          -webkit-text-fill-color:var(--timeline-action-text) !important;
+          text-shadow:none !important;
+        }
         .st-key-timeline_add_uncertainty button {
           min-height:3rem !important; border:1px dashed #668178 !important;
           border-radius:7px !important; background:#06100e !important;
@@ -958,8 +1372,12 @@ def _apply_timeline_theme() -> None:
         }
         .st-key-timeline_anchor_uncertainty button {
           min-height:3rem !important; border:0 !important;
-          border-radius:6px !important; background:#dfe875 !important;
-          color:#11160e !important; box-shadow:none !important;
+          border-radius:6px !important; background:var(--timeline-action) !important;
+          color:var(--timeline-action-text) !important; box-shadow:none !important;
+        }
+        .st-key-timeline_anchor_uncertainty button p {
+          color:var(--timeline-action-text) !important;
+          -webkit-text-fill-color:var(--timeline-action-text) !important;
         }
         .st-key-timeline_choose_benchmark button,
         [class*="st-key-timeline_suggested_move_"] button {
@@ -994,8 +1412,9 @@ def _apply_timeline_theme() -> None:
         }
         [class*="st-key-timeline_utility_"] button:disabled,
         .st-key-timeline_remove_uncertainty button:disabled {
-          opacity:.28 !important; cursor:not-allowed !important;
-          border-style:dashed !important; filter:saturate(.25);
+          opacity:1 !important; cursor:not-allowed !important;
+          color:#727d77 !important; background:#141a17 !important;
+          border:1px dashed #4e5a54 !important; filter:saturate(.25);
         }
         [class*="st-key-timeline_utility_"] button:not(:disabled):hover {
           color:#eef2e8 !important; background:#0a1512 !important;
@@ -1011,12 +1430,30 @@ def _apply_timeline_theme() -> None:
           border-color:#dfe875 !important; color:#dfe875 !important;
         }
         .timeline-progress {
-          color:#71827d; font-size:.66rem; text-align:right; margin-top:.35rem;
+          color:#92a29c; font-size:.72rem; text-align:right; margin-top:.35rem;
         }
         .timeline-progress b { color:#aebdb7; font-weight:500; }
         [data-testid="stWidgetLabel"] p {
-          color:#91a39d !important; font-size:.68rem !important;
-          letter-spacing:.07em; text-transform:uppercase;
+          color:#aebdb7 !important; font-size:var(--type-control) !important;
+          line-height:1.3; font-weight:600; letter-spacing:0;
+          text-transform:none;
+        }
+        [data-testid="stCaptionContainer"] p, .stCaption {
+          font-size:var(--type-helper) !important; line-height:1.45 !important;
+          color:#91a39d !important;
+        }
+        [data-testid="stExpander"] {
+          border-color:#344740 !important; background:#040b09 !important;
+          border-radius:10px !important;
+        }
+        [data-testid="stExpander"] summary,
+        [data-testid="stExpander"] summary p,
+        [data-testid="stExpander"] summary svg {
+          background:#040b09 !important; color:#dce7e1 !important;
+          -webkit-text-fill-color:#dce7e1 !important;
+        }
+        [data-testid="stExpander"] summary:hover {
+          background:#0a1512 !important;
         }
         div[data-baseweb="input"] > div, [data-baseweb="select"] > div,
         textarea {
@@ -1024,10 +1461,13 @@ def _apply_timeline_theme() -> None:
           color:#edf1e8 !important;
         }
         input, textarea { color:#edf1e8 !important; caret-color:#dfe875 !important; }
+        input, textarea, [data-baseweb="select"] { font-size:16px !important; }
         input::placeholder, textarea::placeholder {
           color:#667770 !important; opacity:1;
         }
         [data-testid="stButtonGroup"] button {
+          min-height:52px;
+          font-size:var(--type-button) !important;
           background:#020807 !important; border-color:#344640 !important;
           color:#aab8b3 !important; border-radius:4px !important;
           transition:background 140ms ease, border-color 140ms ease,
@@ -1042,25 +1482,35 @@ def _apply_timeline_theme() -> None:
         }
         button[data-testid="stBaseButton-pillsActive"],
         button[data-testid="stBaseButton-segmented_controlActive"] {
-          background:#dfe875 !important; color:#11160e !important;
-          border-color:#dfe875 !important;
+          background:var(--timeline-action) !important;
+          color:var(--timeline-action-text) !important;
+          border-color:var(--timeline-action) !important;
           box-shadow:inset 0 -3px 0 rgba(17,22,14,.18),
             0 0 0 2px rgba(223,232,117,.12) !important;
+        }
+        button[data-testid="stBaseButton-pillsActive"] p,
+        button[data-testid="stBaseButton-segmented_controlActive"] p {
+          color:var(--timeline-action-text) !important;
+          -webkit-text-fill-color:var(--timeline-action-text) !important;
         }
         [data-testid="stSlider"] [role="slider"] {
           background:#dfe875 !important; border-color:#dfe875 !important;
         }
-        [data-testid="stFormSubmitButton"] button {
-          min-height:3rem; width:100%; background:#dfe875 !important;
-          color:#11160e !important; border:0 !important; border-radius:5px !important;
+        [data-testid="stFormSubmitButton"] button,
+        .st-key-timeline_place_move button {
+          min-height:3rem; width:100%; background:var(--timeline-action) !important;
+          color:var(--timeline-action-text) !important; border:0 !important; border-radius:5px !important;
           box-shadow:none !important; text-transform:uppercase; letter-spacing:.08em;
           transition:transform 100ms ease, filter 140ms ease !important;
         }
-        [data-testid="stFormSubmitButton"] button:hover {
+        [data-testid="stFormSubmitButton"] button:hover,
+        .st-key-timeline_place_move button:hover {
           filter:brightness(1.08); transform:translateY(-1px);
         }
-        [data-testid="stFormSubmitButton"] button p {
-          color:#11160e !important;
+        [data-testid="stFormSubmitButton"] button p,
+        .st-key-timeline_place_move button p {
+          color:var(--timeline-action-text) !important;
+          -webkit-text-fill-color:var(--timeline-action-text) !important;
         }
         .timeline-inspector {
           border-left:2px solid #dfe875; padding:.15rem 0 .15rem 1rem;
@@ -1070,13 +1520,218 @@ def _apply_timeline_theme() -> None:
         [data-testid="stAlert"] {
           background:#07110f; border:1px solid #425b54; color:#e8eee9;
         }
-        @media(max-width:760px) {
+        @media(max-width:900px) {
+          :root { --type-hero:48px; --type-body:clamp(15px,2vw,17px); }
           .block-container { padding:.8rem .8rem 2rem; }
           .timeline-hud { grid-template-columns:1fr 1fr; }
           .timeline-readout { text-align:left; min-width:0; }
           .timeline-confirmation { left:1rem; right:1rem; top:4rem; }
           [data-testid="stPlotlyChart"] { min-height:470px; }
           .timeline-journey-steps { grid-template-columns:repeat(4,1fr); }
+          [data-testid="stWidgetLabel"] p { font-size:16px !important; }
+          [data-testid="stCaptionContainer"] p, .stCaption { font-size:13px !important; }
+          .stButton button, [data-testid="stDownloadButton"] button,
+          [data-testid="stButtonGroup"] button { min-height:52px; font-size:16px !important; }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _apply_main_graphic_move_theme() -> None:
+    """Promote semantic move choices into large, tactile objects."""
+
+    st.markdown(
+        """
+        <style>
+        :root {
+          --main-object-size:4.2rem;
+          --main-object-label-size:.76rem;
+        }
+        [class*="st-key-timeline_move_"] button {
+          min-height:7.3rem !important;
+          border:0 !important;
+          border-radius:30px !important;
+          color:#f5f7ef !important;
+          box-shadow:0 16px 0 rgba(0,0,0,.12),
+            0 24px 52px rgba(0,0,0,.25) !important;
+          transition:transform 150ms ease, box-shadow 150ms ease,
+            filter 150ms ease, outline-color 150ms ease !important;
+        }
+        body .stApp [class*="st-key-timeline_move_"] button p {
+          display:flex !important;
+          flex-direction:column;
+          align-items:center;
+          justify-content:center;
+          gap:.55rem;
+          color:#e8eee9 !important;
+          font-size:var(--main-object-label-size) !important;
+          line-height:1.15 !important;
+          letter-spacing:.06em;
+          -webkit-text-fill-color:#e8eee9;
+        }
+        [class*="st-key-timeline_move_"] button p::before {
+          display:block;
+          font-size:var(--main-object-size);
+          line-height:1;
+          -webkit-text-fill-color:currentColor !important;
+          filter:drop-shadow(0 7px 10px rgba(0,0,0,.16));
+          transition:transform 150ms ease, filter 150ms ease;
+        }
+        [class*="st-key-timeline_move_"] button p::after {
+          display:none !important;
+          content:none !important;
+        }
+        [class*="st-key-timeline_move_"] button:hover {
+          transform:translateY(-7px) scale(1.018);
+          box-shadow:0 18px 0 rgba(0,0,0,.10),
+            0 30px 64px rgba(0,0,0,.32) !important;
+          filter:brightness(1.08);
+        }
+        [class*="st-key-timeline_move_"] button:hover p::before {
+          filter:brightness(1.18)
+            drop-shadow(0 0 18px color-mix(in srgb, currentColor 48%, transparent));
+        }
+        [class*="st-key-timeline_move_"] button:active {
+          transform:translateY(2px) scale(.965) !important;
+          transition-duration:70ms !important;
+        }
+        [class*="st-key-timeline_move_"] button[data-testid="stBaseButton-primary"] {
+          outline:3px solid rgba(199,214,109,.75) !important;
+          outline-offset:3px;
+          filter:brightness(1.12);
+        }
+
+        body .stApp .st-key-timeline_move_release button {
+          --main-object-background:linear-gradient(155deg,rgba(246,211,101,.23),#0c1612 70%);
+          --main-object-accent:#f6d365;
+          background:var(--main-object-background) !important;
+        }
+        body .stApp .st-key-timeline_move_event button {
+          --main-object-background:linear-gradient(155deg,rgba(128,214,195,.21),#0b1512 70%);
+          --main-object-accent:#80d6c3;
+          background:var(--main-object-background) !important;
+        }
+        body .stApp .st-key-timeline_move_gateway button {
+          --main-object-background:linear-gradient(155deg,rgba(214,168,255,.22),#111017 70%);
+          --main-object-accent:#d6a8ff;
+          background:var(--main-object-background) !important;
+        }
+        body .stApp .st-key-timeline_move_action button {
+          --main-object-background:linear-gradient(155deg,rgba(255,139,105,.22),#121411 70%);
+          --main-object-accent:#ff8b69;
+          background:var(--main-object-background) !important;
+        }
+        body .stApp .st-key-timeline_move_update button {
+          --main-object-background:linear-gradient(155deg,rgba(156,168,255,.22),#0e1315 70%);
+          --main-object-accent:#9ca8ff;
+          background:var(--main-object-background) !important;
+        }
+        body .stApp .st-key-timeline_move_milestone button {
+          --main-object-background:linear-gradient(155deg,rgba(232,242,124,.22),#101510 70%);
+          --main-object-accent:#e8f27c;
+          background:var(--main-object-background) !important;
+        }
+        body .stApp .st-key-timeline_move_merge button {
+          --main-object-background:linear-gradient(155deg,rgba(243,166,200,.22),#161015 70%);
+          --main-object-accent:#f3a6c8;
+          background:var(--main-object-background) !important;
+        }
+        body .stApp .st-key-timeline_move_share_resources button {
+          --main-object-background:linear-gradient(155deg,rgba(130,199,255,.22),#0c1419 70%);
+          --main-object-accent:#82c7ff;
+          background:var(--main-object-background) !important;
+        }
+        body .stApp .st-key-timeline_move_acquire_resources button {
+          --main-object-background:linear-gradient(155deg,rgba(123,214,166,.22),#0b1611 70%);
+          --main-object-accent:#7bd6a6;
+          background:var(--main-object-background) !important;
+        }
+        body .stApp .st-key-timeline_move_delegate button {
+          --main-object-background:linear-gradient(155deg,rgba(240,169,122,.22),#17120e 70%);
+          --main-object-accent:#f0a97a;
+          background:var(--main-object-background) !important;
+        }
+        body .stApp .st-key-timeline_move_wait button {
+          --main-object-background:linear-gradient(155deg,rgba(170,180,189,.18),#101414 70%);
+          --main-object-accent:#aab4bd;
+          background:var(--main-object-background) !important;
+        }
+        body .stApp .st-key-timeline_move_prepare button {
+          --main-object-background:linear-gradient(155deg,rgba(255,189,120,.22),#17130e 70%);
+          --main-object-accent:#ffbd78;
+          background:var(--main-object-background) !important;
+        }
+        body .stApp .st-key-timeline_move_get_intelligence button {
+          --main-object-background:linear-gradient(155deg,rgba(168,230,207,.22),#0d1613 70%);
+          --main-object-accent:#a8e6cf;
+          background:var(--main-object-background) !important;
+        }
+        body .stApp .st-key-timeline_move_synchronise button {
+          --main-object-background:linear-gradient(155deg,rgba(200,182,255,.22),#121017 70%);
+          --main-object-accent:#c8b6ff;
+          background:var(--main-object-background) !important;
+        }
+
+        html body .stApp div[class*="st-key-timeline_move_"] .stButton
+        button[data-testid="stBaseButton-primary"] {
+          background:var(--main-object-background) !important;
+          color:#e8eee9 !important;
+        }
+        html body .stApp div[class*="st-key-timeline_move_"] .stButton
+        button[data-testid="stBaseButton-primary"] p {
+          color:#e8eee9 !important;
+          -webkit-text-fill-color:#e8eee9 !important;
+        }
+        html body .stApp div[class*="st-key-timeline_move_"] .stButton
+        button[data-testid="stBaseButton-primary"] p::before {
+          color:var(--main-object-accent) !important;
+          -webkit-text-fill-color:var(--main-object-accent) !important;
+        }
+
+        body .stApp .st-key-timeline_move_release button p::before { content:"★" / ""; color:#f6d365; }
+        body .stApp .st-key-timeline_move_event button p::before { content:"●" / ""; color:#80d6c3; }
+        body .stApp .st-key-timeline_move_gateway button p::before { content:"◈" / ""; color:#d6a8ff; }
+        body .stApp .st-key-timeline_move_action button p::before { content:"▲" / ""; color:#ff8b69; }
+        body .stApp .st-key-timeline_move_update button p::before { content:"■" / ""; color:#9ca8ff; }
+        body .stApp .st-key-timeline_move_milestone button p::before { content:"▼" / ""; color:#e8f27c; }
+        body .stApp .st-key-timeline_move_merge button p::before { content:"⋈" / ""; color:#f3a6c8; }
+        body .stApp .st-key-timeline_move_share_resources button p::before { content:"⇄" / ""; color:#82c7ff; }
+        body .stApp .st-key-timeline_move_acquire_resources button p::before { content:"⇣" / ""; color:#7bd6a6; }
+        body .stApp .st-key-timeline_move_delegate button p::before { content:"↱" / ""; color:#f0a97a; }
+        body .stApp .st-key-timeline_move_wait button p::before { content:"◷" / ""; color:#aab4bd; }
+        body .stApp .st-key-timeline_move_prepare button p::before { content:"◒" / ""; color:#ffbd78; }
+        body .stApp .st-key-timeline_move_get_intelligence button p::before { content:"⌾" / ""; color:#a8e6cf; }
+        body .stApp .st-key-timeline_move_synchronise button p::before { content:"⟳" / ""; color:#c8b6ff; }
+
+        @keyframes main-release-pulse {
+          0%,100% { transform:scale(1); }
+          50% { transform:scale(1.1); }
+        }
+        .st-key-timeline_move_release button:hover p::before {
+          animation:main-release-pulse 900ms ease-in-out infinite;
+        }
+        .st-key-timeline_move_event button:hover p::before { transform:scale(1.12); }
+        .st-key-timeline_move_gateway button:hover p::before { transform:scale(1.12) rotate(45deg); }
+        .st-key-timeline_move_action button:hover p::before { transform:translateY(-4px); }
+        .st-key-timeline_move_update button:hover p::before { transform:rotate(6deg); }
+        .st-key-timeline_move_milestone button:hover p::before { transform:rotate(-8deg); }
+        .st-key-timeline_move_merge button:hover p::before { transform:scaleX(.78) scaleY(1.1); }
+        .st-key-timeline_move_share_resources button:hover p::before { transform:scale(1.14); }
+        .st-key-timeline_move_acquire_resources button:hover p::before { transform:translateY(4px) scale(1.12); }
+        .st-key-timeline_move_delegate button:hover p::before { transform:translate(4px,-3px); }
+        .st-key-timeline_move_wait button:hover p::before { transform:rotate(-18deg); }
+        .st-key-timeline_move_prepare button:hover p::before { transform:rotate(18deg); }
+        .st-key-timeline_move_get_intelligence button:hover p::before { transform:scale(1.14); }
+        .st-key-timeline_move_synchronise button:hover p::before { transform:rotate(28deg); }
+
+        @media(max-width:1000px) {
+          :root { --main-object-size:3.1rem; --main-object-label-size:.66rem; }
+          [class*="st-key-timeline_move_"] button {
+            min-height:6rem !important;
+            border-radius:22px !important;
+          }
         }
         </style>
         """,
@@ -1090,7 +1745,6 @@ def _apply_style_lab_theme(variant: str) -> None:
     common = """
     <style>
     [data-testid="stSidebar"] {
-      min-width:22rem !important; width:22rem !important;
       border-right-color:rgba(191,218,208,.08) !important;
     }
     [data-testid="stSidebarNav"] { display:none !important; }
@@ -1230,6 +1884,16 @@ def _apply_style_lab_theme(variant: str) -> None:
     .st-key-timeline_move_share_resources button p::after {
       content:"Share resources";
     }
+    .st-key-timeline_move_acquire_resources button p::before {
+      content:"⇣"; color:#7bd6a6;
+    }
+    .st-key-timeline_move_acquire_resources button p::after {
+      content:"Acquire resources";
+    }
+    .st-key-timeline_move_delegate button p::before {
+      content:"↱"; color:#f0a97a;
+    }
+    .st-key-timeline_move_delegate button p::after { content:"Delegate"; }
     .st-key-timeline_move_wait button p::before {
       content:"◷"; color:#aab4bd;
     }
@@ -1278,6 +1942,12 @@ def _apply_style_lab_theme(variant: str) -> None:
     .st-key-timeline_move_share_resources button:hover p::before {
       transform:scale(1.14);
     }
+    .st-key-timeline_move_acquire_resources button:hover p::before {
+      transform:translateY(4px) scale(1.12);
+    }
+    .st-key-timeline_move_delegate button:hover p::before {
+      transform:translate(4px,-3px);
+    }
     .st-key-timeline_move_wait button:hover p::before {
       transform:rotate(-18deg);
     }
@@ -1295,9 +1965,6 @@ def _apply_style_lab_theme(variant: str) -> None:
       transition:background 150ms ease, color 150ms ease, opacity 150ms ease !important;
     }
     @media(max-width:900px) {
-      [data-testid="stSidebar"] {
-        min-width:19rem !important; width:19rem !important;
-      }
       [class*="st-key-timeline_move_"] button {
         min-height:5.2rem !important;
       }
@@ -1399,6 +2066,12 @@ def _apply_style_lab_theme(variant: str) -> None:
         .st-key-timeline_move_share_resources button {
           background:linear-gradient(155deg,rgba(130,199,255,.20),#0c1419 70%) !important;
         }
+        .st-key-timeline_move_acquire_resources button {
+          background:linear-gradient(155deg,rgba(123,214,166,.20),#0b1611 70%) !important;
+        }
+        .st-key-timeline_move_delegate button {
+          background:linear-gradient(155deg,rgba(240,169,122,.20),#17120e 70%) !important;
+        }
         .st-key-timeline_move_wait button {
           background:linear-gradient(155deg,rgba(170,180,189,.16),#101414 70%) !important;
         }
@@ -1487,6 +2160,8 @@ def _apply_style_lab_theme(variant: str) -> None:
 _apply_timeline_theme()
 if STYLE_LAB_ENABLED:
     _apply_style_lab_theme(style_lab_variant)
+else:
+    _apply_main_graphic_move_theme()
 _apply_pending_widget_reset()
 
 events = _state("events", [])
@@ -1503,8 +2178,21 @@ pending_uncertainty = bool(_state("pending_uncertainty", False))
 editing_id = _state("editing_id", None)
 show_inspector = bool(_state("show_inspector", False))
 integrated = bool(_state("integrated", False))
-bounds = _state("bounds", {"y": [-0.32, 0.32], "z": [-0.24, 0.90]})
+save_status = str(_state("save_status", "Saved on this device"))
+default_bounds = (
+    {"y": [-0.16, 0.16], "z": [-0.02, 0.48]}
+    if is_new_plan
+    else {"y": [-0.32, 0.32], "z": [-0.24, 0.90]}
+)
+bounds = _state("bounds", default_bounds)
 assert isinstance(bounds, dict)
+
+imported_camera = st.session_state.pop(
+    _widget_key("imported_camera"),
+    None,
+)
+if isinstance(imported_camera, dict):
+    _restore_imported_camera(imported_camera)
 
 outside_count = sum(
     str(event.get("interval_status")) == "outside" for event in events
@@ -1512,15 +2200,22 @@ outside_count = sum(
 placed_events = active_events(events)
 top_left, top_toggle = st.columns([3, 1], vertical_alignment="bottom")
 with top_toggle:
-    layer = st.segmented_control(
-        "Field layer",
-        options=("Personal", "Convergence · simulated"),
-        default="Personal",
-        key=_widget_key("layer"),
-        label_visibility="collapsed",
-        width="stretch",
-    )
-show_collective = layer == "Convergence · simulated"
+    if is_new_plan:
+        st.markdown(
+            f'<div class="timeline-plan-mode"><small>{html.escape(save_status)}</small><b>PERSONAL PLAN</b></div>',
+            unsafe_allow_html=True,
+        )
+        layer = "Personal"
+    else:
+        layer = st.segmented_control(
+            "Field layer",
+            options=("Personal", "Convergence · simulated"),
+            default="Personal",
+            key=_widget_key("layer"),
+            label_visibility="collapsed",
+            width="stretch",
+        )
+show_collective = not is_new_plan and layer == "Convergence · simulated"
 
 with top_left:
     st.markdown(
@@ -1530,7 +2225,7 @@ with top_left:
           <div class="timeline-readout"><small>Phase</small><b>PATH BUILDING</b></div>
           <div class="timeline-readout"><small>Moves</small><b>{len(placed_events):02d}</b></div>
           <div class="timeline-readout"><small>Uncertainty</small><b>{len(uncertainties):02d}</b></div>
-          <div class="timeline-readout"><small>Alignment</small><b>{'TEST LAYER' if show_collective else 'NEUTRAL'}</b></div>
+          <div class="timeline-readout"><small>{html.escape(axis_y_label)}</small><b>{'BASELINE' if is_new_plan else ('TEST LAYER' if show_collective else 'NEUTRAL')}</b></div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -1606,7 +2301,7 @@ with st.sidebar:
         st.markdown(
             f"""
             <div class="timeline-sidebar-head">
-              <span class="timeline-experimental-badge">Experiment</span>
+              <span class="timeline-experimental-badge">{'Plan' if is_new_plan else 'Experiment'}</span>
               <h3>{html.escape(benchmark_title)}</h3>
               <p>{html.escape(str(active_benchmark.get('prompt') or 'Draw the trajectory you imagine.'))}</p>
             </div>
@@ -1614,24 +2309,38 @@ with st.sidebar:
             unsafe_allow_html=True,
         )
         if st.button(
-            "← Choose another benchmark",
+            "← My plans" if is_new_plan else "← Choose another benchmark",
             key="timeline_choose_benchmark",
-            icon="🧭",
+            icon="✨" if is_new_plan else "🧭",
             width="stretch",
         ):
-            st.switch_page("views/test_timeline_benchmarks.py")
+            if is_new_plan:
+                st.session_state["sketch_plan_stage"] = "entrance"
+                st.switch_page("views/test_sketch_plan.py")
+            else:
+                st.switch_page("views/test_timeline_benchmarks.py")
     with st.container(key="timeline_rail"):
         with st.expander("Trajectory", expanded=False):
-            st.caption(
-                f"{ROADMAP_START.strftime('%d %b %Y')} → "
-                f"{ROADMAP_END.strftime('%d %b %Y')}"
-            )
+            if is_new_plan and str(active_benchmark.get("landing_mode")) != "planned":
+                st.caption(
+                    f"Now → {html.escape(destination_label or 'Goal')} · "
+                    f"{html.escape(benchmark_horizon)}"
+                )
+            else:
+                st.caption(
+                    f"{ROADMAP_START.strftime('%d %b %Y')} → "
+                    f"{ROADMAP_END.strftime('%d %b %Y')}"
+                )
             landing_label = st.segmented_control(
                 "How should the path arrive?",
                 options=("Open", "Guided", "Planned"),
-                default="Open",
+                default=initial_landing_label,
                 key=_widget_key("landing_mode"),
-                format_func=lambda value: LANDING_COPY[str(value)],
+                format_func=lambda value: (
+                    "Fixed"
+                    if is_new_plan and str(value) == "Planned"
+                    else LANDING_COPY[str(value)]
+                ),
                 width="stretch",
             )
             st.caption(
@@ -1642,6 +2351,93 @@ with st.sidebar:
                 }[str(landing_label)]
             )
         landing_mode = str(landing_label).lower()
+
+        if is_new_plan:
+            trajectory_document = build_trajectory_document(
+                plan={**active_benchmark, "landing_mode": landing_mode},
+                primitives=events,
+                uncertainty=uncertainties,
+            )
+            trajectory_yaml_text = trajectory_yaml(trajectory_document)
+            _render_local_autosave(trajectory_document)
+            with st.expander("Active plan", expanded=False):
+                st.markdown(
+                    f'<div class="timeline-save-state"><b>{html.escape(save_status)}</b><span>Autosave is active</span></div>',
+                    unsafe_allow_html=True,
+                )
+                st.caption(
+                    f"Now · Goal → {destination_label or 'Open goal'}"
+                )
+                edit_goal, edit_time = st.columns(2)
+                with edit_goal:
+                    if st.button(
+                        "Edit goal",
+                        key="timeline_plan_edit_goal",
+                        width="stretch",
+                    ):
+                        _edit_plan_stage("goal")
+                with edit_time:
+                    if st.button(
+                        "Edit time",
+                        key="timeline_plan_edit_time",
+                        width="stretch",
+                    ):
+                        _edit_plan_stage("time")
+                if st.button(
+                    "Save locally",
+                    key="timeline_plan_save",
+                    width="stretch",
+                ):
+                    st.session_state[_widget_key("save_status")] = (
+                        "Saved on this device"
+                    )
+                    st.session_state[_widget_key("confirmation")] = {
+                        "title": "Saved on this device",
+                        "detail": "Your editable trajectory is up to date",
+                    }
+                    st.rerun()
+                st.download_button(
+                    "Export YAML",
+                    data=trajectory_yaml_text,
+                    file_name=_filename_for_plan(active_benchmark),
+                    mime="application/yaml",
+                    key="timeline_plan_export",
+                    on_click=_mark_exported,
+                    width="stretch",
+                )
+                if st.button(
+                    "Duplicate plan",
+                    key="timeline_plan_duplicate",
+                    width="stretch",
+                ):
+                    duplicate = {
+                        **active_benchmark,
+                        "id": uuid4().hex,
+                        "title": f"{benchmark_title} · copy",
+                    }
+                    st.session_state[ACTIVE_BENCHMARK_KEY] = duplicate
+                    st.session_state[_widget_key("integrated")] = False
+                    st.session_state[_widget_key("confirmation")] = {
+                        "title": "Plan duplicated",
+                        "detail": "The copy has its own local identity",
+                    }
+                    st.rerun()
+                if st.button(
+                    "Start another plan",
+                    key="timeline_plan_start_another",
+                    width="stretch",
+                ):
+                    _confirm_start_another(
+                        trajectory_document,
+                        trajectory_yaml_text,
+                    )
+                if st.button(
+                    "Return to my plans",
+                    key="timeline_plan_return",
+                    width="stretch",
+                ):
+                    st.session_state["sketch_plan_stage"] = "entrance"
+                    st.switch_page("views/test_sketch_plan.py")
 
         rail_title = (
             "Thicken an uncertain stretch"
@@ -1665,57 +2461,47 @@ with st.sidebar:
         )
 
         if pending_uncertainty:
-            uncertainty_center = st.slider(
-                "Centre time",
-                min_value=0.04,
-                max_value=0.96,
+            uncertainty_interval = st.slider(
+                "Uncertain interval",
+                min_value=0.02,
+                max_value=0.98,
                 step=0.01,
-                key=_widget_key("uncertainty_center"),
+                key=_widget_key("uncertainty_interval"),
             )
+            uncertainty_start = float(uncertainty_interval[0])
+            uncertainty_end = float(uncertainty_interval[1])
+            uncertainty_center = (
+                uncertainty_start + uncertainty_end
+            ) / 2.0
+            uncertainty_width = uncertainty_end - uncertainty_start
             uncertainty_date = date_for_parameter(
                 uncertainty_center,
                 start_date=ROADMAP_START,
                 end_date=ROADMAP_END,
             )
-            uncertainty_relative = relative_time_label(
-                uncertainty_center,
-                start_date=ROADMAP_START,
-                end_date=ROADMAP_END,
-            )
             st.markdown(
-                f"""
-                <div class="timeline-time-readout">
-                  <div><small>Centre</small><b>s={uncertainty_center:.2f}</b></div>
-                  <div><small>Relative</small><b>{html.escape(uncertainty_relative)}</b></div>
-                  <div><small>Date</small><b>{uncertainty_date.strftime("%d %b %Y")}</b></div>
-                </div>
-                """,
+                _time_readout(
+                    uncertainty_center,
+                    uncertainty_date,
+                    landing_mode,
+                ),
                 unsafe_allow_html=True,
             )
             uncertainty_strength = st.segmented_control(
-                "Uncertainty strength",
+                "How thick is the uncertainty?",
                 options=tuple(UNCERTAINTY_STRENGTHS),
                 key=_widget_key("uncertainty_strength"),
                 width="stretch",
             )
-            uncertainty_width = st.slider(
-                "Temporal width",
-                min_value=0.06,
-                max_value=0.42,
-                step=0.01,
-                key=_widget_key("uncertainty_width"),
-                help="Fraction of the roadmap affected by this local chunk.",
-            )
-            uncertainty_start = max(
-                0.0,
-                uncertainty_center - (uncertainty_width / 2.0),
-            )
-            uncertainty_end = min(
-                1.0,
-                uncertainty_center + (uncertainty_width / 2.0),
+            uncertainty_profile_label = st.segmented_control(
+                "How does the uncertainty change?",
+                options=("Balanced", "Expands", "Contracts"),
+                key=_widget_key("uncertainty_profile_mode"),
+                width="stretch",
             )
             st.caption(
-                f"Local interval · s={uncertainty_start:.2f}–{uncertainty_end:.2f}"
+                f"Local interval · {_time_language_label(uncertainty_start)} → "
+                f"{_time_language_label(uncertainty_end)}"
             )
             uncertainty_style = uncertainty_geometry(
                 str(uncertainty_strength)
@@ -1724,6 +2510,7 @@ with st.sidebar:
                 "center_parameter": uncertainty_center,
                 "temporal_width": uncertainty_width,
                 "strength": str(uncertainty_strength),
+                "profile_mode": str(uncertainty_profile_label).lower(),
                 **uncertainty_style,
             }
 
@@ -1752,6 +2539,9 @@ with st.sidebar:
                         ).isoformat(),
                         "strength": str(uncertainty_strength),
                         "temporal_width": uncertainty_width,
+                        "profile_mode": str(
+                            uncertainty_profile_label
+                        ).lower(),
                         **uncertainty_style,
                         "created_at": date.today().isoformat(),
                     }
@@ -1819,51 +2609,78 @@ with st.sidebar:
                 start_date=ROADMAP_START,
                 end_date=ROADMAP_END,
             )
-            relative_label = relative_time_label(
-                preview_parameter,
-                start_date=ROADMAP_START,
-                end_date=ROADMAP_END,
-            )
             st.markdown(
-                f"""
-                <div class="timeline-time-readout">
-                  <div><small>Position</small><b>s={preview_parameter:.2f}</b></div>
-                  <div><small>Relative</small><b>{html.escape(relative_label)}</b></div>
-                  <div><small>Date</small><b>{preview_date.strftime("%d %b %Y")}</b></div>
-                </div>
-                """,
+                _time_readout(
+                    preview_parameter,
+                    preview_date,
+                    landing_mode,
+                ),
                 unsafe_allow_html=True,
             )
 
             action_verb = "Update" if editing_id else "Place"
-            with st.form(_widget_key("placement_form"), clear_on_submit=False):
+            with st.container(key=_widget_key("placement_editor")):
                 title = st.text_input(
                     "Title",
                     placeholder="Name the move",
                     max_chars=48,
                     key=_widget_key("form_title"),
                 )
-                importance = st.segmented_control(
+                influence_scale = st.segmented_control(
                     "How much does this change the journey?",
-                    options=tuple(IMPORTANCE_LEVELS),
-                    key=_widget_key("importance"),
-                    format_func=lambda value: IMPORTANCE_COPY[str(value)],
+                    options=tuple(INFLUENCE_SCALES),
+                    key=_widget_key("influence_scale"),
+                    format_func=lambda value: INFLUENCE_COPY[str(value)],
                     width="stretch",
                 )
-                node_mode_label = st.segmented_control(
-                    "Does this bend the path…",
-                    options=("Smooth", "Kink"),
-                    key=_widget_key("node_mode"),
-                    format_func=lambda value: NODE_MODE_COPY[str(value)],
+                st.caption(INFLUENCE_HELP[str(influence_scale)])
+                directional_mode_label = st.segmented_control(
+                    "How does this change the direction of the path?",
+                    options=("Gradually", "Abruptly"),
+                    key=_widget_key("directional_mode"),
                     width="stretch",
                 )
+                topology_mode_label = st.segmented_control(
+                    "Topology",
+                    options=("Continuation", "Bifurcation"),
+                    key=_widget_key("topology_mode"),
+                    width="stretch",
+                )
+                branch_label_a = "Option A"
+                branch_label_b = "Option B"
+                if topology_mode_label == "Bifurcation":
+                    with st.container(border=True):
+                        st.number_input(
+                            "Number of branches",
+                            min_value=2,
+                            max_value=2,
+                            value=2,
+                            disabled=True,
+                            help="RC0.1 supports a binary bifurcation.",
+                        )
+                        branch_left, branch_right = st.columns(2)
+                        with branch_left:
+                            branch_label_a = st.text_input(
+                                "First branch name",
+                                max_chars=48,
+                                key=_widget_key("branch_label_a"),
+                            )
+                        with branch_right:
+                            branch_label_b = st.text_input(
+                                "Second branch name",
+                                max_chars=48,
+                                key=_widget_key("branch_label_b"),
+                            )
                 with st.expander("Details · optional", expanded=False):
-                    st.caption(
-                        "Descriptions, dependencies, collaborators, evidence, "
-                        "visibility and tags remain outside this first geometry test."
+                    description = st.text_area(
+                        "Description",
+                        placeholder="Add context that should travel with this move.",
+                        key=_widget_key("description"),
                     )
-                submitted = st.form_submit_button(
+                submitted = st.button(
                     f"{action_verb} {definition['label'].lower()}",
+                    key=_widget_key("place_move"),
+                    type="primary",
                     width="stretch",
                 )
 
@@ -1893,7 +2710,7 @@ with st.sidebar:
                         "Move the time slider."
                     )
                 else:
-                    geometry = geometry_for_importance(str(importance))
+                    geometry = geometry_for_influence(str(influence_scale))
                     existing = next(
                         (
                             event
@@ -1902,28 +2719,79 @@ with st.sidebar:
                         ),
                         None,
                     )
+                    move_id = str(existing["id"]) if existing else uuid4().hex
+                    now = datetime.now().astimezone().isoformat()
+                    topology = (
+                        "branching"
+                        if topology_mode_label == "Bifurcation"
+                        else "continuation"
+                    )
+                    branch_labels = (
+                        [
+                            {
+                                "id": f"{move_id}:1",
+                                "parent_id": move_id,
+                                "label": branch_label_a.strip() or "Option A",
+                            },
+                            {
+                                "id": f"{move_id}:2",
+                                "parent_id": move_id,
+                                "label": branch_label_b.strip() or "Option B",
+                            },
+                        ]
+                        if topology == "branching"
+                        else []
+                    )
                     event_record: dict[str, object] = {
                         "id": (
-                            str(existing["id"]) if existing else uuid4().hex
+                            move_id
                         ),
                         "type": str(pending_type),
                         "title": clean_title,
                         "time_parameter": preview_parameter,
+                        "temporal_position": preview_parameter,
                         "date_value": preview_date.isoformat(),
-                        "time_basis": "date",
+                        "date": preview_date.isoformat(),
+                        "time_basis": (
+                            "date"
+                            if landing_mode == "planned"
+                            and temporal_mode == "linear"
+                            else "relative"
+                        ),
                         "interval_start": ROADMAP_START.isoformat(),
                         "interval_end": ROADMAP_END.isoformat(),
-                        "importance": str(importance),
-                        "node_mode": str(node_mode_label).lower(),
+                        "influence_scale": str(influence_scale),
+                        "directional_mode": str(
+                            directional_mode_label
+                        ).lower(),
+                        "topology_mode": topology,
+                        "branch_parent": (
+                            existing.get("branch_parent") if existing else None
+                        ),
+                        "branch_labels": branch_labels,
+                        "energy_effect": geometry["energy_offset"],
+                        "entropy_effect": 0.0,
+                        "influence_radius": geometry["influence_width"],
                         "energy_offset": geometry["energy_offset"],
                         "alignment_offset": 0.0,
                         "influence_width": geometry["influence_width"],
                         "interval_status": "active",
+                        "description": description.strip(),
+                        "intention": str(existing.get("intention") or "") if existing else "",
+                        "dependencies": list(existing.get("dependencies") or []) if existing else [],
+                        "responsible_actors": list(existing.get("responsible_actors") or []) if existing else [],
+                        "collaborators": list(existing.get("collaborators") or []) if existing else [],
+                        "resources_needed": list(existing.get("resources_needed") or []) if existing else [],
+                        "completion_evidence": list(existing.get("completion_evidence") or []) if existing else [],
+                        "visibility": str(existing.get("visibility") or "Private") if existing else "Private",
+                        "tags": list(existing.get("tags") or []) if existing else [],
+                        "notes": str(existing.get("notes") or "") if existing else "",
                         "created_at": (
                             str(existing["created_at"])
                             if existing
-                            else date.today().isoformat()
+                            else now
                         ),
+                        "modified_at": now,
                     }
                     if existing:
                         index = events.index(existing)
@@ -1951,10 +2819,10 @@ with st.sidebar:
 with st.container(key="timeline_stage"):
     if not placed_events:
         st.markdown(
-            """
+            f"""
             <div class="timeline-first-instruction">
-              <b>Your path exists. Now shape it.</b>
-              <span>Try rotating the view, then choose your first move below.</span>
+              <b>{'What should happen—not necessarily first, but off the top of your head?' if is_new_plan else 'Your path exists. Now shape it.'}</b>
+              <span>{'Choose any move that comes to mind.' if is_new_plan else 'Try rotating the view, then choose your first move below.'}</span>
             </div>
             """,
             unsafe_allow_html=True,
@@ -1973,7 +2841,7 @@ with st.container(key="timeline_stage"):
         f"""
         <div class="timeline-field-note">
           <span>Drag to orbit · scroll to zoom</span>
-          <span>{'simulated collective traces' if show_collective else 'personal alignment neutral'}</span>
+          <span>{'entropy baseline' if is_new_plan else ('simulated collective traces' if show_collective else 'personal alignment neutral')}</span>
         </div>
         """,
         unsafe_allow_html=True,
@@ -2046,7 +2914,10 @@ with st.container(key="timeline_stage"):
         unsafe_allow_html=True,
     )
     with st.container(key="timeline_core_moves"):
-        _render_move_row(CORE_EVENT_TYPE_KEYS, pending_type)
+        _render_move_row(
+            CORE_EVENT_TYPE_KEYS,
+            pending_type,
+        )
 
     st.markdown(
         (
@@ -2080,6 +2951,33 @@ with st.container(key="timeline_stage"):
                 "detail": "Latest local chunk removed",
             }
             st.rerun()
+
+    if is_new_plan:
+        save_column, export_column = st.columns(2)
+        with save_column:
+            if st.button(
+                "Save locally",
+                key="timeline_utility_save",
+                width="stretch",
+            ):
+                st.session_state[_widget_key("save_status")] = (
+                    "Saved on this device"
+                )
+                st.session_state[_widget_key("confirmation")] = {
+                    "title": "Saved on this device",
+                    "detail": "Your editable trajectory is up to date",
+                }
+                st.rerun()
+        with export_column:
+            st.download_button(
+                "Export YAML",
+                data=trajectory_yaml_text,
+                file_name=_filename_for_plan(active_benchmark),
+                mime="application/yaml",
+                key="timeline_utility_export",
+                on_click=_mark_exported,
+                width="stretch",
+            )
 
     undo_column, inspect_column, integrate_column = st.columns(
         [1, 1, 1.5]
@@ -2127,10 +3025,49 @@ with st.container(key="timeline_stage"):
         )
 
     if integrated:
-        st.success(
-            "Trajectory integrated for this session. No record has been saved.",
-            icon="✅",
+        integration_detail = (
+            "Your path is becoming clearer. It is saved on this device, "
+            "but has not yet been exported."
+            if is_new_plan
+            else "Your path is becoming clearer. It has not yet been saved "
+            "on this device or exported."
         )
+        st.markdown(
+            f"""
+            <div class="timeline-integration-card">
+              <b>Trajectory integrated</b>
+              <span>{html.escape(integration_detail)}</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        if is_new_plan:
+            saved_column, export_after_column, continue_column = st.columns(3)
+            with saved_column:
+                st.button(
+                    "Saved locally ✓",
+                    key="timeline_integrated_saved",
+                    disabled=True,
+                    width="stretch",
+                )
+            with export_after_column:
+                st.download_button(
+                    "Export YAML",
+                    data=trajectory_yaml_text,
+                    file_name=_filename_for_plan(active_benchmark),
+                    mime="application/yaml",
+                    key="timeline_integrated_export",
+                    on_click=_mark_exported,
+                    width="stretch",
+                )
+            with continue_column:
+                if st.button(
+                    "Continue editing",
+                    key="timeline_integrated_continue",
+                    width="stretch",
+                ):
+                    st.session_state[_widget_key("integrated")] = False
+                    st.rerun()
 
     if show_inspector and placed_events:
         with st.sidebar:
@@ -2164,8 +3101,9 @@ with st.container(key="timeline_stage"):
                   {html.escape(selected_definition['label'])} ·
                   s={float(selected_event['time_parameter']):.2f} ·
                   {date.fromisoformat(str(selected_event['date_value'])).strftime('%d %b %Y')} ·
-                  {html.escape(IMPORTANCE_COPY.get(str(selected_event['importance']), str(selected_event['importance'])))} ·
-                  {html.escape(NODE_MODE_COPY.get(str(selected_event['node_mode']).title(), str(selected_event['node_mode']).title()))}
+                  {html.escape(INFLUENCE_COPY[_event_influence(selected_event)])} ·
+                  {html.escape(directional_mode(selected_event).title())} ·
+                  {html.escape(topology_mode(selected_event).title())}
                 </div>
                 """,
                 unsafe_allow_html=True,

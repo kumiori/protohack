@@ -45,6 +45,24 @@ EVENT_TYPES: dict[str, dict[str, str]] = {
         "color": "#82c7ff",
         "description": "Exchange capacity, time, materials or access.",
     },
+    "acquire_resources": {
+        "label": "Acquire resources",
+        "glyph": "⇣",
+        "color": "#7bd6a6",
+        "description": (
+            "Bring missing money, people, tools, space, access or materials "
+            "into the plan."
+        ),
+    },
+    "delegate": {
+        "label": "Delegate",
+        "glyph": "↱",
+        "color": "#f0a97a",
+        "description": (
+            "Transfer responsibility or authority to another person, team "
+            "or agent."
+        ),
+    },
     "wait": {
         "label": "Wait",
         "glyph": "◷",
@@ -82,17 +100,28 @@ CORE_EVENT_TYPE_KEYS = (
 PLANNING_PRIMITIVE_KEYS = (
     "merge",
     "share_resources",
+    "acquire_resources",
+    "delegate",
     "wait",
     "prepare",
     "get_intelligence",
     "synchronise",
 )
 
-IMPORTANCE_LEVELS: dict[str, dict[str, float]] = {
-    "Signal": {"energy_offset": 0.14, "influence_width": 0.08},
-    "Lever": {"energy_offset": 0.28, "influence_width": 0.14},
-    "Threshold": {"energy_offset": 0.44, "influence_width": 0.22},
+INFLUENCE_SCALES: dict[str, dict[str, float]] = {
+    "Local": {"energy_offset": 0.14, "influence_width": 0.08},
+    "Structural": {"energy_offset": 0.28, "influence_width": 0.14},
+    "Dominant": {"energy_offset": 0.44, "influence_width": 0.22},
 }
+
+# Read compatibility for pre-RC0 plans and callers. New documents use
+# ``influence_scale`` and the Local/Structural/Dominant vocabulary.
+LEGACY_INFLUENCE_SCALES = {
+    "Signal": "Local",
+    "Lever": "Structural",
+    "Threshold": "Dominant",
+}
+IMPORTANCE_LEVELS = INFLUENCE_SCALES
 
 UNCERTAINTY_STRENGTHS: dict[str, dict[str, float]] = {
     "Light": {"radius": 0.045, "opacity": 0.22},
@@ -100,7 +129,9 @@ UNCERTAINTY_STRENGTHS: dict[str, dict[str, float]] = {
     "Strong": {"radius": 0.160, "opacity": 0.11},
 }
 
-NODE_MODES = ("smooth", "kink")
+DIRECTIONAL_MODES = ("gradually", "abruptly")
+TOPOLOGY_MODES = ("continuation", "branching")
+NODE_MODES = ("smooth", "kink", "jump", "bifurcation")
 LANDING_MODES = ("open", "guided", "planned")
 
 
@@ -109,7 +140,7 @@ class ControlNode:
     """One hard point in the piecewise spline."""
 
     point: Point
-    node_mode: str = "smooth"
+    directional_mode: str = "gradually"
     influence_width: float = 0.0
     event_id: str | None = None
 
@@ -168,13 +199,53 @@ def relative_time_label(
     return f"Year {year_number}"
 
 
-def geometry_for_importance(importance: str) -> dict[str, float]:
-    """Return the deterministic energy and influence parameters."""
+def geometry_for_influence(influence_scale: str) -> dict[str, float]:
+    """Return deformation amplitude and temporal radius for one scale."""
 
+    canonical = LEGACY_INFLUENCE_SCALES.get(influence_scale, influence_scale)
     try:
-        return dict(IMPORTANCE_LEVELS[importance])
+        return dict(INFLUENCE_SCALES[canonical])
     except KeyError as exc:
-        raise ValueError(f"Unknown importance: {importance}") from exc
+        raise ValueError(f"Unknown influence scale: {influence_scale}") from exc
+
+
+def geometry_for_importance(importance: str) -> dict[str, float]:
+    """Compatibility alias for pre-RC0 callers."""
+
+    return geometry_for_influence(importance)
+
+
+def directional_mode(event: Mapping[str, object]) -> str:
+    """Return the canonical regularity choice from current or legacy data."""
+
+    authored = str(event.get("directional_mode") or "").strip().lower()
+    if authored in DIRECTIONAL_MODES:
+        return authored
+    legacy = str(event.get("node_mode") or "smooth").strip().lower()
+    return "abruptly" if legacy in {"kink", "jump"} else "gradually"
+
+
+def topology_mode(event: Mapping[str, object]) -> str:
+    """Return the canonical topology choice from current or legacy data."""
+
+    authored = str(event.get("topology_mode") or "").strip().lower()
+    if authored in TOPOLOGY_MODES:
+        return authored
+    return (
+        "branching"
+        if str(event.get("node_mode") or "").strip().lower()
+        == "bifurcation"
+        else "continuation"
+    )
+
+
+def primitive_plot_label(event: Mapping[str, object]) -> str:
+    """Combine semantic glyph and authored title for direct plot reading."""
+
+    event_type = str(event.get("type") or "event")
+    definition = EVENT_TYPES.get(event_type, EVENT_TYPES["event"])
+    title = str(event.get("title") or definition["label"]).strip()
+    return f"{definition['glyph']} {title}"
 
 
 def reconcile_event_dates(
@@ -260,9 +331,9 @@ def control_nodes(
         event_type = str(event["type"])
         if event_type not in EVENT_TYPES:
             raise ValueError(f"Unknown event type: {event_type}")
-        mode = str(event["node_mode"]).lower()
-        if mode not in NODE_MODES:
-            raise ValueError(f"Unknown node mode: {mode}")
+        direction = directional_mode(event)
+        if direction not in DIRECTIONAL_MODES:
+            raise ValueError(f"Unknown directional mode: {direction}")
         parameter = float(event["time_parameter"])
         if not 0.0 < parameter < 1.0:
             raise ValueError("Placed events must sit inside the roadmap interval.")
@@ -274,7 +345,7 @@ def control_nodes(
                     _baseline_energy(parameter)
                     + float(event["energy_offset"]),
                 ),
-                node_mode=mode,
+                directional_mode=direction,
                 influence_width=float(event["influence_width"]),
                 event_id=str(event["id"]),
             )
@@ -314,7 +385,7 @@ def node_tangents(
         previous_slope = secants[index - 1]
         next_slope = secants[index]
         node = nodes[index]
-        if node.node_mode == "kink":
+        if node.directional_mode == "abruptly":
             tangents.append((previous_slope, next_slope))
             continue
 
@@ -454,6 +525,96 @@ def sample_trajectory(
     )
 
 
+def binary_branch_stems(
+    events: Sequence[Mapping[str, object]],
+    *,
+    landing_mode: str = "open",
+    samples: int = 52,
+) -> tuple[dict[str, object], ...]:
+    """Generate two visible futures from the first RC0 branch point.
+
+    RC0 keeps post-branch primitives common to both visual stems. Assigning
+    primitives to an individual branch is deliberately deferred, but the split
+    is topological in the rendered plan: there is one incoming trajectory and
+    two outgoing traces with stable branch identities.
+    """
+
+    if samples < 3:
+        raise ValueError("A branch needs at least three samples.")
+    branch_event = next(
+        (
+            event
+            for event in active_events(events)
+            if topology_mode(event) == "branching"
+        ),
+        None,
+    )
+    if branch_event is None:
+        return ()
+
+    start = float(branch_event["time_parameter"])
+    span = 1.0 - start
+    influence_radius = float(
+        branch_event.get("influence_radius")
+        or branch_event.get("influence_width")
+        or 0.14
+    )
+    separation = max(0.09, influence_radius * 0.9)
+    raw_labels = branch_event.get("branch_labels") or ()
+    labels: list[tuple[str, str]] = []
+    if isinstance(raw_labels, Sequence) and not isinstance(raw_labels, str):
+        for index, item in enumerate(raw_labels[:2]):
+            if isinstance(item, Mapping):
+                labels.append(
+                    (
+                        str(item.get("id") or f"{branch_event['id']}:{index + 1}"),
+                        str(item.get("label") or f"Option {chr(65 + index)}"),
+                    )
+                )
+            else:
+                labels.append(
+                    (f"{branch_event['id']}:{index + 1}", str(item))
+                )
+    while len(labels) < 2:
+        index = len(labels)
+        labels.append(
+            (f"{branch_event['id']}:{index + 1}", f"Option {chr(65 + index)}")
+        )
+
+    stems: list[dict[str, object]] = []
+    for branch_index, sign in enumerate((-1.0, 1.0)):
+        x_values: list[float] = []
+        y_values: list[float] = []
+        z_values: list[float] = []
+        for sample_index in range(samples):
+            progress = sample_index / (samples - 1)
+            parameter = start + (span * progress)
+            x_value, y_value, z_value = trajectory_point(
+                parameter,
+                events,
+                landing_mode=landing_mode,
+            )
+            if directional_mode(branch_event) == "abruptly":
+                divergence = progress
+            else:
+                divergence = progress**2 * (3.0 - (2.0 * progress))
+            x_values.append(x_value)
+            y_values.append(y_value + (sign * separation * divergence))
+            z_values.append(z_value)
+        branch_id, label = labels[branch_index]
+        stems.append(
+            {
+                "id": branch_id,
+                "parent_id": str(branch_event["id"]),
+                "label": label,
+                "x": x_values,
+                "y": y_values,
+                "z": z_values,
+            }
+        )
+    return tuple(stems)
+
+
 def event_points(
     events: Sequence[Mapping[str, object]],
 ) -> tuple[list[float], list[float], list[float]]:
@@ -481,13 +642,24 @@ def uncertainty_profile(
     *,
     center: float,
     temporal_width: float,
+    profile_mode: str = "balanced",
 ) -> float:
-    """Evaluate a smooth compact bump with exact local support."""
+    """Evaluate the chosen local radius profile over one interval."""
 
     if not 0.0 < temporal_width < 1.0:
         raise ValueError("Uncertainty width must be between zero and one.")
+    if profile_mode not in {"balanced", "expands", "contracts"}:
+        raise ValueError(f"Unknown uncertainty profile: {profile_mode}")
     half_width = temporal_width / 2.0
     local = (float(parameter) - float(center)) / half_width
+    if local < -1.0 or local > 1.0:
+        return 0.0
+    progress = (local + 1.0) / 2.0
+    smooth_progress = progress**2 * (3.0 - (2.0 * progress))
+    if profile_mode == "expands":
+        return smooth_progress
+    if profile_mode == "contracts":
+        return 1.0 - smooth_progress
     if abs(local) >= 1.0:
         return 0.0
     return exp(1.0 - (1.0 / (1.0 - local**2)))
@@ -503,6 +675,7 @@ def uncertainty_radius(
         parameter,
         center=float(chunk["center_parameter"]),
         temporal_width=float(chunk["temporal_width"]),
+        profile_mode=str(chunk.get("profile_mode") or "balanced"),
     )
     return float(chunk["radius"]) * profile
 
@@ -550,6 +723,72 @@ def uncertainty_envelope_points(
     return envelope_x, envelope_y, envelope_z
 
 
+def uncertainty_tube_mesh(
+    x_values: Sequence[float],
+    y_values: Sequence[float],
+    z_values: Sequence[float],
+    chunk: Mapping[str, object],
+    *,
+    radial_fraction: float = 1.0,
+    directions: int = 14,
+) -> dict[str, list[float] | list[int]]:
+    """Build an approximate 3D tube with smooth local entry and exit."""
+
+    if directions < 6:
+        raise ValueError("An uncertainty tube needs at least six directions.")
+    if not 0.0 < radial_fraction <= 1.0:
+        raise ValueError("Radial fraction must sit between zero and one.")
+    if not (
+        len(x_values) == len(y_values)
+        and len(y_values) == len(z_values)
+    ):
+        raise ValueError("Trajectory coordinates must have equal lengths.")
+
+    rings: list[tuple[float, float, float, float]] = []
+    for x_value, y_value, z_value in zip(x_values, y_values, z_values):
+        radius = uncertainty_radius(float(x_value), chunk) * radial_fraction
+        if radius > 1e-7:
+            rings.append(
+                (
+                    float(x_value),
+                    float(y_value),
+                    float(z_value),
+                    radius,
+                )
+            )
+
+    mesh_x: list[float] = []
+    mesh_y: list[float] = []
+    mesh_z: list[float] = []
+    for x_value, y_value, z_value, radius in rings:
+        for direction in range(directions):
+            angle = 2.0 * pi * direction / directions
+            mesh_x.append(x_value)
+            mesh_y.append(y_value + (radius * cos(angle)))
+            mesh_z.append(z_value + (radius * sin(angle)))
+
+    face_i: list[int] = []
+    face_j: list[int] = []
+    face_k: list[int] = []
+    for ring_index in range(max(0, len(rings) - 1)):
+        current = ring_index * directions
+        following = (ring_index + 1) * directions
+        for direction in range(directions):
+            next_direction = (direction + 1) % directions
+            face_i.extend((current + direction, current + direction))
+            face_j.extend((following + direction, following + next_direction))
+            face_k.extend((following + next_direction, current + next_direction))
+
+    return {
+        "x": mesh_x,
+        "y": mesh_y,
+        "z": mesh_z,
+        "i": face_i,
+        "j": face_j,
+        "k": face_k,
+    }
+
+
 def kink_indicators(
     events: Sequence[Mapping[str, object]],
     *,
@@ -561,7 +800,7 @@ def kink_indicators(
     tangents = node_tangents(nodes, landing_mode=landing_mode)
     indicators: list[tuple[Point, Point, Point]] = []
     for index, node in enumerate(nodes[1:-1], start=1):
-        if node.node_mode != "kink":
+        if node.directional_mode != "abruptly":
             continue
         left_span = node.point[0] - nodes[index - 1].point[0]
         right_span = nodes[index + 1].point[0] - node.point[0]

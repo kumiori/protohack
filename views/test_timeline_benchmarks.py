@@ -361,6 +361,17 @@ def _apply_benchmark_theme() -> None:
         """
         <style>
         @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+        :root {
+          --type-hero:clamp(42px,5.2vw,72px);
+          --type-page-title:clamp(32px,3.5vw,48px);
+          --type-section:clamp(24px,2.2vw,32px);
+          --type-control:20px;
+          --type-button:17px;
+          --type-body:clamp(15px,1.1vw,17px);
+          --type-helper:14px;
+          --type-option:13px;
+          --type-meta:12px;
+        }
         .stApp {
           background:
             radial-gradient(circle at 82% 0%, rgba(103,142,130,.13), transparent 32rem),
@@ -377,14 +388,14 @@ def _apply_benchmark_theme() -> None:
           border-bottom:1px solid #293934; padding:.3rem 0 1.7rem; margin-bottom:1.2rem;
         }
         .benchmark-hero small, .benchmark-level small {
-          color:#dfe875; text-transform:uppercase; letter-spacing:.16em; font-size:.65rem;
+          color:#dfe875; text-transform:uppercase; letter-spacing:.16em; font-size:var(--type-meta);
         }
         .benchmark-hero h1 {
-          color:#f0f4ef; font-size:clamp(2rem,4vw,4rem); line-height:1;
+          color:#f0f4ef; font-size:var(--type-hero) !important; line-height:1;
           max-width:16ch; margin:.55rem 0 .75rem; letter-spacing:-.045em;
         }
         .benchmark-hero p {
-          color:#92a39d; max-width:70ch; line-height:1.65; font-size:.86rem;
+          color:#92a39d; max-width:70ch; line-height:1.5; font-size:var(--type-body);
         }
         .benchmark-level {
           display:flex; justify-content:space-between; gap:2rem; align-items:end;
@@ -395,8 +406,8 @@ def _apply_benchmark_theme() -> None:
         .benchmark-card-copy h3 {
           color:#edf2ed !important;
         }
-        .benchmark-level h2 { margin:.3rem 0 0; font-size:1.3rem; }
-        .benchmark-level p { color:#82938d; max-width:48ch; font-size:.76rem; }
+        .benchmark-level h2 { margin:.3rem 0 0; font-size:var(--type-section); }
+        .benchmark-level p { color:#82938d; max-width:48ch; font-size:var(--type-body); line-height:1.5; }
         [class*="st-key-benchmark_card_"],
         [class*="st-key-challenge_card_"] {
           min-height:15rem; border:1px solid #31443e; border-radius:8px;
@@ -414,9 +425,10 @@ def _apply_benchmark_theme() -> None:
           color:#70837c; text-transform:uppercase; letter-spacing:.1em; font-size:.6rem;
         }
         .benchmark-card-copy h3 { font-size:1.05rem; margin:.65rem 0; }
-        .benchmark-card-copy p { color:#8fa19a; line-height:1.55; font-size:.73rem; }
+        .benchmark-card-copy p { color:#8fa19a; line-height:1.5; font-size:15px; }
         [class*="st-key-choose_benchmark_"] button,
         [class*="st-key-choose_challenge_"] button {
+          min-height:52px !important; font-size:var(--type-button) !important;
           border:1px solid #536a62 !important; background:transparent !important;
           color:#b9cbc4 !important; box-shadow:none !important;
           transition:transform 100ms ease, background 140ms ease,
@@ -445,12 +457,14 @@ def _apply_benchmark_theme() -> None:
           background:#040b09; font-size:1.1rem; letter-spacing:.08em;
         }
         .st-key-start_timeline_benchmark button {
-          min-height:3.7rem; background:#dfe875 !important; color:#101711 !important;
+          min-height:52px !important; font-size:var(--type-button) !important;
+          background:#dfe875 !important; color:#101711 !important;
           border:0 !important; box-shadow:0 10px 30px rgba(0,0,0,.28) !important;
         }
         [data-testid="stButtonGroup"] button {
+          min-height:52px !important; font-size:var(--type-button) !important;
           background:#030807 !important; border-color:#344841 !important;
-          color:#a6b8b1 !important; min-height:2.9rem;
+          color:#a6b8b1 !important;
           transition:background 140ms ease, color 140ms ease,
             transform 100ms ease !important;
         }
@@ -493,7 +507,7 @@ def _apply_benchmark_theme() -> None:
           font-size:.64rem;
         }
         .benchmark-setup-title h1 {
-          color:#f0f4ef; font-size:clamp(2rem,4vw,3.7rem);
+          color:#f0f4ef; font-size:var(--type-page-title) !important;
           line-height:1.05; letter-spacing:-.045em; margin:.55rem 0 .8rem;
         }
         .benchmark-setup-title h1,
@@ -502,8 +516,16 @@ def _apply_benchmark_theme() -> None:
           color:#edf2ed !important;
         }
         .benchmark-setup-title p {
-          color:#91a39d; max-width:65ch; line-height:1.65; font-size:.82rem;
+          color:#91a39d; max-width:65ch; line-height:1.5; font-size:var(--type-body);
         }
+        [data-testid="stWidgetLabel"] p {
+          font-size:var(--type-control) !important; line-height:1.3;
+          font-weight:600; text-transform:none;
+        }
+        [data-testid="stCaptionContainer"] p, .stCaption {
+          font-size:var(--type-helper) !important; line-height:1.45 !important;
+        }
+        input, textarea { font-size:16px !important; }
         div[data-baseweb="input"] > div {
           background:#06100e !important; border-color:#3b5048 !important;
         }
@@ -565,12 +587,18 @@ def _apply_benchmark_theme() -> None:
         @keyframes path-preview {
           to { transform:scaleX(1); }
         }
-        @media(max-width:800px) {
+        @media(max-width:900px) {
+          :root { --type-hero:48px; --type-body:clamp(15px,2vw,17px); }
           .block-container { padding:1rem 1rem 3rem; }
           .benchmark-level { display:block; }
           .benchmark-steps { grid-template-columns:1fr 1fr; }
           .benchmark-endpoints { grid-template-columns:1fr; gap:1rem; }
           .benchmark-endpoints em { width:1px; height:3rem; border-top:0; border-left:1px dashed #4c625a; }
+          [data-testid="stWidgetLabel"] p { font-size:16px !important; }
+          [data-testid="stCaptionContainer"] p, .stCaption { font-size:13px !important; }
+          .stButton button, [data-testid="stButtonGroup"] button {
+            min-height:52px; font-size:16px !important;
+          }
         }
         </style>
         """,

@@ -978,3 +978,64 @@ After Sections 22A–G are confirmed, define only:
 - authored semantic, capacity, resource, and constraint tags for each action.
 
 These objects now live in `protocol/specs/commons_smoke_v1.yaml`. The scenario wording is explicitly marked provisional so Nathalie and the team can replace it without changing the application or data contract.
+
+## 24. Trajectory planning instrument
+
+The experimental planner now has a separate semantic entrance: Plan → Now → Goal
+→ Landing → Time. It hands off to one complete geometry field with all event and
+planning primitives, independent influence, direction and topology choices, and
+local uncertainty.
+
+The current pilot contract is:
+
+- meaning precedes dates and geometry;
+- events bend the centreline, kinks redirect it, uncertainty thickens it;
+- camera and axis bounds preserve spatial cognition across reruns;
+- local autosave, integration and YAML export remain distinct and visible;
+- imported and recovered plans remain editable;
+- no existing user-facing capability is silently removed by onboarding work.
+
+Conceptual invariants: the initial condition is always Now; chronology is the
+Horizon axis; Energy expresses mobilisation; Entropy remains neutral until
+authored or collectively derived; the centreline is always the current best
+estimate. Open, Guided and Fixed landing modes remain distinct. Time can be
+qualitative (Now, Soon, Later, Sometime, Eventually, Landing) or linear.
+No landing or time mode is inferred while its control is empty: the next action
+stays disabled and only validated values cross into the model. Guided landing
+stores an authored positive value and unit, such as 3 weeks or 6 months, and
+uses that duration to set the horizon. Qualitative anchors retain deliberately
+non-uniform spacing; linear ticks are calendar-facing and proportional to elapsed
+time.
+
+Release Candidate 0 includes Release, Event, Information gateway, Action, Update,
+Milestone, Merge, Share resources, Acquire resources, Delegate, Wait, Prepare,
+Get intelligence and Synchronise. Acquire resources brings missing capacity into
+the plan; Share resources redistributes capacity already held. Delegate transfers
+responsibility or authority for a move.
+
+Influence sets geometric scale: Local creates an ε-scale deformation,
+Structural creates an order-one deformation and is the default, and Dominant
+creates a 1/ε-scale deformation. Each level controls both amplitude and temporal
+influence radius. Direction independently chooses Gradually (continuous tangent)
+or Abruptly (distinct incoming and outgoing tangents). Topology independently
+chooses Continuation or Branching, with Continuation the safe default.
+The editor calls the second choice Bifurcation. Its fixed binary count and branch
+name controls are revealed only after Bifurcation is selected.
+
+RC0 branching is binary. A branching move preserves the common past, creates two
+named outgoing stems and persists stable branch IDs plus their parent relation.
+Every confirmed move also renders its semantic glyph and authored title beside
+its plot marker, with alternating offsets to reduce collisions.
+The optional-details expander stores free-text description now while the schema
+reserves intention, dependencies, actors, resources, evidence, visibility, tags
+and notes for structured editing later. Autosave stores an editable browser-local
+document. YAML is the portable format. Integration accepts a contribution but is
+neither storage nor export.
+
+Uncertainty is an isotropic local tube with a smooth entry and exit and balanced,
+expanding or contracting radius. Assigning moves to an individual branch,
+arbitrary branch trees, merging, branch probabilities, automatic branch
+comparison, anisotropy, global uncertainty and soft attractors are deferred.
+
+The decisive design question remains whether Entropy/Alignment should eventually
+be directly authored or emerge only from comparison with collective trajectories.
