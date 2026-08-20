@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "protocol-lab"
+version = "0.1.0"
+description = "Deterministic, inspectable execution and replay for authored protocols"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = ["PyYAML>=6.0,<7"]
+
+[project.optional-dependencies]
+test = ["pytest>=8,<9"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

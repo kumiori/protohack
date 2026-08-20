@@ -2,6 +2,8 @@
 
 | Feature | Route | Status | Owning module | Acceptance test | Dependencies | Class |
 |---|---|---|---|---|---|---|
+| Independently installable deterministic protocol engine | Build artifact | Implemented | `packages/protocol-lab` | `packages/protocol-lab/tests/test_public_api.py` | PyYAML only | Required |
+| Independently installable trajectory reasoning engine | Build artifact | Implemented | `packages/trajectory-engine` | `packages/trajectory-engine/tests/test_public_api.py` | PyYAML only | Required |
 | Plan → Now → Goal → Landing → Time onboarding | `/test-sketch-plan` | Implemented | `views/test_sketch_plan.py`, `protocol/timeline_plan.py` | `tests/test_sketch_plan.py` | Streamlit, Plotly | Required |
 | Validated landing/time choice gates and Guided value + unit | `/test-sketch-plan` | Implemented | `views/test_sketch_plan.py`, `protocol/timeline_plan.py` | `tests/test_sketch_plan.py` | Streamlit session state | Required |
 | Non-uniform qualitative and proportional calendar time axes | Both planning routes | Implemented | `protocol/timeline_plan.py`, planning views | `tests/test_sketch_plan.py` | Plotly | Required |

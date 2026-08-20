@@ -1,4 +1,4 @@
-"""Immutable authoring objects for a Protocol Laboratory experiment."""
+"""Immutable, protocol-neutral authoring objects for a protocol experiment."""
 
 from __future__ import annotations
 
@@ -62,6 +62,7 @@ class ParticipantDefinition:
 class MessageDefinition:
     id: str
     label: str
+    human_label: str
     sender: str
     receiver: str
     technical: str
@@ -155,6 +156,10 @@ class ExperimentDefinition:
     atlas_functions: tuple[str, ...]
     question: str
     human_question: str
+    rationale_question: str
+    rationale: tuple[str, ...]
+    shared_capability: str
+    reveal: str
     situation: tuple[str, ...]
     need: str
     north_star: str
