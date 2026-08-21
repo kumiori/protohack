@@ -28,8 +28,8 @@ tester does not accidentally create a branch.
 
 ## Visual hierarchy and typography
 
-The trajectory is the dominant object. Horizon and Energy form the initial
-projection; Entropy is depth. The preview uses the full horizontal extent and the
+The trajectory is the dominant object. Time and Energy form the initial
+projection; Uncertainty is depth. The preview uses the full horizontal extent and the
 camera persists across every Streamlit rerun.
 
 - Hero or step question: `clamp(42px, 5.2vw, 72px)`, 700–800 weight.
@@ -86,9 +86,33 @@ Save failed. The current browser implementation normally settles immediately on
 Saved on this device; import and storage failures must show a readable in-theme
 error while retaining the in-memory plan.
 
+## Shared goals and explicit sharing
+
+`/shared-goals` is a public experimental index backed by the shared repository.
+An open goal card shows its title, objective, creator agent and contribution
+count. Opening a goal reveals Trajectories, Compare and Overlay. “Sketch my
+trajectory” enters the existing onboarding and individual planner with only a
+separate `goal_id` session context; it never opens a collaborative editor.
+
+Local save and social sharing are different actions. Autosave, Save locally and
+Export YAML never write to a shared goal. The planner writes a contribution only
+after the participant explicitly chooses “Share trajectory with this goal”. A
+shared contribution can later be edited in the same individual planner and
+published with “Update shared trajectory”; its trajectory ID, goal ID, agent ID
+and creation time remain stable while its canonical payload, update time and
+revision advance.
+
+There is no separate Join action. Contribution is the only RC0.2 participation
+act. Duplicate active contributions for the same `goal_id + agent_id` fail
+visibly unless the participant explicitly updates the existing trajectory.
+Different temporal languages, landing modes and dates remain native to each
+trajectory. Compare and Overlay use only the intrinsic normalized Now → Landing
+coordinate and expose native temporal metadata on inspection or hover. They do
+not score consensus, average geometry or synthesize a path.
+
 ## Camera and responsive behaviour
 
-The camera begins in the Horizon–Energy projection with Entropy as depth. It is
+The camera begins in the Time–Energy projection with Uncertainty as depth. It is
 restored after add, edit, undo, uncertainty, integration and rerender. Bounds
 expand but do not contract in-session. Below 760 px, titles clamp, progress wraps,
 the main container loses excess padding, and the field retains at least 470 px of

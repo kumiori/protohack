@@ -40,8 +40,12 @@ from protocol.timeline import (
 )
 from protocol.timeline_plan import (
     QUALITATIVE_TIME_ANCHORS,
+    REALIZATION_STATUSES,
     linear_time_ticks,
+    now_parameter,
     qualitative_time_label,
+    realize_primitive,
+    resolve_actual_timestamp,
 )
 from protocol.trajectory_schema import (
     DEFAULT_CAMERA,
@@ -50,11 +54,19 @@ from protocol.trajectory_schema import (
     build_trajectory_document,
     trajectory_yaml,
 )
+from protocol.shared_goals import (
+    AGENT_COLOURS,
+    AGENT_TYPES,
+    build_goal_trajectory,
+    revised_goal_trajectory,
+)
+from storage import get_repository
 
 
 STATE_PREFIX = "timeline_game_"
 MINIMUM_MOVES = 3
 ACTIVE_BENCHMARK_KEY = "timeline_active_benchmark"
+SHARED_CONTEXT_KEY = "shared_goal_context"
 STYLE_LAB_ENABLED = bool(globals().get("TIMELINE_STYLE_LAB", False))
 STYLE_LAB_VARIANTS = ("Instrument", "Playground", "Gallery")
 STYLE_LAB_KEY = "timeline_style_lab_variant"
@@ -69,7 +81,7 @@ if not isinstance(active_benchmark, dict):
 source_kind = str(active_benchmark.get("source_kind") or "benchmark")
 is_new_plan = source_kind == "plan"
 temporal_mode = str(active_benchmark.get("temporal_mode") or "linear")
-axis_y_label = str(active_benchmark.get("axis_y_label") or "Alignment")
+axis_y_label = "Uncertainty"
 benchmark_title = str(active_benchmark.get("title") or "Open trajectory")
 benchmark_horizon = str(
     active_benchmark.get("horizon_label") or "2-year experimental horizon"
@@ -122,6 +134,53 @@ def _state(name: str, default: object) -> object:
 def _event_label(event: dict[str, object]) -> str:
     definition = EVENT_TYPES[str(event["type"])]
     return f"{definition['glyph']} {event['title']}"
+
+
+def _realization_glyph(event: dict[str, object]) -> str:
+    return {"Done": "✓", "Changed": "~", "Skipped": "⊘", "Cancelled": "×"}.get(
+        str(event.get("status") or "Planned"), "○"
+    )
+
+
+def _record_realization(event_id: str, updated: dict[str, object]) -> None:
+    for index, item in enumerate(events):
+        if str(item.get("id")) == event_id:
+            events[index] = updated
+            break
+    st.session_state[_widget_key("integrated")] = False
+
+
+@st.dialog("Record what happened")
+def _realization_dialog(event: dict[str, object]) -> None:
+    current = str(event.get("status") or "Planned")
+    status = st.selectbox("Status", REALIZATION_STATUSES, index=REALIZATION_STATUSES.index(current))
+    actual_timestamp = None
+    expression = ""
+    if status in {"Done", "Changed", "Skipped"}:
+        when = st.segmented_control("When did this happen?", ("Now", "Earlier"), default="Now")
+        if when == "Earlier":
+            earlier_mode = st.segmented_control("Earlier", ("Exact date", "Time ago"), default="Exact date")
+            if earlier_mode == "Exact date":
+                actual_day = st.date_input("Exact date", value=date.today())
+                actual_time = st.time_input("Time", value=datetime.now().time().replace(second=0, microsecond=0))
+                exact = datetime.combine(actual_day, actual_time).astimezone()
+                actual_timestamp, expression = resolve_actual_timestamp(now=datetime.now().astimezone(), exact=exact)
+            else:
+                ago_value = st.number_input("How many?", min_value=1, value=1, step=1)
+                ago_unit = st.selectbox("Unit", ("Days", "Weeks", "Months"))
+                actual_timestamp, expression = resolve_actual_timestamp(now=datetime.now().astimezone(), ago_value=int(ago_value), ago_unit=ago_unit)
+        else:
+            actual_timestamp, expression = resolve_actual_timestamp(now=datetime.now().astimezone())
+    note = st.text_area("What changed?" if status == "Changed" else "What actually happened? (optional)", value=str(event.get("realization_note") or ""))
+    revision_needed = st.checkbox("Trajectory may need revision", value=bool(event.get("trajectory_revision_needed", False)))
+    if st.button("Save realisation", type="primary", width="stretch"):
+        try:
+            updated = realize_primitive(event, status=status, changed_at=datetime.now().astimezone(), actual_timestamp=actual_timestamp, actual_time_expression=expression, note=note, revision_needed=revision_needed)
+        except ValueError as exc:
+            st.error(str(exc))
+        else:
+            _record_realization(str(event["id"]), updated)
+            st.rerun()
 
 
 def _event_influence(event: dict[str, object]) -> str:
@@ -573,6 +632,109 @@ def _confirm_start_another(
         st.rerun()
 
 
+@st.dialog("Share trajectory")
+def _share_trajectory_dialog(document: dict[str, object]) -> None:
+    """Keep local saving separate from an explicit social write."""
+
+    repository = get_repository()
+    context = st.session_state.get(SHARED_CONTEXT_KEY)
+    context = dict(context) if isinstance(context, dict) else {}
+    trajectory_id = str(context.get("trajectory_id") or "")
+    if trajectory_id:
+        existing = repository.get_goal_trajectory(trajectory_id)
+        if not existing:
+            st.error("The shared trajectory could not be found.")
+            return
+        st.write(
+            f"Update revision {int(existing.get('revision') or 1)} of your "
+            f"trajectory for goal {existing['goal_id']}?"
+        )
+        st.caption(
+            "The shared payload will change. Its trajectory, goal, agent and "
+            "creation identities remain the same."
+        )
+        if st.button("Update shared trajectory", type="primary", width="stretch"):
+            try:
+                revised = revised_goal_trajectory(
+                    existing,
+                    document,
+                    agent_id=str(context.get("agent_id") or ""),
+                )
+                saved = repository.record_goal_trajectory(
+                    revised,
+                    update_existing=True,
+                )
+            except ValueError as exc:
+                st.error(str(exc))
+            else:
+                st.session_state[SHARED_CONTEXT_KEY] = {
+                    **context,
+                    "revision": int(saved["revision"]),
+                }
+                st.success(f"Shared trajectory updated to revision {saved['revision']}.")
+        return
+
+    goals = repository.list_shared_goals()
+    if not goals:
+        st.warning("Create an open shared goal before sharing this trajectory.")
+        return
+    requested_goal_id = str(context.get("goal_id") or "")
+    goal_ids = [str(goal["goal_id"]) for goal in goals]
+    selected_goal_id = st.selectbox(
+        "Choose shared goal",
+        options=goal_ids,
+        index=goal_ids.index(requested_goal_id) if requested_goal_id in goal_ids else 0,
+        format_func=lambda value: next(
+            str(goal["title"]) for goal in goals if goal["goal_id"] == value
+        ),
+    )
+    display_name = st.text_input(
+        "Agent display name",
+        value=str(context.get("agent_display_name") or ""),
+    )
+    agent_id = st.text_input("Agent ID", value=str(context.get("agent_id") or ""))
+    agent_type = st.selectbox("Agent type", AGENT_TYPES)
+    colour = st.selectbox("Trajectory colour", AGENT_COLOURS)
+    st.caption(
+        "Sharing creates a public contribution. Your local editable copy and "
+        "local save history remain separate."
+    )
+    if st.button(
+        "Share trajectory with this goal",
+        type="primary",
+        width="stretch",
+        disabled=not display_name.strip() or not agent_id.strip(),
+    ):
+        try:
+            contribution = build_goal_trajectory(
+                document,
+                goal_id=selected_goal_id,
+                agent_id=agent_id,
+                agent_display_name=display_name,
+                agent_type=agent_type,
+                colour=colour,
+                source=(
+                    "created_for_goal"
+                    if requested_goal_id == selected_goal_id
+                    else "imported_existing_plan"
+                ),
+            )
+            saved = repository.record_goal_trajectory(contribution)
+        except ValueError as exc:
+            st.error(str(exc))
+        else:
+            st.session_state[SHARED_CONTEXT_KEY] = {
+                "goal_id": selected_goal_id,
+                "trajectory_id": str(saved["trajectory_id"]),
+                "agent_id": agent_id,
+                "agent_display_name": display_name,
+                "agent_type": agent_type,
+                "colour": colour,
+                "revision": 1,
+            }
+            st.success("Trajectory shared. Local saving remains unchanged.")
+
+
 def _add_uncertainty_chunk(
     figure: go.Figure,
     x: list[float],
@@ -739,11 +901,22 @@ def _build_figure(
         centreline_y = [y[index] for index in incoming]
         centreline_z = [z[index] for index in incoming]
 
+    current_parameter = now_parameter(active_benchmark, placed, today=date.today())
+    past_indexes = [index for index, parameter in enumerate(centreline_x) if float(parameter) <= current_parameter]
+    future_indexes = [index for index, parameter in enumerate(centreline_x) if float(parameter) >= current_parameter]
+    if past_indexes:
+        figure.add_trace(go.Scatter3d(
+            x=[centreline_x[index] for index in past_indexes],
+            y=[centreline_y[index] for index in past_indexes],
+            z=[centreline_z[index] for index in past_indexes],
+            mode="lines", line={"color": "#71827d", "width": 7}, opacity=0.68,
+            hoverinfo="skip", showlegend=False, name="Observed history",
+        ))
     figure.add_trace(
         go.Scatter3d(
-            x=centreline_x,
-            y=centreline_y,
-            z=centreline_z,
+            x=[centreline_x[index] for index in future_indexes],
+            y=[centreline_y[index] for index in future_indexes],
+            z=[centreline_z[index] for index in future_indexes],
             mode="lines",
             line={"color": "#ecf7ef", "width": 8},
             hoverinfo="skip",
@@ -773,7 +946,7 @@ def _build_figure(
             )
         )
 
-    now_point = trajectory_point(0.0, events, landing_mode=landing_mode)
+    now_point = trajectory_point(current_parameter, events, landing_mode=landing_mode)
     figure.add_trace(
         go.Scatter3d(
             x=[now_point[0]],
@@ -781,9 +954,9 @@ def _build_figure(
             z=[now_point[2]],
             mode="markers+text",
             marker={
-                "size": 7,
-                "color": "#ecf7ef",
-                "line": {"color": "#07100f", "width": 2},
+                "size": 20,
+                "color": "#dfe875",
+                "line": {"color": "#f7ffd0", "width": 3},
             },
             text=["NOW"],
             textposition="bottom center",
@@ -810,7 +983,7 @@ def _build_figure(
             z=[END_POINT[2]],
             mode="markers+text",
             marker={
-                "size": 8,
+                "size": 16,
                 "symbol": "diamond-open",
                 "color": "#8fa39c",
                 "line": {"color": "#8fa39c", "width": 2},
@@ -833,10 +1006,10 @@ def _build_figure(
                 mode="markers+text",
                 marker={
                     "size": [
-                        9
+                        18
                         if directional_mode(event) == "abruptly"
                         or topology_mode(event) == "branching"
-                        else 6
+                        else 12
                         for event in placed
                     ],
                     "color": [
@@ -845,7 +1018,7 @@ def _build_figure(
                     ],
                     "opacity": 0.72,
                 },
-                text=[primitive_plot_label(event) for event in placed],
+                text=[f"{_realization_glyph(event)} {primitive_plot_label(event)}" for event in placed],
                 textposition=[
                     "top center" if index % 2 == 0 else "bottom center"
                     for index, _ in enumerate(placed)
@@ -868,6 +1041,8 @@ def _build_figure(
                         INFLUENCE_COPY[_event_influence(event)],
                         directional_mode(event).title(),
                         topology_mode(event).title(),
+                        str(event.get("status") or "Planned"),
+                        str(event.get("actual_timestamp") or "Not recorded"),
                     ]
                     for event in placed
                 ],
@@ -876,7 +1051,9 @@ def _build_figure(
                     "%{customdata[1]} · s=%{customdata[2]} / %{customdata[3]}"
                     "<br>Journey effect: %{customdata[4]}"
                     "<br>Direction: %{customdata[5]}"
-                    "<br>Topology: %{customdata[6]}<extra></extra>"
+                    "<br>Topology: %{customdata[6]}"
+                    "<br>Status: %{customdata[7]}"
+                    "<br>Actual: %{customdata[8]}<extra></extra>"
                 ),
                 showlegend=False,
                 name="Placed events",
@@ -919,7 +1096,7 @@ def _build_figure(
                 z=[preview[2]],
                 mode="markers+text",
                 marker={
-                    "size": 11,
+                    "size": 22,
                     "symbol": "circle-open",
                     "color": preview_definition["color"],
                     "line": {
@@ -961,6 +1138,12 @@ def _build_figure(
         )
         tick_values = [position for position, _ in linear_ticks]
         tick_text = [label for _, label in linear_ticks]
+    # Geometry remains v2-compatible internally; presentation follows the
+    # conceptual order (time, energy, uncertainty).
+    for trace in figure.data:
+        if trace.type in {"scatter3d", "mesh3d"}:
+            trace.y, trace.z = trace.z, trace.y
+
     figure.update_layout(
         height=620,
         margin={"l": 0, "r": 0, "t": 8, "b": 0},
@@ -999,20 +1182,6 @@ def _build_figure(
             },
             "yaxis": {
                 "title": {
-                    "text": axis_y_label.upper(),
-                    "font": {"color": "#c2d0cb", "size": 14},
-                },
-                "range": bounds["y"],
-                "nticks": 4,
-                "gridcolor": "#13201d",
-                "linecolor": "#43534e",
-                "zerolinecolor": "#43534e",
-                "showticklabels": False,
-                "showbackground": False,
-                "showspikes": False,
-            },
-            "zaxis": {
-                "title": {
                     "text": "ENERGY",
                     "font": {"color": "#c2d0cb", "size": 14},
                 },
@@ -1025,8 +1194,47 @@ def _build_figure(
                 "showbackground": False,
                 "showspikes": False,
             },
+            "zaxis": {
+                "title": {
+                    "text": "UNCERTAINTY",
+                    "font": {"color": "#c2d0cb", "size": 14},
+                },
+                "range": bounds["y"],
+                "nticks": 4,
+                "gridcolor": "#13201d",
+                "linecolor": "#43534e",
+                "zerolinecolor": "#43534e",
+                "showticklabels": False,
+                "showbackground": False,
+                "showspikes": False,
+            },
         },
         uirevision="timeline-camera-v2",
+    )
+    return figure
+
+
+def _apply_time_energy_projection(figure: go.Figure) -> go.Figure:
+    """Project the rendered field onto time–energy without changing its data."""
+
+    for trace in figure.data:
+        if trace.type not in {"scatter3d", "mesh3d"} or trace.z is None:
+            continue
+        trace.z = tuple(None if value is None else 0.0 for value in trace.z)
+    figure.update_scenes(
+        camera={
+            "eye": {"x": 0.0, "y": 0.0, "z": 2.8},
+            "center": {"x": 0.0, "y": 0.0, "z": 0.0},
+            "up": {"x": 0.0, "y": 1.0, "z": 0.0},
+            "projection": {"type": "orthographic"},
+        },
+        aspectratio={"x": 2.5, "y": 1.0, "z": 0.08},
+        zaxis={
+            "range": [-0.01, 0.01],
+            "showgrid": False,
+            "showticklabels": False,
+            "title": {"text": ""},
+        },
     )
     return figure
 
@@ -1113,14 +1321,14 @@ def _apply_style_lab_figure(
             "linecolor": line,
             "zerolinecolor": line,
             "showgrid": show_grid,
-            "title": {"text": axis_y_label.upper(), "font": {"color": axis}},
+            "title": {"text": "ENERGY", "font": {"color": axis}},
         },
         zaxis={
             "gridcolor": grid,
             "linecolor": line,
             "zerolinecolor": line,
             "showgrid": show_grid,
-            "title": {"text": "ENERGY", "font": {"color": axis}},
+            "title": {"text": "UNCERTAINTY", "font": {"color": axis}},
         },
     )
     return figure
@@ -2405,6 +2613,21 @@ with st.sidebar:
                     on_click=_mark_exported,
                     width="stretch",
                 )
+                shared_context = st.session_state.get(SHARED_CONTEXT_KEY)
+                is_shared_revision = (
+                    isinstance(shared_context, dict)
+                    and bool(shared_context.get("trajectory_id"))
+                )
+                if st.button(
+                    (
+                        "Update shared trajectory"
+                        if is_shared_revision
+                        else "Share with a goal"
+                    ),
+                    key="timeline_plan_share",
+                    width="stretch",
+                ):
+                    _share_trajectory_dialog(trajectory_document)
                 if st.button(
                     "Duplicate plan",
                     key="timeline_plan_duplicate",
@@ -2770,6 +2993,7 @@ with st.sidebar:
                         ),
                         "branch_labels": branch_labels,
                         "energy_effect": geometry["energy_offset"],
+                        "uncertainty_effect": 0.0,
                         "entropy_effect": 0.0,
                         "influence_radius": geometry["influence_width"],
                         "energy_offset": geometry["energy_offset"],
@@ -2841,7 +3065,7 @@ with st.container(key="timeline_stage"):
         f"""
         <div class="timeline-field-note">
           <span>Drag to orbit · scroll to zoom</span>
-          <span>{'entropy baseline' if is_new_plan else ('simulated collective traces' if show_collective else 'personal alignment neutral')}</span>
+          <span>{'uncertainty baseline' if is_new_plan else ('simulated collective traces' if show_collective else 'authored uncertainty state')}</span>
         </div>
         """,
         unsafe_allow_html=True,
@@ -2885,6 +3109,11 @@ with st.container(key="timeline_stage"):
         uncertainty_preview=uncertainty_preview,
         bounds=bounds,
     )
+    time_energy_projection = bool(
+        st.session_state.get(_widget_key("time_energy_projection"), False)
+    )
+    if time_energy_projection:
+        trajectory_figure = _apply_time_energy_projection(trajectory_figure)
     if STYLE_LAB_ENABLED:
         trajectory_figure = _apply_style_lab_figure(
             trajectory_figure,
@@ -2901,13 +3130,22 @@ with st.container(key="timeline_stage"):
         },
         key=_widget_key("field"),
     )
-    _render_camera_persistence_hook(
-        (
-            f"{len(events)}:{len(uncertainties)}:{pending_type}:"
-            f"{pending_uncertainty}:{preview_parameter}:"
-            f"{uncertainty_preview}"
-        )
+    st.toggle(
+        "Time–energy projection",
+        key=_widget_key("time_energy_projection"),
+        help=(
+            "Flatten the view onto the time–energy plane. "
+            "The trajectory data and saved camera remain unchanged."
+        ),
     )
+    if not time_energy_projection:
+        _render_camera_persistence_hook(
+            (
+                f"{len(events)}:{len(uncertainties)}:{pending_type}:"
+                f"{pending_uncertainty}:{preview_parameter}:"
+                f"{uncertainty_preview}"
+            )
+        )
 
     st.markdown(
         '<div class="timeline-dock-label">Choose what happens next</div>',
@@ -3098,6 +3336,7 @@ with st.container(key="timeline_stage"):
                 f"""
                 <div class="timeline-inspector">
                   <b>{html.escape(selected_definition['glyph'])} {html.escape(str(selected_event['title']))}</b><br>
+                  {_realization_glyph(selected_event)} {html.escape(str(selected_event.get('status') or 'Planned'))} ·
                   {html.escape(selected_definition['label'])} ·
                   s={float(selected_event['time_parameter']):.2f} ·
                   {date.fromisoformat(str(selected_event['date_value'])).strftime('%d %b %Y')} ·
@@ -3108,6 +3347,15 @@ with st.container(key="timeline_stage"):
                 """,
                 unsafe_allow_html=True,
             )
+            if bool(selected_event.get("trajectory_revision_needed")):
+                st.warning("Trajectory may need revision")
+            if st.button(
+                "Mark as done" if str(selected_event.get("status") or "Planned") == "Planned" else "Update realization",
+                key="timeline_utility_realize",
+                type="primary",
+                width="stretch",
+            ):
+                _realization_dialog(selected_event)
             edit_column, remove_column = st.columns(2)
             with edit_column:
                 if st.button(
@@ -3133,3 +3381,24 @@ with st.container(key="timeline_stage"):
                     ]
                     st.session_state[_widget_key("integrated")] = False
                     st.rerun()
+
+    if placed_events:
+        with st.sidebar:
+            with st.expander("History", expanded=False):
+                realized_only = st.toggle("Realized only", value=True, key=_widget_key("history_realized_only"))
+                history_items = sorted(
+                    (
+                        event for event in placed_events
+                        if not realized_only or str(event.get("status") or "Planned") != "Planned"
+                    ),
+                    key=lambda event: str(event.get("actual_timestamp") or event.get("modified_at") or ""),
+                    reverse=True,
+                )
+                if not history_items:
+                    st.caption("No realised moves yet.")
+                for event in history_items:
+                    stamp = str(event.get("actual_timestamp") or "")
+                    when = datetime.fromisoformat(stamp).strftime("%d %b %Y, %H:%M") if stamp else "Not yet realized"
+                    st.markdown(f"**{_realization_glyph(event)} {html.escape(str(event['title']))}**  \n{html.escape(str(event.get('status') or 'Planned'))} · {when}")
+                    if event.get("realization_note"):
+                        st.caption(f'“{str(event["realization_note"])}”')

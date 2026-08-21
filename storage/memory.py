@@ -16,7 +16,67 @@ class InMemoryRepository:
         self._coordination: dict[str, dict[str, Any]] = {}
         self._feedback: list[dict[str, Any]] = []
         self._protocol_lab_field_notes: dict[str, dict[str, Any]] = {}
+        self._shared_goals: dict[str, dict[str, Any]] = {}
+        self._goal_trajectories: dict[str, dict[str, Any]] = {}
         self._lock = RLock()
+
+    def create_shared_goal(self, goal: dict[str, Any]) -> dict[str, Any]:
+        goal_id = str(goal["goal_id"])
+        with self._lock:
+            self._shared_goals.setdefault(goal_id, deepcopy(goal))
+            return deepcopy(self._shared_goals[goal_id])
+
+    def list_shared_goals(self) -> list[dict[str, Any]]:
+        with self._lock:
+            rows = [
+                deepcopy(goal) for goal in self._shared_goals.values()
+                if goal.get("status") == "open" and goal.get("visibility") == "public"
+            ]
+        return sorted(rows, key=lambda goal: str(goal.get("created_at", "")), reverse=True)
+
+    def get_shared_goal(self, goal_id: str) -> dict[str, Any] | None:
+        with self._lock:
+            goal = self._shared_goals.get(goal_id)
+            return deepcopy(goal) if goal else None
+
+    def record_goal_trajectory(
+        self,
+        trajectory: dict[str, Any],
+        *,
+        update_existing: bool = False,
+    ) -> dict[str, Any]:
+        trajectory_id = str(trajectory["trajectory_id"])
+        goal_id = str(trajectory["goal_id"])
+        agent_id = str(trajectory["agent_id"])
+        with self._lock:
+            duplicate = next((
+                row for row in self._goal_trajectories.values()
+                if row.get("goal_id") == goal_id
+                and row.get("agent_id") == agent_id
+                and row.get("status") != "withdrawn"
+            ), None)
+            if duplicate and not update_existing:
+                raise ValueError("This agent already has a trajectory for this goal.")
+            if update_existing:
+                if not duplicate or str(duplicate["trajectory_id"]) != trajectory_id:
+                    raise ValueError("The shared trajectory to update was not found.")
+                if int(trajectory.get("revision") or 0) <= int(duplicate.get("revision") or 0):
+                    raise ValueError("A shared update must advance the revision.")
+            self._goal_trajectories[trajectory_id] = deepcopy(trajectory)
+            return deepcopy(trajectory)
+
+    def list_goal_trajectories(self, goal_id: str) -> list[dict[str, Any]]:
+        with self._lock:
+            rows = [
+                deepcopy(row) for row in self._goal_trajectories.values()
+                if row.get("goal_id") == goal_id and row.get("status") != "withdrawn"
+            ]
+        return sorted(rows, key=lambda row: str(row.get("created_at", "")))
+
+    def get_goal_trajectory(self, trajectory_id: str) -> dict[str, Any] | None:
+        with self._lock:
+            row = self._goal_trajectories.get(trajectory_id)
+            return deepcopy(row) if row else None
 
     def record_protocol_lab_field_note(
         self, note: dict[str, Any]

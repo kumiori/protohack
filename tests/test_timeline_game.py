@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -31,6 +31,8 @@ from protocol.timeline import (
     uncertainty_radius,
     uncertainty_tube_mesh,
 )
+from protocol.timeline_plan import now_parameter, realize_primitive, resolve_actual_timestamp
+from protocol.trajectory_schema import build_trajectory_document, normalise_trajectory_document
 
 
 ROOT = Path(__file__).parent.parent
@@ -97,6 +99,60 @@ def button(app: AppTest, label: str):
     matches = [candidate for candidate in app.button if candidate.label == label]
     assert len(matches) == 1
     return matches[0]
+
+
+def test_realization_keeps_planned_coordinate_and_appends_prior_state() -> None:
+    placed = event(parameter=0.34)
+    changed = realize_primitive(
+        placed,
+        status="Changed",
+        changed_at=datetime(2026, 8, 13, 12, tzinfo=timezone.utc),
+        actual_timestamp="2026-08-12T10:00:00+00:00",
+        actual_time_expression="1 day ago",
+        note="Scope expanded.",
+        revision_needed=True,
+    )
+    done = realize_primitive(
+        changed,
+        status="Done",
+        changed_at=datetime(2026, 8, 14, 12, tzinfo=timezone.utc),
+        actual_timestamp="2026-08-14T12:00:00+00:00",
+    )
+
+    assert done["time_parameter"] == placed["time_parameter"]
+    assert done["status"] == "Done"
+    assert [item["status"] for item in done["realization_history"]] == ["Planned", "Changed"]
+    assert done["realization_history"][1]["realization_note"] == "Scope expanded."
+
+
+def test_changed_realisation_requires_an_observation() -> None:
+    with pytest.raises(ValueError, match="require a realisation note"):
+        realize_primitive(event(), status="Changed", changed_at=datetime.now(timezone.utc))
+
+
+def test_two_clocks_locate_now_independently() -> None:
+    qualitative = {"temporal_mode": "qualitative"}
+    first, second = event(parameter=0.2), event(parameter=0.7)
+    first["status"] = "Done"
+    second["status"] = "Planned"
+    assert now_parameter(qualitative, [first, second], today=date(2026, 8, 13)) == pytest.approx(0.2)
+    linear = {"temporal_mode": "linear", "start_date": "2026-08-01", "end_date": "2026-08-21"}
+    assert now_parameter(linear, [], today=date(2026, 8, 11)) == pytest.approx(0.5)
+
+
+def test_realization_round_trips_through_canonical_yaml_shape() -> None:
+    placed = event()
+    placed.update({"status": "Done", "actual_timestamp": "2026-08-13T12:00:00+03:00", "actual_time_expression": "now", "realization_note": "Met.", "realization_history": []})
+    plan = {"title": "Plan", "initial_condition": "Start", "goal_statement": "Finish"}
+    restored = normalise_trajectory_document(build_trajectory_document(plan=plan, primitives=[placed], uncertainty=[]))
+    assert restored["primitives"][0]["status"] == "Done"
+    assert restored["primitives"][0]["actual_timestamp"] == placed["actual_timestamp"]
+
+
+def test_time_ago_is_resolved_but_expression_is_retained() -> None:
+    actual, expression = resolve_actual_timestamp(now=datetime(2026, 8, 13, 12, tzinfo=timezone.utc), ago_value=2, ago_unit="Weeks")
+    assert actual.startswith("2026-07-30T12:00:00")
+    assert expression == "2 weeks ago"
 
 
 def test_placed_events_are_hard_hermite_nodes() -> None:
@@ -263,7 +319,7 @@ def test_sidebar_and_action_colours_do_not_override_native_resizing_or_contrast(
     assert "window.parent.location.href" not in source
 
 
-def test_personal_alignment_remains_neutral() -> None:
+def test_uncertainty_state_remains_neutral_until_authored() -> None:
     events = [
         event(event_id="release", event_type="release", parameter=0.2),
         event(event_id="action", event_type="action", parameter=0.7),
@@ -457,6 +513,13 @@ def test_timeline_is_an_isolated_registered_test_surface() -> None:
     assert 'options=("Continuation", "Bifurcation")' in view_source
     assert "Number of branches" in view_source
     assert "Try rotating the view" in view_source
+    assert '"Time–energy projection"' in view_source
+    assert '"projection": {"type": "orthographic"}' in view_source
+    assert '"text": "UNCERTAINTY"' in view_source
+    assert '"size": 20' in view_source
+    assert 'else 12' in view_source
+    assert "Save realisation" in view_source
+    assert "No realised moves yet." in view_source
 
 
 def test_main_timeline_uses_the_playground_graphic_move_objects() -> None:

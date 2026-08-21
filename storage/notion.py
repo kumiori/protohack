@@ -28,6 +28,11 @@ def _rich(properties: dict[str, Any], name: str) -> str:
     return "".join(str(value.get("plain_text") or "") for value in values)
 
 
+def _title_value(properties: dict[str, Any], name: str = "Name") -> str:
+    values = (properties.get(name) or {}).get("title") or []
+    return "".join(str(value.get("plain_text") or "") for value in values)
+
+
 def _email(properties: dict[str, Any], name: str = "email") -> str | None:
     value = (properties.get(name) or {}).get("email")
     return str(value).strip() if value else None
@@ -159,6 +164,187 @@ class NotionRepository:
             )
         ]
         return sorted(notes, key=lambda note: str(note.get("created_at", "")))
+
+    @staticmethod
+    def _shared_goal_from_page(page: dict[str, Any]) -> dict[str, Any]:
+        properties = page.get("properties") or {}
+        return {
+            "goal_id": _rich(properties, "goal_id"),
+            "title": _title_value(properties),
+            "objective": _rich(properties, "objective"),
+            "created_by_agent_id": _rich(properties, "created_by_agent_id"),
+            "created_at": _date(properties, "created_at"),
+            "status": _select(properties, "status"),
+            "visibility": _select(properties, "visibility"),
+            "_page_id": str(page.get("id") or ""),
+        }
+
+    def create_shared_goal(self, goal: dict[str, Any]) -> dict[str, Any]:
+        existing = self.get_shared_goal(str(goal["goal_id"]))
+        if existing:
+            return existing
+        created = self._client.pages.create(
+            parent={"type": "data_source_id", "data_source_id": self._sources["goals"]},
+            properties={
+                "Name": {"title": _text(str(goal["title"]))},
+                "goal_id": {"rich_text": _text(str(goal["goal_id"]))},
+                "objective": {"rich_text": _text(str(goal.get("objective") or ""))},
+                "created_by_agent_id": {"rich_text": _text(str(goal.get("created_by_agent_id") or ""))},
+                "created_at": {"date": {"start": str(goal["created_at"])}},
+                "status": {"select": {"name": str(goal.get("status") or "open")}},
+                "visibility": {"select": {"name": "public"}},
+            },
+        )
+        result = dict(goal)
+        result["_page_id"] = str(created.get("id") or "")
+        return result
+
+    def list_shared_goals(self) -> list[dict[str, Any]]:
+        pages = self._query_all(
+            "goals",
+            filter_={"and": [
+                {"property": "status", "select": {"equals": "open"}},
+                {"property": "visibility", "select": {"equals": "public"}},
+            ]},
+        )
+        return sorted(
+            [self._shared_goal_from_page(page) for page in pages],
+            key=lambda goal: str(goal.get("created_at", "")),
+            reverse=True,
+        )
+
+    def get_shared_goal(self, goal_id: str) -> dict[str, Any] | None:
+        pages = self._query_all(
+            "goals",
+            filter_={"property": "goal_id", "rich_text": {"equals": goal_id}},
+        )
+        page = next((
+            candidate for candidate in pages
+            if _rich(candidate.get("properties") or {}, "goal_id") == goal_id
+        ), None)
+        return self._shared_goal_from_page(page) if page else None
+
+    @staticmethod
+    def _goal_trajectory_from_page(page: dict[str, Any]) -> dict[str, Any]:
+        properties = page.get("properties") or {}
+        raw_payload = _rich(properties, "trajectory_payload")
+        try:
+            payload = json.loads(raw_payload) if raw_payload else {}
+        except json.JSONDecodeError:
+            payload = {}
+        goal_relation = (properties.get("goal") or {}).get("relation") or []
+        return {
+            "trajectory_id": _rich(properties, "trajectory_id"),
+            "goal_id": "",
+            "agent_id": _rich(properties, "agent_id"),
+            "agent_display_name": _rich(properties, "agent_display_name"),
+            "agent_type": _select(properties, "agent_type"),
+            "title": _rich(properties, "title"),
+            "schema_version": _rich(properties, "schema_version"),
+            "trajectory_payload": payload,
+            "created_at": _date(properties, "created_at"),
+            "updated_at": _date(properties, "updated_at"),
+            "status": _select(properties, "status"),
+            "source": _select(properties, "source"),
+            "revision": int((properties.get("revision") or {}).get("number") or 1),
+            "_goal_page_id": str(goal_relation[0].get("id") or "") if goal_relation else "",
+            "_page_id": str(page.get("id") or ""),
+        }
+
+    def list_goal_trajectories(self, goal_id: str) -> list[dict[str, Any]]:
+        goal = self.get_shared_goal(goal_id)
+        if not goal:
+            return []
+        pages = self._query_all(
+            "goal_trajectories",
+            filter_={"property": "goal", "relation": {"contains": str(goal["_page_id"])}},
+        )
+        rows = []
+        for page in pages:
+            row = self._goal_trajectory_from_page(page)
+            if row.get("status") != "withdrawn":
+                row["goal_id"] = goal_id
+                rows.append(row)
+        return sorted(rows, key=lambda row: str(row.get("created_at", "")))
+
+    def get_goal_trajectory(self, trajectory_id: str) -> dict[str, Any] | None:
+        pages = self._query_all(
+            "goal_trajectories",
+            filter_={"property": "trajectory_id", "rich_text": {"equals": trajectory_id}},
+        )
+        page = next((
+            candidate for candidate in pages
+            if _rich(candidate.get("properties") or {}, "trajectory_id") == trajectory_id
+        ), None)
+        if not page:
+            return None
+        row = self._goal_trajectory_from_page(page)
+        goal_page_id = str(row.pop("_goal_page_id", ""))
+        goal_pages = self._query_all("goals")
+        matching_goal = next(
+            (goal for goal in goal_pages if str(goal.get("id") or "") == goal_page_id),
+            None,
+        )
+        if matching_goal:
+            row["goal_id"] = _rich(matching_goal.get("properties") or {}, "goal_id")
+        return row
+
+    def record_goal_trajectory(
+        self,
+        trajectory: dict[str, Any],
+        *,
+        update_existing: bool = False,
+    ) -> dict[str, Any]:
+        goal_id = str(trajectory["goal_id"])
+        agent_id = str(trajectory["agent_id"])
+        goal = self.get_shared_goal(goal_id)
+        if not goal:
+            raise ValueError("The shared goal does not exist.")
+        duplicate = next((
+            row for row in self.list_goal_trajectories(goal_id)
+            if row.get("agent_id") == agent_id
+        ), None)
+        if duplicate and not update_existing:
+            raise ValueError("This agent already has a trajectory for this goal.")
+        if update_existing:
+            if not duplicate or duplicate.get("trajectory_id") != trajectory.get("trajectory_id"):
+                raise ValueError("The shared trajectory to update was not found.")
+            if int(trajectory.get("revision") or 0) <= int(duplicate.get("revision") or 0):
+                raise ValueError("A shared update must advance the revision.")
+        payload_json = json.dumps(
+            trajectory["trajectory_payload"],
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+        properties = {
+            "Name": {"title": _text(f"{trajectory['agent_display_name']} · {trajectory['title']}")},
+            "goal": _relation(str(goal["_page_id"])),
+            "trajectory_id": {"rich_text": _text(str(trajectory["trajectory_id"]))},
+            "agent_id": {"rich_text": _text(agent_id)},
+            "agent_display_name": {"rich_text": _text(str(trajectory["agent_display_name"]))},
+            "agent_type": {"select": {"name": str(trajectory["agent_type"])}},
+            "title": {"rich_text": _text(str(trajectory["title"]))},
+            "schema_version": {"rich_text": _text(str(trajectory["schema_version"]))},
+            "trajectory_payload": {"rich_text": _text(payload_json)},
+            "created_at": {"date": {"start": str(trajectory["created_at"])}},
+            "updated_at": {"date": {"start": str(trajectory["updated_at"])}},
+            "status": {"select": {"name": str(trajectory["status"])}},
+            "source": {"select": {"name": str(trajectory["source"])}},
+            "revision": {"number": int(trajectory["revision"])},
+        }
+        if update_existing and duplicate:
+            page = self._client.pages.update(
+                page_id=str(duplicate["_page_id"]),
+                properties=properties,
+            )
+        else:
+            page = self._client.pages.create(
+                parent={"type": "data_source_id", "data_source_id": self._sources["goal_trajectories"]},
+                properties=properties,
+            )
+        result = dict(trajectory)
+        result["_page_id"] = str(page.get("id") or "")
+        return result
 
     @staticmethod
     def _question_set_submission_from_page(

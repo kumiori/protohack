@@ -55,16 +55,13 @@ with st.container(key="primitive-landing-canvas"):
     with copy:
         with st.container(key="primitive-hero-copy"):
             st.title("Commons")
-            st.title("Simulator")
-            st.write(
-                "A strategic simulation for shared systems and collective "
-                "decision-making."
-            )
+            st.title("Playground")
+            st.write("Strategy for shared systems and collective decision-making.")
 
         with st.container(key="primitive-enter-action"):
             st.page_link(
                 "views/commons.py",
-                label="Enter the simulator  →",
+                label="Enter the playground  →",
                 width="stretch",
             )
 

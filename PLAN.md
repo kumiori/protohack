@@ -995,10 +995,12 @@ The current pilot contract is:
 - imported and recovered plans remain editable;
 - no existing user-facing capability is silently removed by onboarding work.
 
-Conceptual invariants: the initial condition is always Now; chronology is the
-Horizon axis; Energy expresses mobilisation; Entropy remains neutral until
-authored or collectively derived; the centreline is always the current best
-estimate. Open, Guided and Fixed landing modes remain distinct. Time can be
+Conceptual invariants: the initial condition is always Now; trajectory space is
+`(time, energy, uncertainty)`; Energy expresses mobilisation; Uncertainty is a
+human-authorable state variable; and the centreline is always the current best
+estimate. Paths are generally irreversible: time is strictly ordered, uncertainty
+magnitude is non-negative, and realised history is append-only. Open, Guided and
+Fixed landing modes remain distinct. Time can be
 qualitative (Now, Soon, Later, Sometime, Eventually, Landing) or linear.
 No landing or time mode is inferred while its control is empty: the next action
 stays disabled and only validated values cross into the model. Guided landing
@@ -1037,5 +1039,6 @@ expanding or contracting radius. Assigning moves to an individual branch,
 arbitrary branch trees, merging, branch probabilities, automatic branch
 comparison, anisotropy, global uncertainty and soft attractors are deferred.
 
-The decisive design question remains whether Entropy/Alignment should eventually
-be directly authored or emerge only from comparison with collective trajectories.
+The former Entropy/Alignment axis is retired from the visible model. Legacy
+fields remain read/write aliases only so existing `trajectory-plan/v2` documents
+continue to load without losing geometry.

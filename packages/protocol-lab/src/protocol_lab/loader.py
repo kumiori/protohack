@@ -1,4 +1,4 @@
-"""Load and validate versioned Protocol Laboratory experiment definitions."""
+"""Load and validate versioned, protocol-neutral experiment definitions."""
 
 from __future__ import annotations
 
@@ -121,6 +121,7 @@ def _message(row: Mapping[str, Any]) -> MessageDefinition:
     return MessageDefinition(
         id=_text(row.get("id")),
         label=_text(row.get("label")),
+        human_label=_text(row.get("human_label")),
         sender=_text(row.get("sender")),
         receiver=_text(row.get("receiver")),
         technical=_text(row.get("technical")),
@@ -264,6 +265,10 @@ def load_experiment(path: str | Path) -> ExperimentDefinition:
         atlas_functions=_strings(raw.get("atlas_functions")),
         question=_text(raw.get("question")),
         human_question=_text(raw.get("human_question")),
+        rationale_question=_text(raw.get("rationale_question")),
+        rationale=_strings(raw.get("rationale")),
+        shared_capability=_text(raw.get("shared_capability")),
+        reveal=_text(raw.get("reveal")),
         situation=_strings(raw.get("situation")),
         need=_text(raw.get("need")),
         north_star=_text(raw.get("north_star")),

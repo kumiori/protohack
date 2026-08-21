@@ -11,6 +11,22 @@ architecture. Experiment definitions, deterministic execution, rendering,
 scenarios, reflection, replay, and Field Notes live in the independent
 [`protocol_lab`](protocol_lab) package.
 
+## Extracted engines
+
+The reusable logic is now maintained as two independently installable and
+independently versioned packages:
+
+- [`packages/protocol-lab`](packages/protocol-lab) — deterministic protocol
+  definitions, execution, invariant evaluation, replay, hashing, and evidence;
+- [`packages/trajectory-engine`](packages/trajectory-engine) — portable
+  trajectory schemas, time semantics, geometry, uncertainty, branching,
+  append-only realisation, and independently authored contributions.
+
+Protocol Hack remains the consumer and owns Streamlit pages, experimental
+content, styling, storage integration, and application policy. Compatibility
+adapters preserve existing application imports while new consumers can use the
+package APIs directly.
+
 Protocol Hack is a one-scenario strategic mapping experiment. The pilot asks a participant to make one first move, explain it in one sentence, review it, save a return key, and explicitly integrate the resulting anonymous trajectory into a Commons Map.
 
 Every normal question systematically provides `Continue`, `Flag`, and `Skip`. Flagging uses the feedback vocabulary and an optional note. Skipping opens a dialog and requires a reason. A successful integration always triggers balloons; opening the confirmation dialog alone never writes anything.
@@ -52,7 +68,7 @@ Set `MOSAIC_STATEMENT_URL` to the published Google Doc URL to expose the
 - `/commons-map` — public strategic distribution and participant-theme graph;
 - `/commons-host` — access-code-protected strategic, coordination, and diagnostic views;
 - `/test-timeline-benchmarks` — scenario-first onboarding laboratory with eight game-like levels, challenge cards, a hidden impossible benchmark, and sidebar experiment briefs that hand selected horizons into the trajectory game;
-- `/test-timeline-game` — session-only 3D trajectory sandbox using twelve event and planning primitives as hard piecewise-Hermite nodes, a continuous time/date preview slider, Smooth/Kink geometry, separate local uncertainty envelopes that never move the centreline, preserved camera orientation, simulated convergence traces, and a three-move integration gate without record writes;
+- `/test-timeline-game` — session-only `(time, energy, uncertainty)` trajectory sandbox using event and planning primitives as hard piecewise-Hermite nodes, a continuous time/date preview slider, gradual/abrupt geometry, separate local uncertainty envelopes that never move the centreline, preserved camera orientation, simulated convergence traces, and a three-move integration gate without record writes;
 - `/test-timeline-style-lab` — visual-only comparison of Instrument, Playground, and Gallery treatments over the exact same trajectory game, with oversized event objects, subtle motion, and a trajectory-first scene;
 - `/test-landing-primitives` — landing-page study composed from native Streamlit primitives and scoped styled containers, without authored HTML markup;
 - `/test-smokegun` — preserved first local smoke-test interface, grouped under `Tests` in navigation.

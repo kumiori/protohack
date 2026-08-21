@@ -76,7 +76,7 @@ def test_open_plan_begins_now_without_an_authored_start_or_target_date() -> None
     assert payload["target_date"] is None
     assert "end_date" not in payload
     assert payload["temporal_mode"] == "qualitative"
-    assert payload["axis_y_label"] == "Entropy"
+    assert payload["axis_y_label"] == "Uncertainty"
 
 
 def test_guided_and_fixed_landings_preserve_their_distinct_meanings() -> None:
@@ -223,7 +223,7 @@ def test_new_plan_editor_preserves_the_complete_primitive_set() -> None:
     }
     rendered = "\n".join(markdown.value for markdown in app.markdown)
     assert "What should happen—not necessarily first" in rendered
-    assert "Entropy" in rendered
+    assert "Uncertainty" in rendered
 
     button(app, "Action").click().run()
     rendered = "\n".join(markdown.value for markdown in app.markdown)
@@ -384,6 +384,7 @@ def test_rc0_document_contains_the_complete_move_contract() -> None:
         "branch_parent",
         "branch_labels",
         "energy_effect",
+        "uncertainty_effect",
         "entropy_effect",
         "influence_radius",
         "description",

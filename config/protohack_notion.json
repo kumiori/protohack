@@ -1,14 +1,13 @@
 {
-  "schema_version": "protohack-notion-v2-mapping-coordination",
+  "schema_version": "protohack-notion-v3-shared-trajectories",
   "prefix": "protohack",
   "parent_page_id": "3a554516-e9e1-8023-b1f4-ef9fc0cad03c",
   "parent_page_url": "https://app.notion.com/p/ProtocolHack-3a554516e9e18023b1f4ef9fc0cad03c",
   "status": "ready",
-  "updated_at": "2026-07-22T19:07:38+00:00",
+  "updated_at": "2026-08-11T09:06:46+00:00",
   "seed_session": {
     "session_code": "commons_pilot_2026",
-    "page_id": "3a554516-e9e1-813b-8b18-ef1ea51ea96c",
-    "page_url": "https://app.notion.com/p/3a554516e9e1813b8b18ef1ea51ea96c"
+    "page_id": "3a554516-e9e1-813b-8b18-ef1ea51ea96c"
   },
   "databases": {
     "sessions": {
@@ -50,6 +49,16 @@
       "title": "protohack_Events",
       "database_id": "0af0774e-15fa-4250-aaa3-3f9cd491f170",
       "data_source_id": "db45d224-5e69-4ca3-a11d-5030ea85f50f"
+    },
+    "goals": {
+      "title": "protohack_Goals",
+      "database_id": "627ba3f8-b25c-4950-ae65-3cc73b6e4959",
+      "data_source_id": "a47d75c2-780f-40ad-84ec-ab7e3cdec5ab"
+    },
+    "goal_trajectories": {
+      "title": "protohack_GoalTrajectories",
+      "database_id": "fadc56e7-d0c0-4109-b82a-5f0dc10c6c8e",
+      "data_source_id": "e7a7ef37-a601-4a00-898f-891cb24f2ebd"
     }
   }
 }

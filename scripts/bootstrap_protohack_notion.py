@@ -35,7 +35,7 @@ from notion_client.errors import APIResponseError
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MANIFEST = ROOT / "config" / "protohack_notion.json"
 DEFAULT_NOTION_VERSION = "2025-09-03"
-SCHEMA_VERSION = "protohack-notion-v2-mapping-coordination"
+SCHEMA_VERSION = "protohack-notion-v3-shared-trajectories"
 PREFIX = "protohack"
 
 
@@ -286,6 +286,48 @@ DATABASES: dict[str, dict[str, Any]] = {
             ),
         },
     },
+    "goals": {
+        "title": f"{PREFIX}_Goals",
+        "properties": {
+            "Name": {"title": {}},
+            "goal_id": rich_text(),
+            "objective": rich_text(),
+            "created_by_agent_id": rich_text(),
+            "status": select(("open", "green"), ("closed", "gray")),
+            "visibility": select(("public", "blue")),
+            "created_at": date(),
+        },
+    },
+    "goal_trajectories": {
+        "title": f"{PREFIX}_GoalTrajectories",
+        "properties": {
+            "Name": {"title": {}},
+            "trajectory_id": rich_text(),
+            "agent_id": rich_text(),
+            "agent_display_name": rich_text(),
+            "agent_type": select(
+                ("person", "blue"),
+                ("team", "green"),
+                ("institution", "purple"),
+                ("assistant", "orange"),
+            ),
+            "title": rich_text(),
+            "schema_version": rich_text(),
+            "trajectory_payload": rich_text(),
+            "created_at": date(),
+            "updated_at": date(),
+            "status": select(
+                ("draft", "gray"),
+                ("shared", "green"),
+                ("withdrawn", "red"),
+            ),
+            "source": select(
+                ("created_for_goal", "blue"),
+                ("imported_existing_plan", "purple"),
+            ),
+            "revision": number(),
+        },
+    },
 }
 
 
@@ -313,6 +355,9 @@ RELATIONS: dict[str, dict[str, tuple[str, str]]] = {
     "events": {
         "session": ("sessions", "events"),
         "player": ("players", "events"),
+    },
+    "goal_trajectories": {
+        "goal": ("goals", "contributions"),
     },
 }
 
@@ -526,6 +571,8 @@ def emit_secrets(manifest: dict[str, Any]) -> str:
         "protohack_moderation_votes_db_id": "moderation_votes",
         "protohack_decisions_db_id": "decisions",
         "protohack_events_db_id": "events",
+        "protohack_goals_db_id": "goals",
+        "protohack_goal_trajectories_db_id": "goal_trajectories",
     }
     lines = ["[notion]", '# token = "secret_..."']
     lines.extend(

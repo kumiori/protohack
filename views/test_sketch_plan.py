@@ -179,8 +179,8 @@ def _preview_figure(payload: dict[str, object]) -> go.Figure:
     figure.add_trace(
         go.Scatter3d(
             x=x,
-            y=y,
-            z=z,
+            y=z,
+            z=y,
             mode="lines",
             line={"color": "#edf2ed", "width": 8},
             hoverinfo="skip",
@@ -190,8 +190,8 @@ def _preview_figure(payload: dict[str, object]) -> go.Figure:
     figure.add_trace(
         go.Scatter3d(
             x=[x[0], END_POINT[0]],
-            y=[y[0], END_POINT[1]],
-            z=[z[0], END_POINT[2]],
+            y=[z[0], END_POINT[2]],
+            z=[y[0], END_POINT[1]],
             mode="markers+text",
             marker={
                 "size": [7, 9],
@@ -243,16 +243,16 @@ def _preview_figure(payload: dict[str, object]) -> go.Figure:
                 "showbackground": False,
             },
             "yaxis": {
-                "title": "ENTROPY",
-                "range": [-0.12, 0.12],
+                "title": "ENERGY",
+                "range": [-0.02, 0.48],
                 "gridcolor": "#17231f",
                 "linecolor": "#40524b",
                 "showticklabels": False,
                 "showbackground": False,
             },
             "zaxis": {
-                "title": "ENERGY",
-                "range": [-0.02, 0.48],
+                "title": "UNCERTAINTY",
+                "range": [-0.12, 0.12],
                 "gridcolor": "#17231f",
                 "linecolor": "#40524b",
                 "showticklabels": False,
@@ -435,6 +435,13 @@ def _apply_theme() -> None:
 
 
 _apply_theme()
+shared_goal_context = st.session_state.get("shared_goal_context")
+if isinstance(shared_goal_context, dict) and shared_goal_context.get("goal_id"):
+    st.info(
+        "Sketching an independent trajectory for shared goal "
+        f"{shared_goal_context['goal_id']}. Nothing is shared until you "
+        "explicitly choose Share trajectory in the editor."
+    )
 restore_value = st.query_params.get("restore")
 if restore_value:
     try:

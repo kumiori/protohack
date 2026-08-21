@@ -508,7 +508,7 @@ st.html(
     <main>
       <section class="landing-shell" aria-labelledby="landing-title">
         <nav class="landing-nav" aria-label="Primary navigation">
-          <a class="landing-brand" href="./">Commons Evolver</a>
+          <a class="landing-brand" href="./">Commons Evolve</a>
           <div class="landing-links">
             <a href="#about">About</a>
             <a href="./commons-map">Explore</a>
@@ -517,7 +517,7 @@ st.html(
 
         <div class="landing-hero">
           <div class="landing-copy">
-            <h1 class="landing-title" id="landing-title">Commons<br>Evolver</h1>
+            <h1 class="landing-title" id="landing-title">Commons<br>Evolve</h1>
             <p class="landing-deck">A strategic simulation for shared systems and collective decision-making.</p>
             <a class="landing-enter" href="./commons">
               Enter the simulator <span aria-hidden="true">→</span>

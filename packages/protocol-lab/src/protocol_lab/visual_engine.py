@@ -1,4 +1,4 @@
-"""Protocol-neutral view models consumed by the Streamlit renderer."""
+"""Protocol-neutral sequence projections for arbitrary renderers."""
 
 from __future__ import annotations
 

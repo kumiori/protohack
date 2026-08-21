@@ -65,7 +65,8 @@ def _apply_styles() -> None:
         .lab-topbar { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:.35rem .2rem .8rem; border-bottom:1px solid var(--lab-line); font-family:"DM Mono",monospace; text-transform:uppercase; letter-spacing:.08em; font-size:.7rem; }
         .lab-topbar b { color:var(--lab-text); font-weight:500; }
         .lab-topbar span:last-child { color:var(--lab-acid); }
-        .st-key-lab_rail, .st-key-lab_workspace, .st-key-lab_telemetry { border:1px solid var(--lab-line); border-radius:8px; background:linear-gradient(145deg,rgba(17,23,24,.96),rgba(10,14,15,.98)); min-height:76vh; padding:1rem; box-shadow:inset 0 1px 0 rgba(255,255,255,.025); }
+        .st-key-lab_rail, .st-key-lab_workspace, .st-key-lab_telemetry { border:1px solid var(--lab-line); border-radius:9px; background:linear-gradient(145deg,rgba(17,23,24,.96),rgba(10,14,15,.98)); min-height:76vh; padding:1rem; box-shadow:inset 0 1px 0 rgba(255,255,255,.025); }
+        .st-key-lab_telemetry { background:linear-gradient(145deg,rgba(14,19,20,.88),rgba(9,13,14,.94)); }
         .lab-brand { font-family:"DM Mono",monospace; font-size:1.05rem; font-weight:600; letter-spacing:.08em; margin:.1rem 0 1.55rem; }
         .lab-prompt { color:var(--lab-acid); font-size:1.1rem; margin-top:.25rem; }
         .lab-rail-section { margin:1.2rem 0 .45rem; padding-top:.85rem; border-top:1px solid var(--lab-line); font-family:"DM Mono",monospace; color:var(--lab-muted); font-size:.58rem; text-transform:uppercase; letter-spacing:.08em; }
@@ -143,24 +144,52 @@ def _apply_styles() -> None:
         .lab-function.active { color:var(--lab-acid); border-color:#69783a; background:rgba(216,243,106,.06); }
         .lab-experiment-card { border:1px solid #3e4643; border-radius:7px; padding:1.2rem; background:#0b1011; margin:.8rem 0 1rem; }
         .lab-experiment-card h2 { font-size:clamp(1.5rem,3vw,2.5rem) !important; margin:.35rem 0 .65rem; }
-        .lab-experience-heading { padding:.6rem 0 1.2rem; }
-        .lab-experience-heading h1 { margin:.35rem 0 .6rem; font-size:clamp(2.5rem,6vw,5.3rem) !important; }
-        .lab-guided-question { max-width:980px; font-size:clamp(1.45rem,3.2vw,2.75rem); line-height:1.18; margin:.5rem 0 2rem; color:#eef2ee; }
-        .lab-situation { min-height:35vh; display:flex; flex-direction:column; justify-content:center; max-width:860px; padding:1.2rem 0; }
-        .lab-situation-line { font-size:clamp(1.15rem,2.2vw,1.8rem); line-height:1.5; margin:.1rem 0; color:#cfd6d1; }
+        .lab-atlas-rationale { color:var(--lab-acid); font-size:clamp(1.05rem,2vw,1.35rem); line-height:1.4; max-width:760px; }
+        .lab-supporting-question { color:#aeb8b2; font-size:.78rem; line-height:1.5; margin:.3rem 0 .7rem; }
+        .lab-experience-heading { padding:.35rem 0 .55rem; }
+        .lab-experience-heading h1 { margin:.3rem 0 .4rem; font-size:clamp(2rem,4vw,3.35rem) !important; }
+        .lab-experience-heading .lab-situation-line { font-size:.88rem; color:#aeb8b2; }
+        .lab-guided-question { max-width:880px; font-size:clamp(1.35rem,2.6vw,2rem); line-height:1.3; margin:.15rem 0 .25rem; color:var(--lab-acid); }
+        .lab-guided-question-support { max-width:850px; font-size:.82rem; line-height:1.5; margin:0 0 1rem; color:#9da7a1; }
+        .lab-situation { min-height:24vh; display:flex; flex-direction:column; justify-content:center; max-width:860px; padding:.8rem 0; }
+        .lab-situation-line { font-size:clamp(1rem,1.7vw,1.35rem); line-height:1.5; margin:.1rem 0; color:#cfd6d1; }
+        .lab-rationale-card { border-left:3px solid var(--lab-acid); background:rgba(216,243,106,.04); padding:.85rem 1rem; margin:.8rem 0 1.1rem; max-width:850px; }
+        .lab-rationale-card p { color:#cbd3ce; font-size:.88rem; line-height:1.6; margin:.2rem 0; }
         .lab-protocol-footnote { margin-top:.8rem; color:var(--lab-muted); font-family:"DM Mono",monospace; font-size:.62rem; }
         .lab-stage-nav { display:grid; grid-template-columns:repeat(4,1fr); gap:.35rem; margin:.2rem 0 1.4rem; }
         .lab-stage-step { border-top:2px solid #303837; padding:.55rem 0; color:#69736e; font-family:"DM Mono",monospace; font-size:.58rem; text-transform:uppercase; letter-spacing:.08em; }
         .lab-stage-step.active { border-color:var(--lab-acid); color:var(--lab-acid); }
         .lab-stage-step.complete { border-color:#73803e; color:#a8b16d; }
-        .lab-exchange { min-height:34vh; display:flex; flex-direction:column; justify-content:center; max-width:940px; margin:auto; }
-        .lab-exchange-parties { display:grid; grid-template-columns:1fr 1fr; gap:1rem; align-items:stretch; }
-        .lab-party { position:relative; border:1px solid var(--lab-line); border-radius:7px; padding:1.25rem; min-height:10rem; background:#0b1011; }
+        .lab-exchange { display:flex; flex-direction:column; justify-content:center; max-width:980px; margin:.15rem auto .8rem; }
+        .lab-exchange-meta { display:flex; align-items:center; justify-content:space-between; margin-bottom:.55rem; }
+        .lab-step-count { border:1px solid #3a4441; border-radius:5px; padding:.3rem .55rem; color:#aeb8b2; font-family:"DM Mono",monospace; font-size:.66rem; text-transform:uppercase; }
+        .lab-exchange-parties { display:grid; grid-template-columns:minmax(0,1fr) minmax(8.2rem,.62fr) minmax(0,1fr); gap:.75rem; align-items:stretch; }
+        .lab-party { position:relative; border:1px solid var(--lab-line); border-radius:8px; padding:1rem; min-height:12rem; background:#0b1011; display:flex; flex-direction:column; }
         .lab-party.active { border-color:#6f7d3c; box-shadow:inset 0 0 0 1px rgba(216,243,106,.08); }
-        .lab-party span { font-family:"DM Mono",monospace; color:var(--lab-muted); font-size:.6rem; text-transform:uppercase; letter-spacing:.08em; }
-        .lab-party p { margin:.75rem 0 0; font-size:clamp(1rem,1.7vw,1.25rem); line-height:1.55; color:#dce2de; }
+        .lab-party > span { font-family:"DM Mono",monospace; color:#c9d1cc; font-size:.7rem; text-transform:uppercase; letter-spacing:.06em; }
+        .lab-party p { margin:.75rem 0; font-size:clamp(.9rem,1.45vw,1.12rem); line-height:1.55; color:#dce2de; flex:1; }
+        .lab-party-facts { border-top:1px solid var(--lab-line); padding-top:.6rem; display:grid; gap:.28rem; }
+        .lab-party-fact { display:flex; justify-content:space-between; gap:.5rem; font-family:"DM Mono",monospace; font-size:.63rem; color:var(--lab-muted); }
+        .lab-party-fact b { color:var(--lab-acid); font-weight:500; text-align:right; }
         .lab-party.active::after { content:""; position:absolute; right:1rem; bottom:1rem; width:.45rem; height:.45rem; border-radius:50%; background:var(--lab-acid); animation:labPulse 1.2s ease-in-out infinite; }
-        .lab-message-flight { display:grid; place-items:center; min-height:2.3rem; color:var(--lab-acid); font-family:"DM Mono",monospace; font-size:.7rem; text-align:center; padding:.55rem; animation:labSignal 620ms ease-out both; }
+        .lab-message-flight { position:relative; display:grid; place-items:center; min-height:12rem; color:var(--lab-acid); font-family:"DM Mono",monospace; text-align:center; padding:.4rem; }
+        .lab-message-flight::before { content:""; position:absolute; left:0; right:0; top:50%; border-top:1px solid #69783a; }
+        .lab-message-flight.right::after { content:"›"; position:absolute; right:-.1rem; top:calc(50% - 1rem); font-size:1.55rem; color:var(--lab-acid); }
+        .lab-message-flight.left::after { content:"‹"; position:absolute; left:-.1rem; top:calc(50% - 1rem); font-size:1.55rem; color:var(--lab-acid); }
+        .lab-message-object { position:relative; z-index:1; min-width:6.6rem; border:1px solid var(--lab-acid); border-radius:7px; padding:.65rem .75rem; background:var(--lab-acid); color:#0a0e0f; box-shadow:0 0 28px rgba(216,243,106,.16); }
+        .lab-message-object b { display:block; font-size:.9rem; }
+        .lab-message-object small { display:block; margin-top:.22rem; font-size:.58rem; color:#26300d; }
+        .lab-trajectory { display:flex; align-items:center; justify-content:center; gap:.45rem; border:1px solid var(--lab-line); border-radius:7px; margin:.7rem 0; padding:.55rem .7rem; font-family:"DM Mono",monospace; font-size:.66rem; }
+        .lab-trajectory-step { color:#59635e; padding:.22rem .38rem; border:1px solid transparent; border-radius:4px; }
+        .lab-trajectory-step.complete { color:#aeb8b2; }
+        .lab-trajectory-step.complete::before { content:"✓ "; color:var(--lab-acid); }
+        .lab-trajectory-step.current { color:var(--lab-acid); border-color:#64723a; background:rgba(216,243,106,.05); }
+        .lab-trajectory-arrow { color:#59635e; }
+        .lab-shared-capability { border:1px solid #65743a; border-radius:7px; padding:.85rem 1rem; margin:1rem 0; background:rgba(216,243,106,.045); }
+        .lab-shared-capability b { display:block; color:var(--lab-acid); font-family:"DM Mono",monospace; font-size:.65rem; text-transform:uppercase; margin-bottom:.35rem; }
+        .lab-shared-capability p { margin:0; color:#e1e7e2; font-size:1rem; line-height:1.55; }
+        .lab-reveal { color:#cbd3ce; font-size:1rem; line-height:1.65; max-width:780px; }
+        .lab-mode { border:1px solid #53612d; border-radius:999px; padding:.42rem .65rem; color:var(--lab-acid); font-family:"DM Mono",monospace; font-size:.63rem; text-transform:uppercase; text-align:center; white-space:nowrap; }
         @keyframes labSignal { from { opacity:.15; transform:translateX(-8%); } to { opacity:1; transform:translateX(0); } }
         @keyframes labPulse { 50% { opacity:.25; transform:scale(.72); } }
         .lab-reflection { max-width:850px; min-height:34vh; display:flex; flex-direction:column; justify-content:center; }
@@ -178,9 +207,9 @@ def _apply_styles() -> None:
         .lab-inspect-drawer h3 { margin:1.1rem 0 .45rem; }
         .lab-inspect-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:1rem; padding:.3rem 0; border-bottom:1px solid #202828; font-family:"DM Mono",monospace; font-size:.6rem; }
         .lab-inspect-row b { color:var(--lab-acid); font-variant-numeric:tabular-nums; text-align:right; }
-        div.stButton > button, div.stFormSubmitButton > button, div.stDownloadButton > button { background:#101516 !important; border:1px solid #38413e !important; border-radius:5px !important; color:#cbd3ce !important; box-shadow:none !important; min-height:2.55rem !important; font-family:"DM Mono",monospace !important; font-size:.64rem !important; text-transform:uppercase; letter-spacing:.04em; }
-        div.stButton > button:hover, div.stFormSubmitButton > button:hover, div.stDownloadButton > button:hover { background:#171d1d !important; border-color:var(--lab-acid) !important; color:var(--lab-acid) !important; transform:none !important; box-shadow:none !important; }
-        div.stButton > button[data-testid="stBaseButton-primary"] { background:var(--lab-acid) !important; border-color:var(--lab-acid) !important; color:#0a0e0f !important; }
+        div.stButton > button, div.stFormSubmitButton > button, div.stDownloadButton > button, div.stLinkButton > a { background:#101516 !important; border:1px solid #38413e !important; border-radius:6px !important; color:#cbd3ce !important; box-shadow:none !important; min-height:2.55rem !important; font-family:"DM Mono",monospace !important; font-size:.66rem !important; text-transform:uppercase; letter-spacing:.04em; cursor:pointer !important; align-items:center !important; justify-content:center !important; }
+        div.stButton > button:hover, div.stFormSubmitButton > button:hover, div.stDownloadButton > button:hover, div.stLinkButton > a:hover { background:#171d1d !important; border-color:var(--lab-acid) !important; color:var(--lab-acid) !important; transform:none !important; box-shadow:none !important; }
+        div.stButton > button[data-testid="stBaseButton-primary"], div.stLinkButton > a[data-testid="stBaseLinkButton-primary"] { background:var(--lab-acid) !important; border-color:var(--lab-acid) !important; color:#0a0e0f !important; }
         div.stButton > button:disabled, div.stFormSubmitButton > button:disabled { opacity:1 !important; color:#89948e !important; border-color:#303836 !important; background:#0c1112 !important; cursor:not-allowed !important; }
         div.stButton > button:disabled p, div.stFormSubmitButton > button:disabled p { color:#89948e !important; }
         div.st-key-lab_toggle_expansion button[data-testid="stBaseButton-secondary"] { background:#101516 !important; border-color:#38413e !important; color:#cbd3ce !important; }
@@ -201,6 +230,10 @@ def _apply_styles() -> None:
           .lab-function-item:not(.active) { display:none; }
           .lab-console-grid { grid-template-columns:1fr; }
           .lab-terminal { border-right:0; border-bottom:1px solid var(--lab-line); }
+          .lab-exchange-parties { grid-template-columns:1fr; }
+          .lab-message-flight { min-height:5rem; }
+          .lab-message-flight.right::after { content:"⌄"; right:calc(50% - .4rem); top:auto; bottom:-.35rem; }
+          .lab-message-flight.left::after { content:"⌃"; left:calc(50% - .4rem); top:-.35rem; }
         }
         @media (max-width:640px) {
           .block-container { padding:.7rem !important; }
@@ -219,6 +252,14 @@ def render_atlas_landing(
     active_experiment: ExperimentDefinition,
 ) -> None:
     _apply_styles()
+    rationale_question = (
+        active_experiment.rationale_question or active_experiment.human_question
+    )
+    supporting_question = (
+        f'<p class="lab-supporting-question">{html.escape(active_experiment.human_question)}</p>'
+        if active_experiment.human_question != rationale_question
+        else ""
+    )
     with st.container(key="lab_atlas_shell"):
         st.markdown(
             f"""
@@ -255,19 +296,19 @@ def render_atlas_landing(
             <section class="lab-experiment-card">
               <div class="lab-kicker">Experiment {active_experiment.experiment_number:02d} &nbsp; / &nbsp; {html.escape(active_experiment.atlas_functions[0])}</div>
               <h2>{html.escape(active_experiment.experience_title)}</h2>
-              <p><b>{html.escape(active_experiment.human_question)}</b></p>
+              <p class="lab-atlas-rationale"><b>{html.escape(rationale_question)}</b></p>
+              {supporting_question}
               <p class="lab-protocol-footnote">Experiment {active_experiment.experiment_number:02d} uses the {html.escape(active_experiment.protocol.name)}.</p>
             </section>
             """,
             unsafe_allow_html=True,
         )
-        if st.button(
+        st.link_button(
             "Enter Experiment 01 →",
-            key=f"lab_begin_{active_experiment.id}",
+            "/protocol-lab-connection",
             type="primary",
-        ):
-            st.session_state[_state_key(active_experiment, "stage")] = "experiment"
-            st.rerun()
+            width="stretch",
+        )
 
         with st.expander("Queued experiments / architecture canaries"):
             for entry in atlas.entries:
@@ -315,22 +356,31 @@ def _render_lab_rail(experiment: ExperimentDefinition, current_stage: str) -> No
         '<div class="lab-brand">PROTOCOL LAB<div class="lab-prompt">&gt;_</div></div>',
         unsafe_allow_html=True,
     )
-    st.markdown('<div class="lab-label">Experiment path</div>', unsafe_allow_html=True)
+    st.markdown('<div class="lab-label">Laboratory</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<a class="lab-route-link" href="/protocol-lab">Atlas</a>'
+        '<div class="lab-rail-section">Experiments</div>'
+        f'<div class="lab-objective">{experiment.experiment_number:02d} · {html.escape(experiment.atlas_functions[0])}'
+        f'<b>{html.escape(experiment.experience_title)}</b></div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown('<div class="lab-rail-section">Experiment path</div>', unsafe_allow_html=True)
     stages = ("connect", "disrupt", "interpret", "respond")
     progress = "".join(
         f'<div class="lab-function-item{(" active" if stage == current_stage else "")}">{index:02d} &nbsp; {stage.title()}</div>'
         for index, stage in enumerate(stages, start=1)
     )
     st.markdown(f'<div class="lab-function-list">{progress}</div>', unsafe_allow_html=True)
-    st.markdown(
-        '<div class="lab-rail-section">Specimen</div>'
-        f'<div class="lab-objective">Experiment {experiment.experiment_number:02d}'
-        f'<b>{html.escape(experiment.atlas_functions[0])}</b></div>',
-        unsafe_allow_html=True,
+    st.link_button("← Protocol Atlas", "/protocol-lab", width="stretch")
+    if st.button("Open archaeology", key="lab_open_archaeology", width="stretch"):
+        _archaeology_dialog(experiment)
+    st.button(
+        "Multiplayer · future",
+        key="lab_multiplayer_future",
+        disabled=True,
+        width="stretch",
+        help="Interactive mode currently gives one participant control of one endpoint. Two-participant control is planned.",
     )
-    if st.button("← Protocol Atlas", key="lab_back_to_atlas", width="stretch"):
-        st.session_state[_state_key(experiment, "stage")] = "atlas"
-        st.rerun()
     st.markdown(
         '<a class="lab-route-link" href="/commons">◇ Commons research instrument</a>',
         unsafe_allow_html=True,
@@ -490,6 +540,12 @@ def _render_archaeology(experiment: ExperimentDefinition) -> None:
         f'<div class="lab-evolution">{entries}</div>',
         unsafe_allow_html=True,
     )
+
+
+@st.dialog("Protocol archaeology", width="large")
+def _archaeology_dialog(experiment: ExperimentDefinition) -> None:
+    """Open the experiment's historical dossier beside the laboratory bench."""
+    _render_archaeology(experiment)
 
 
 def _render_compression(
@@ -745,22 +801,30 @@ def _deliver_player_message(
 ) -> None:
     commands = [*session.commands, Command.deliver(message_instance_id)]
     updated = replay(experiment, tuple(commands))
-    first_participant = experiment.participants[0].id
+    _queue_ambient_discoveries(experiment, session, updated)
+    st.session_state[_state_key(experiment, "commands")] = commands
+    if updated.final_state.status == experiment.completion_status:
+        st.session_state[_state_key(experiment, "milestone_ready")] = True
+    st.rerun()
 
-    # The laboratory operates the counterpart. A short delay lets the response
-    # feel transmitted rather than computed in the same instant.
-    while updated.final_state.pending_messages:
-        response = updated.final_state.pending_messages[0]
-        definition = experiment.message(response.message_id)
-        if definition.sender == first_participant or response.deliver_at > updated.final_state.tick:
-            break
-        time.sleep(0.42)
-        st.session_state[_state_key(experiment, "counterpart_reaction")] = " ".join(
-            definition.expanded
-        )
-        commands.append(Command.deliver(response.instance_id))
-        updated = replay(experiment, tuple(commands))
 
+def _deliver_counterpart_message(
+    experiment: ExperimentDefinition,
+    session: Replay,
+    message_instance_id: str,
+) -> None:
+    """Let the laboratory operate the other endpoint after showing its reply."""
+    pending = next(
+        message
+        for message in session.final_state.pending_messages
+        if message.instance_id == message_instance_id
+    )
+    definition = experiment.message(pending.message_id)
+    st.session_state[_state_key(experiment, "counterpart_reaction")] = (
+        _message_copy(experiment, definition.id)
+    )
+    commands = [*session.commands, Command.deliver(message_instance_id)]
+    updated = replay(experiment, tuple(commands))
     _queue_ambient_discoveries(experiment, session, updated)
     st.session_state[_state_key(experiment, "commands")] = commands
     if updated.final_state.status == experiment.completion_status:
@@ -779,6 +843,19 @@ def _render_stage_progress(current_stage: str) -> None:
     st.markdown(f'<div class="lab-stage-nav">{items}</div>', unsafe_allow_html=True)
 
 
+def _render_guiding_questions(experiment: ExperimentDefinition) -> None:
+    primary = experiment.rationale_question or experiment.human_question
+    supporting = (
+        f'<div class="lab-guided-question-support">{html.escape(experiment.human_question)}</div>'
+        if experiment.human_question != primary
+        else ""
+    )
+    st.markdown(
+        f'<div class="lab-guided-question">{html.escape(primary)}</div>{supporting}',
+        unsafe_allow_html=True,
+    )
+
+
 def _render_situation(
     experiment: ExperimentDefinition,
     session: Replay,
@@ -787,10 +864,19 @@ def _render_situation(
         f'<p class="lab-situation-line">{html.escape(line)}</p>'
         for line in experiment.situation
     )
+    rationale = "".join(
+        f'<p>{html.escape(line)}</p>' for line in experiment.rationale
+    )
+    rationale_card = (
+        '<div class="lab-rationale-card"><div class="lab-label">The minimum shared context</div>'
+        f'{rationale}</div>'
+        if rationale
+        else ""
+    )
     st.markdown(
         '<section class="lab-situation">'
         '<div class="lab-label">The situation</div>'
-        f'{situation}</section>',
+        f'{situation}{rationale_card}</section>',
         unsafe_allow_html=True,
     )
     transition = _opening_transition(experiment, session)
@@ -826,6 +912,81 @@ def _guided_action_label(
     if emitted <= 1:
         return "Send your opening message"
     return "Send your confirmation"
+
+
+def _participant_reference(
+    experiment: ExperimentDefinition,
+    participant_id: str,
+) -> tuple[str, str]:
+    """Return a definition-driven local reference useful in the current specimen."""
+    for message in experiment.messages:
+        if not message.baseline or message.sender != participant_id:
+            continue
+        metadata = tuple(
+            (key, value)
+            for key, value in message.metadata
+            if key.casefold() != "flags"
+        )
+        if metadata:
+            key, value = next(
+                (
+                    (candidate_key, candidate_value)
+                    for candidate_key, candidate_value in metadata
+                    if candidate_key.casefold() == "sequence"
+                ),
+                metadata[0],
+            )
+            return _humanize(key), value
+    return "Local reference", "Not declared"
+
+
+def _message_copy(experiment: ExperimentDefinition, message_id: str) -> str:
+    return " ".join(
+        line.split(": ", 1)[-1]
+        for line in experiment.message(message_id).expanded
+    )
+
+
+def _metadata_label(key: str) -> str:
+    normalized = key.casefold()
+    if normalized == "sequence":
+        return "seq"
+    if normalized == "acknowledgement":
+        return "ack"
+    return _humanize(key)
+
+
+def _trajectory_markup(
+    experiment: ExperimentDefinition,
+    session: Replay,
+) -> str:
+    state = session.final_state
+    pending_ids = {message.message_id for message in state.pending_messages}
+    delivered_ids = {
+        event.message_id
+        for event in state.events
+        if event.event_type == "message_delivered"
+    }
+    steps: list[str] = []
+    for message in (item for item in experiment.messages if item.baseline):
+        status = (
+            "current"
+            if message.id in pending_ids
+            else "complete"
+            if message.id in delivered_ids
+            else "future"
+        )
+        if steps:
+            steps.append('<span class="lab-trajectory-arrow">→</span>')
+        step_label = (
+            f"{message.human_label} · {message.label}"
+            if message.human_label
+            else message.label
+        )
+        steps.append(
+            f'<span class="lab-trajectory-step {status}">{html.escape(step_label)}</span>'
+        )
+    return f'<div class="lab-trajectory">{"".join(steps)}</div>'
 
 
 def _render_packet_details(
@@ -864,41 +1025,75 @@ def _render_exchange(
 
     pending = state.pending_messages[0]
     definition = experiment.message(pending.message_id)
-    copy = " ".join(definition.expanded)
+    copy = _message_copy(experiment, pending.message_id)
     first_participant = experiment.participants[0].id
+    second_participant = experiment.participants[1].id
     sender_is_you = definition.sender == first_participant
     you_copy = copy if sender_is_you else "Waiting for the message."
     other_copy = copy if not sender_is_you else str(
         st.session_state.get(_state_key(experiment, "counterpart_reaction"))
-        or "Waiting."
+        or "Waiting for your opening message."
     )
+    you_reference = _participant_reference(experiment, first_participant)
+    other_reference = _participant_reference(experiment, second_participant)
+    baseline = tuple(message for message in experiment.messages if message.baseline)
+    baseline_ids = tuple(message.id for message in baseline)
+    step_index = (
+        baseline_ids.index(definition.id) + 1
+        if definition.id in baseline_ids
+        else min(len(baseline), 1)
+    )
+    technical_metadata = tuple(
+        (key, value)
+        for key, value in definition.metadata
+        if key.casefold() != "flags"
+    ) or definition.metadata
+    metadata_copy = " · ".join(
+        f"{_metadata_label(key)}={value}" for key, value in technical_metadata
+    )
+    direction = "right" if sender_is_you else "left"
+    human_step = definition.human_label or "Message"
     st.markdown(
         '<section class="lab-exchange">'
-        '<div class="lab-label">The active message</div>'
+        f'<div class="lab-exchange-meta"><div class="lab-label">{html.escape(human_step)}</div>'
+        f'<div class="lab-step-count">Step {step_index} of {len(baseline)}</div></div>'
         '<div class="lab-exchange-parties">'
-        f'<article class="lab-party{(" active" if sender_is_you else "")}"><span>You</span><p>{html.escape(you_copy)}</p></article>'
-        f'<article class="lab-party{("" if sender_is_you else " active")}"><span>Other side</span><p>{html.escape(other_copy)}</p></article>'
+        f'<article class="lab-party{(" active" if sender_is_you else "")}"><span>You / {html.escape(experiment.participant(first_participant).label)}</span>'
+        f'<p>{html.escape(you_copy)}</p><div class="lab-party-facts">'
+        f'<div class="lab-party-fact"><span>Local protocol state</span><b>{html.escape(state.participant_state(first_participant))}</b></div>'
+        f'<div class="lab-party-fact"><span>{html.escape(you_reference[0])}</span><b>{html.escape(you_reference[1])}</b></div></div></article>'
+        f'<div class="lab-message-flight {direction}"><div class="lab-message-object"><b>{html.escape(definition.label)}</b><small>{html.escape(metadata_copy)}</small></div></div>'
+        f'<article class="lab-party{("" if sender_is_you else " active")}"><span>Other side / {html.escape(experiment.participant(second_participant).label)}</span>'
+        f'<p>{html.escape(other_copy)}</p><div class="lab-party-facts">'
+        f'<div class="lab-party-fact"><span>Local protocol state</span><b>{html.escape(state.participant_state(second_participant))}</b></div>'
+        f'<div class="lab-party-fact"><span>{html.escape(other_reference[0])}</span><b>{html.escape(other_reference[1])}</b></div></div></article>'
         '</div>'
-        f'<div class="lab-message-flight">{("YOU → OTHER SIDE" if sender_is_you else "OTHER SIDE → YOU")}</div>'
+        f'{_trajectory_markup(experiment, session)}'
         '</section>',
         unsafe_allow_html=True,
     )
-    _render_packet_details(experiment, session, pending.message_id)
     action_label = _guided_action_label(experiment, session, pending.message_id)
     delayed = pending.deliver_at > state.tick
-    if st.button(
-        action_label,
-        key=f"lab_guided_deliver_{pending.instance_id}",
-        type="primary",
-        disabled=delayed,
-        width="stretch",
-    ):
-        _deliver_player_message(experiment, session, pending.instance_id)
-    st.caption(
-        f"{definition.label} → {_humanize(definition.receiver)}"
-        if not delayed
-        else f"Available at logical time {pending.deliver_at}"
-    )
+    if sender_is_you:
+        if st.button(
+            action_label,
+            key=f"lab_guided_deliver_{pending.instance_id}",
+            type="primary",
+            disabled=delayed,
+            width="stretch",
+        ):
+            _deliver_player_message(experiment, session, pending.instance_id)
+        st.caption(
+            f"{definition.label} → {_humanize(definition.receiver)}"
+            if not delayed
+            else f"Available at logical time {pending.deliver_at}"
+        )
+    else:
+        st.caption("The other side is responding automatically.")
+        if not delayed:
+            time.sleep(0.65)
+            _deliver_counterpart_message(experiment, session, pending.instance_id)
+    _render_packet_details(experiment, session, pending.message_id)
 
 
 def _render_milestone(
@@ -913,10 +1108,22 @@ def _render_milestone(
         )
     else:
         items = "<li>A message changed what one participant could know and do.</li>"
+    reveal = (
+        f'<p class="lab-reveal">{html.escape(experiment.reveal)}</p>'
+        if experiment.reveal
+        else ""
+    )
+    shared_capability = (
+        '<div class="lab-shared-capability"><b>Shared capability</b>'
+        f'<p>{html.escape(experiment.shared_capability)}</p></div>'
+        if experiment.shared_capability
+        else ""
+    )
     st.markdown(
         '<section class="lab-reflection">'
         '<div class="lab-label">Milestone reached</div>'
         '<h2>What actually happened?</h2>'
+        f'{reveal}{shared_capability}'
         f'<ul>{items}</ul>'
         '<p class="lab-protocol-footnote">These are interpretations linked to the exchange, not objective measurements.</p>'
         '</section>',
@@ -938,7 +1145,7 @@ def _render_compression_reveal(
 ) -> None:
     baseline = tuple(message for message in experiment.messages if message.baseline)
     human_steps = "".join(
-        f"<p>{index}. {html.escape(' '.join(message.expanded))}</p>"
+        f"<p><b>{index}. {html.escape(message.human_label or message.label)}</b><br>{html.escape(_message_copy(experiment, message.id))}</p>"
         for index, message in enumerate(baseline, start=1)
     )
     compressed = "".join(
@@ -1017,6 +1224,13 @@ def _render_inspection(
         f'<b>{html.escape(result.status.upper())}</b></div>'
         for result in state.invariant_results
     )
+    transition_rows = "".join(
+        '<div class="lab-inspect-row">'
+        f'<span>{html.escape(event.label)}</span>'
+        f'<b>{html.escape(event.event_id)}</b></div>'
+        for event in state.events
+        if event.event_type == "transition"
+    ) or '<p class="lab-protocol-footnote">No transition executed yet.</p>'
     event_rows = "".join(
         '<div class="lab-event">'
         f'<code>{html.escape(event.event_id)}</code>'
@@ -1041,6 +1255,8 @@ def _render_inspection(
         f'{message_markup}'
         '<h3>Timers</h3>'
         f'{timer_markup}'
+        '<h3>State transitions</h3>'
+        f'{transition_rows}'
         '<h3>Invariants</h3>'
         f'{invariant_rows}'
         '<h3>Recent event record</h3>'
@@ -1391,8 +1607,8 @@ def render_laboratory(
         st.session_state[stage_key] = current_stage
     st.markdown(
         '<div class="lab-topbar">'
-        f'<b>Protocol Laboratory &nbsp; / &nbsp; Experiment {experiment.experiment_number:02d} &nbsp; / &nbsp; {html.escape(experiment.atlas_functions[0])}</b>'
-        f'<span>{html.escape(current_stage.upper())}</span>'
+        f'<b>Experiment {experiment.experiment_number:02d} &nbsp; / &nbsp; {html.escape(experiment.atlas_functions[0])} &nbsp; / &nbsp; {html.escape(experiment.experience_title)}</b>'
+        '<span>Mode · Interactive</span>'
         "</div>",
         unsafe_allow_html=True,
     )
@@ -1405,7 +1621,7 @@ def render_laboratory(
             _render_lab_rail(experiment, current_stage)
     with workspace_column:
         with st.container(key="lab_workspace"):
-            heading_column, inspect_column = st.columns((4.5, 1))
+            heading_column, mode_column, inspect_column = st.columns((4.4, 1.1, 1))
             with heading_column:
                 st.markdown(
                     '<section class="lab-experience-heading">'
@@ -1415,6 +1631,8 @@ def render_laboratory(
                     '</section>',
                     unsafe_allow_html=True,
                 )
+            with mode_column:
+                st.markdown('<div class="lab-mode">Interactive</div>', unsafe_allow_html=True)
             inspect_key = _state_key(experiment, "inspect_open")
             with inspect_column:
                 if st.button(
@@ -1430,10 +1648,7 @@ def render_laboratory(
                 _render_inspection(experiment, session)
 
             _render_stage_progress(current_stage)
-            st.markdown(
-                f'<div class="lab-guided-question">{html.escape(experiment.human_question)}</div>',
-                unsafe_allow_html=True,
-            )
+            _render_guiding_questions(experiment)
 
             if current_stage == "connect":
                 _render_connect(experiment, session)
@@ -1449,8 +1664,6 @@ def render_laboratory(
                     participant_id=participant_id,
                 )
 
-            with st.expander("Advanced · Protocol archaeology and evolution"):
-                _render_archaeology(experiment)
             if current_stage != "respond":
                 with st.expander("Library · Field notes"):
                     _render_field_notes(

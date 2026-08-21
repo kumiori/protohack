@@ -1,4 +1,18 @@
-"""Public interfaces for the Protocol Laboratory."""
+"""Protocol Hack adapter for the independently packaged Protocol Laboratory."""
+
+from pathlib import Path
+
+# Keep application-only atlas, reflection and UI modules local while resolving
+# the engine from the independently installable package source tree.
+_PACKAGE_SOURCE = (
+    Path(__file__).resolve().parent.parent
+    / "packages"
+    / "protocol-lab"
+    / "src"
+    / "protocol_lab"
+)
+if _PACKAGE_SOURCE.is_dir():
+    __path__.append(str(_PACKAGE_SOURCE))
 
 from .atlas import AtlasEntry, ProtocolAtlas, load_atlas
 from .loader import ExperimentValidationError, load_experiment
@@ -17,6 +31,9 @@ from .engine import (
     initial_state,
     replay,
 )
+from .models import ExperimentDefinition as ProtocolDefinition
+from .observation import Observation
+from .runtime import ProtocolEngine
 from .models import (
     Claim,
     EvolutionEntry,
@@ -56,10 +73,13 @@ __all__ = [
     "MessageDefinition",
     "ParticipantDefinition",
     "ProtocolIdentity",
+    "ProtocolDefinition",
+    "ProtocolEngine",
     "ProtocolAtlas",
     "ProtocolCommandError",
     "ProtocolEvent",
     "ReflectionPrompt",
+    "Observation",
     "ReflectionCue",
     "Replay",
     "SequenceRow",

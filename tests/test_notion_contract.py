@@ -4,10 +4,27 @@ from pathlib import Path
 
 import storage.notion as notion_module
 from scripts.bootstrap_protohack_notion import DATABASES, RELATIONS, SCHEMA_VERSION
+from protocol.shared_goals import build_goal_trajectory
+from protocol.timeline_plan import build_plan_payload
+from protocol.trajectory_schema import build_trajectory_document
 from storage.notion import NotionRepository
 
 
 PARTICIPANT = "00000000-0000-4000-8000-000000000001"
+
+
+def _trajectory_document() -> dict[str, object]:
+    plan = build_plan_payload(
+        title="X path",
+        description="",
+        initial_condition="We have an idea.",
+        goal_statement="The panel has taken place.",
+        goal_conditions="",
+        landing_mode="Open",
+        temporal_mode="Qualitative",
+        created_at="2026-08-10T12:00:00+03:00",
+    )
+    return build_trajectory_document(plan=plan, primitives=[], uncertainty=[])
 
 
 class FakeDataSources:
@@ -16,6 +33,10 @@ class FakeDataSources:
 
     def query(self, **arguments):
         source_id = arguments["data_source_id"]
+        if source_id.endswith("goal-trajectories"):
+            return {"results": deepcopy(self.owner.goal_trajectories), "has_more": False}
+        if source_id.endswith("goals"):
+            return {"results": deepcopy(self.owner.goals), "has_more": False}
         if source_id.endswith("responses"):
             return {"results": deepcopy(self.owner.responses), "has_more": False}
         if source_id.endswith("events"):
@@ -45,6 +66,8 @@ class FakeClient:
         self.responses: list[dict] = []
         self.players: list[dict] = []
         self.events: list[dict] = []
+        self.goals: list[dict] = []
+        self.goal_trajectories: list[dict] = []
         self.created: list[dict] = []
         self.updated: list[dict] = []
         self.data_sources = FakeDataSources(self)
@@ -60,6 +83,8 @@ def _manifest(tmp_path: Path) -> Path:
             "responses": {"data_source_id": "source-responses"},
             "players": {"data_source_id": "source-players"},
             "events": {"data_source_id": "source-events"}
+            ,"goals": {"data_source_id": "source-goals"}
+            ,"goal_trajectories": {"data_source_id": "source-goal-trajectories"}
           }
         }""",
         encoding="utf-8",
@@ -68,12 +93,57 @@ def _manifest(tmp_path: Path) -> Path:
 
 
 def test_bootstrap_v2_has_no_strategy_to_contact_relation() -> None:
-    assert SCHEMA_VERSION == "protohack-notion-v2-mapping-coordination"
+    assert SCHEMA_VERSION == "protohack-notion-v3-shared-trajectories"
     assert "player" not in RELATIONS["responses"]
     assert "participant_uuid" in DATABASES["responses"]["properties"]
     assert "rationale" in DATABASES["responses"]["properties"]
     assert "participant_uuid" in DATABASES["players"]["properties"]
     assert "coordination_status" in DATABASES["players"]["properties"]
+    assert "goals" in DATABASES
+    assert "goal_trajectories" in DATABASES
+    assert RELATIONS["goal_trajectories"]["goal"] == ("goals", "contributions")
+    assert "trajectory_payload" in DATABASES["goal_trajectories"]["properties"]
+
+
+def test_shared_trajectory_write_keeps_canonical_payload_in_one_field(
+    monkeypatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(notion_module, "Client", FakeClient)
+    repository = NotionRepository(token="test", manifest_path=_manifest(tmp_path))
+    client = FakeClient.instance
+    assert client is not None
+    client.goals = [{
+        "id": "goal-page",
+        "properties": {
+            "Name": {"title": [{"plain_text": "AI Summit 2027"}]},
+            "goal_id": {"rich_text": [{"plain_text": "summit-2027"}]},
+            "objective": {"rich_text": [{"plain_text": "Organise the panel."}]},
+            "created_by_agent_id": {"rich_text": [{"plain_text": "andres"}]},
+            "created_at": {"date": {"start": "2026-08-10T12:00:00+03:00"}},
+            "status": {"select": {"name": "open"}},
+            "visibility": {"select": {"name": "public"}},
+        },
+    }]
+    shared = build_goal_trajectory(
+        _trajectory_document(),
+        goal_id="summit-2027",
+        agent_id="x",
+        agent_display_name="X",
+        created_at="2026-08-10T13:00:00+03:00",
+    )
+
+    repository.record_goal_trajectory(shared)
+
+    created = client.created[-1]["properties"]
+    serialized = "".join(
+        item["text"]["content"]
+        for item in created["trajectory_payload"]["rich_text"]
+    )
+    payload = json.loads(serialized)
+    assert payload["schema_version"] == "trajectory-plan/v2"
+    assert "goal_id" not in payload["plan"]
+    assert created["goal"] == {"relation": [{"id": "goal-page"}]}
+    assert created["revision"] == {"number": 1}
 
 
 def test_strategy_write_never_contains_player_relation(monkeypatch, tmp_path: Path) -> None:
