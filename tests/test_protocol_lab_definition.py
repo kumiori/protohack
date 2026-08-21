@@ -13,6 +13,7 @@ def test_tcp_experiment_satisfies_the_fixed_laboratory_contract() -> None:
     experiment = load_experiment(SPEC_DIRECTORY / "tcp_handshake_v1.yaml")
 
     assert experiment.id == "experiment_01_tcp_handshake"
+    assert experiment.version == "1.1.0-pilot"
     assert experiment.experiment_number == 1
     assert experiment.experience_title == "The Handshake"
     assert experiment.situation == (
@@ -26,6 +27,16 @@ def test_tcp_experiment_satisfies_the_fixed_laboratory_contract() -> None:
     )
     assert experiment.human_question == (
         "How do two parties establish enough shared state to begin communicating?"
+    )
+    assert experiment.rationale_question == (
+        "How little must two strangers share before they can begin communicating?"
+    )
+    assert experiment.rationale == (
+        "We can establish a shared coordinate system for what we send and what we have received.",
+        "TCP does this with two independent sequence spaces and acknowledgements of what comes next.",
+    )
+    assert experiment.shared_capability == (
+        "We can both count, independently, and acknowledge where the other is in their count."
     )
     assert experiment.need.startswith("Synchronize a shared connection")
     assert experiment.protocol.name == "TCP three-way handshake"
@@ -59,11 +70,24 @@ def test_tcp_experiment_satisfies_the_fixed_laboratory_contract() -> None:
 def test_tcp_baseline_excludes_scenario_only_messages() -> None:
     experiment = load_experiment(SPEC_DIRECTORY / "tcp_handshake_v1.yaml")
 
-    assert [message.id for message in experiment.messages if message.baseline] == [
+    baseline = [message for message in experiment.messages if message.baseline]
+    assert [message.id for message in baseline] == [
         "syn",
         "syn_ack",
         "ack",
     ]
+    assert [message.human_label for message in baseline] == [
+        "Knock",
+        "Answer the knock",
+        "Confirm",
+    ]
+    assert dict(experiment.message("syn").metadata)["sequence"] == "100"
+    assert dict(experiment.message("syn_ack").metadata) == {
+        "acknowledgement": "101",
+        "flags": "SYN,ACK",
+        "sequence": "500",
+    }
+    assert dict(experiment.message("ack").metadata)["acknowledgement"] == "501"
 
 
 @pytest.mark.parametrize(

@@ -16,7 +16,9 @@ from protocol_lab.laboratory_ui import _list_saved_field_notes
 ROOT = Path(__file__).parent.parent
 SPEC_DIRECTORY = ROOT / "protocol_lab" / "specs"
 APP_ENTRY = ROOT / "app.py"
-VIEW = ROOT / "views" / "protocol_lab.py"
+ATLAS_VIEW = ROOT / "views" / "protocol_lab.py"
+CONNECTION_VIEW = ROOT / "views" / "protocol_lab_connection.py"
+FEATURE_REGISTRY = ROOT / "FEATURE_REGISTRY.md"
 
 
 def button_by_key(app: AppTest, key: str):
@@ -75,12 +77,19 @@ def test_protocol_laboratory_is_an_additive_registered_route() -> None:
 
     assert '"views/protocol_lab.py"' in source
     assert 'url_path="protocol-lab"' in source
+    assert '"views/protocol_lab_connection.py"' in source
+    assert 'url_path="protocol-lab-connection"' in source
+    assert "._url_path" not in source
     assert '"views/protocol_lab_host.py"' in source
     assert 'url_path="protocol-lab-host"' in source
+    registry = FEATURE_REGISTRY.read_text(encoding="utf-8")
+    assert "Protocol Atlas organised by human function" in registry
+    assert "Human rationale and independent sequence-space narration" in registry
+    assert "`/protocol-lab-connection?run=<id>`" in registry
 
 
-def test_participant_can_enter_experiment_and_execute_first_message() -> None:
-    app = AppTest.from_file(str(VIEW), default_timeout=10).run()
+def test_atlas_is_a_stable_entrance_not_a_session_selected_experiment() -> None:
+    app = AppTest.from_file(str(ATLAS_VIEW), default_timeout=10).run()
 
     assert not app.exception
     text = rendered_text(app)
@@ -88,19 +97,38 @@ def test_participant_can_enter_experiment_and_execute_first_message() -> None:
     assert "Experiment 01" in text
     assert "Connection" in text
     assert "Identity" in text
+    assert "How little must two strangers share before they can begin communicating?" in text
+    assert not any(button.key == "lab_begin_negotiation" for button in app.button)
+    experiment_link = app.get("link_button")[0].proto
+    assert experiment_link.label == "Enter Experiment 01 →"
+    assert experiment_link.url == "/protocol-lab-connection"
 
-    button_by_key(app, "lab_begin_experiment_01_tcp_handshake").click().run()
+
+def test_participant_can_execute_the_spatial_handshake() -> None:
+    app = AppTest.from_file(str(CONNECTION_VIEW), default_timeout=10).run()
 
     assert not app.exception
     text = rendered_text(app)
     assert "The Handshake" in text
     assert "Think about beginning communication." in text
+    assert "How little must two strangers share before they can begin communicating?" in text
     assert "How do two parties establish enough shared state" in text
+    assert "We can establish a shared coordinate system" in text
+    assert "two independent sequence spaces" in text
     assert "Two parties want to communicate" in text
     assert "Neither knows whether the other is ready" in text
     assert button_by_key(app, "lab_begin_negotiation")
     assert "Experiment 01 uses the TCP three-way handshake" in text
     assert "Interpretive traces" in text
+    assert "Mode · Interactive" in text
+    assert button_by_key(app, "lab_multiplayer_future").disabled
+    assert button_by_key(app, "lab_open_archaeology")
+    assert app.query_params["run"]
+
+    button_by_key(app, "lab_open_archaeology").click().run()
+    archaeology = rendered_text(app)
+    assert "Protocol archaeology" in archaeology
+    assert "Why was this invented?" in archaeology
 
     button_by_key(app, "lab_begin_negotiation").click().run()
 
@@ -109,7 +137,14 @@ def test_participant_can_enter_experiment_and_execute_first_message() -> None:
         Command.transition("client_active_open")
     ]
     text = rendered_text(app)
-    assert "I want to begin. Here is where my sequence starts." in text
+    assert "You / Client" in text
+    assert "Other side / Server" in text
+    assert "Local protocol state" in text
+    assert "Sequence" in text
+    assert "Step 1 of 3" in text
+    assert "Knock" in text
+    assert "I want to open a connection." in text
+    assert "I will begin counting my stream from 100." in text
     assert any("Commitment" in toast.value for toast in app.toast)
     assert button_by_key(app, "lab_guided_deliver_m0001").label == (
         "Send your opening message"
@@ -126,13 +161,21 @@ def test_participant_can_enter_experiment_and_execute_first_message() -> None:
     ]
     assert "What changed?" not in rendered_text(app)
     assert app.toast
-    assert "Other side: I heard your beginning. Here is mine." in rendered_text(app)
+    assert "I heard you starting at 100, so I expect 101 from you." in rendered_text(app)
+    assert "I will begin my own count from 500." in rendered_text(app)
+    assert "Confirm" in rendered_text(app)
+    assert "I heard that you start at 500, so I expect 501 from you." in rendered_text(app)
+    assert "Step 3 of 3" in rendered_text(app)
     assert button_by_key(app, "lab_guided_deliver_m0003").label == (
         "Send your confirmation"
     )
 
     button_by_key(app, "lab_guided_deliver_m0003").click().run()
-    assert "What actually happened?" in rendered_text(app)
+    text = rendered_text(app)
+    assert "What actually happened?" in text
+    assert "Surprisingly little." in text
+    assert "They do not need the same starting point" in text
+    assert "We can both count, independently" in text
     assert button_by_key(app, "lab_reveal_compression")
 
     button_by_key(app, "lab_reveal_compression").click().run()
@@ -149,8 +192,7 @@ def test_participant_can_enter_experiment_and_execute_first_message() -> None:
 
 
 def test_technical_layer_is_disclosed_only_when_inspect_is_opened() -> None:
-    app = AppTest.from_file(str(VIEW), default_timeout=10).run()
-    button_by_key(app, "lab_begin_experiment_01_tcp_handshake").click().run()
+    app = AppTest.from_file(str(CONNECTION_VIEW), default_timeout=10).run()
 
     assert "How do two endpoints establish compatible connection state" not in rendered_text(app)
 
@@ -161,3 +203,4 @@ def test_technical_layer_is_disclosed_only_when_inspect_is_opened() -> None:
     assert "synchronised technical layer" in text
     assert "How do two endpoints establish compatible connection state" in text
     assert "Invariants" in text
+    assert "State transitions" in text

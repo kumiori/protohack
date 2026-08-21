@@ -12,8 +12,10 @@ Created databases:
 - `protohack_ModerationVotes`
 - `protohack_Decisions`
 - `protohack_Events`
+- `protohack_Goals`
+- `protohack_GoalTrajectories`
 
-The non-secret database and data-source IDs are recorded in `config/protohack_notion.json`. The Notion token is never written by the bootstrap. The current schema is `protohack-notion-v2-mapping-coordination`.
+The non-secret database and data-source IDs are recorded in `config/protohack_notion.json`. The Notion token is never written by the bootstrap. The current schema is `protohack-notion-v3-shared-trajectories`.
 
 The first database family was accidentally created through a connector bound to the `Science` workspace. Its IDs are retained only for provenance in `config/protohack_notion.science-orphaned.json`; the application never reads that archive.
 
@@ -64,3 +66,16 @@ The initial session is `commons_pilot_2026`. The smoke protocol remains visibly 
 `protohack_Responses` is the anonymous strategic store. It contains `participant_uuid`, scenario/decision/action IDs, rationale, authored tags, the serialized strategic profile, version metadata, and integration timestamps. It deliberately has no relation to `protohack_Players`.
 
 `protohack_Players` is retained in its current location for the pilot. It contains `participant_uuid`, opt-in, consent version/time, coordination status, and optional email. `anonymous_interest` means `Yes` without email; `reachable_interest` means `Yes` with email.
+
+## Shared trajectory coordination
+
+`protohack_Goals` stores public objective identity, creator attribution and
+open/closed state. It contains no owner, common time language, common landing
+mode, dates, geometry or primitives.
+
+`protohack_GoalTrajectories` stores one contribution per goal and agent. Its
+`trajectory_payload` field is the canonical serialized `trajectory-plan/v2`
+document. The relation to `protohack_Goals` is the synchronization boundary;
+the trajectory schema remains authoritative. Duplicate active contributions
+are rejected unless an explicit revision update preserves trajectory, goal,
+agent and creation identities.

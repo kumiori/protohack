@@ -1,0 +1,1183 @@
+registry:
+  id: mosaic_agentic_protocol_certification_registry
+  title: Agentic protocol certification and temporal multiplex registry
+  version: 0.2.0
+  status: research_seed
+  created_at: 2026-08-07
+  updated_at: 2026-08-09
+  observed_at: 2026-08-07
+  timezone: Europe/Paris
+  owner: Mosaic relational observatory
+  language: en
+  public_only: true
+  purpose: >-
+    Evidence-backed input for generating a dated protocol genealogy and a
+    multiplex actor-protocol network. The registry separates technical origin,
+    stewardship, governance, maintenance, implementation, deployment,
+    endorsement, and announced support.
+  scope_rule: >-
+    Admit a protocol to the certified core only when public evidence establishes
+    a specification, a version history, a governance surface, and at least one
+    working implementation. Retain superseded protocols when they passed all
+    four gates during their active life and affect the genealogy.
+  derived_from:
+    - agentic_public_source_registry@0.2.0
+  institutional_state_contract:
+    source_collection: protocol_regimes
+    current_steward_ids: compiler_derived
+    steward_graph_edges: compiler_derived
+    governor_graph_edges: compiler_derived
+
+certification_policy:
+  rule: all_gates_required
+  gates:
+    public_specification:
+      pass_when:
+        - A normative or explicitly official specification is publicly readable.
+        - The protocol boundary and conformance language can be identified.
+      fail_when:
+        - Only a launch post, white paper, product page, or SDK README exists.
+    version_history:
+      pass_when:
+        - At least two identifiable protocol or specification versions exist.
+        - Releases, tags, dated revisions, or a maintained changelog distinguish them.
+      fail_when:
+        - Repository commits exist but no protocol-level versions can be resolved.
+    governance_surface:
+      pass_when:
+        - A public charter, governance file, maintainer structure, standards-body
+          process, or named decision body defines change authority.
+      fail_when:
+        - An originating company alone controls changes without a published process.
+    implementation:
+      pass_when:
+        - A runnable SDK, reference implementation, conformance suite, independent
+          implementation, or verified production deployment exists.
+      fail_when:
+        - Only diagrams, examples without runnable code, or announced intent exists.
+  verdicts:
+    certified_current: All four gates pass and the protocol remains active.
+    certified_superseded: All four gates passed, but the protocol was merged, archived, or replaced.
+    held_frontier: One or more gates remain unproved or the candidate needs decomposition.
+    rejected_out_of_scope: The object is a framework, product, convention, or institution rather than a protocol.
+  evidence_states:
+    independently_verified: Two compatible sources, including at least one primary source.
+    primary_verified: Directly established by one authoritative primary source.
+    announced: Claimed in an originator, steward, or partner announcement.
+    inferred: Derived from repository or release evidence; never sufficient alone for governance or deployment.
+  confidence_scale:
+    high: Direct primary evidence with unambiguous actor, relation, and date.
+    medium: Primary evidence exists but scope, date, or actor semantics require qualification.
+    low: Discovery evidence or inference awaiting primary confirmation.
+
+date_semantics:
+  event_date: Date on which the event occurred or became effective.
+  published_at: Date on which the cited source was published.
+  observed_at: Date on which Mosaic checked the source.
+  date_precision_values: [day, month, year, unknown]
+  date_basis_values:
+    - announcement_publication
+    - release_timestamp
+    - specification_revision
+    - governance_effective_date
+    - repository_archival_date
+    - first_verified_deployment
+
+controlled_vocabularies:
+  protocol_layers:
+    tool_context: Agent-to-tool and agent-to-data interaction.
+    agent_communication: Agent discovery, messaging, task exchange, and collaboration.
+    delegated_authority: User intent, mandates, credentials, and agent authorization.
+    commerce: Product discovery, checkout, orders, and post-purchase operations.
+    machine_payment: Price negotiation, authorization, payment proof, and settlement over machine interfaces.
+  actor_types:
+    - company
+    - foundation
+    - standards_body
+    - open_source_project
+    - university
+    - public_institution
+  relation_types:
+    ORIGINATED: Actor first designed and publicly introduced the protocol.
+    CO_DEVELOPED: Actor is explicitly named as a co-developer.
+    DONATED_TO: Originator transferred protocol assets or stewardship to another actor.
+    STEWARDED_BY: Actor holds institutional stewardship.
+    GOVERNED_BY: Decision body governs the protocol.
+    HOLDS_VOTING_SEAT: Organisation holds a formal vote in the governing body.
+    CHAIRS: Person or organisation chairs a governing or standards group.
+    MAINTAINS: Actor or person has documented maintenance authority.
+    CONTRIBUTES_CODE: Repository evidence shows material code or specification contributions.
+    PUBLISHES_SDK: Actor publishes a protocol SDK.
+    REFERENCE_IMPLEMENTS: Actor publishes an official reference implementation.
+    INDEPENDENTLY_IMPLEMENTS: Actor implements without being the originator or official reference publisher.
+    INTEGRATES: Actor exposes protocol support inside a product or service.
+    DEPLOYS_IN_PRODUCTION: Primary evidence states live production use.
+    ENDORSES: Actor explicitly endorses the protocol.
+    ANNOUNCES_SUPPORT_FOR: Actor is named as supporting the protocol at a dated event.
+    MEMBER_OF_STEWARD: Actor belongs to the protocol's steward foundation; this does not imply a vote or implementation.
+    FUNDS: Actor provides direct project funding; foundation membership alone is insufficient.
+    EXTENDS: Protocol or actor publishes a compatible extension.
+    INTEROPERATES_WITH: Specifications define a binding or compatibility path.
+    SUPERSEDES: Protocol replaces another protocol.
+    MERGED_INTO: Protocol development is absorbed into another project.
+  event_types:
+    - repository_created
+    - public_launch
+    - specification_release
+    - governance_adoption
+    - stewardship_transfer
+    - foundation_launch
+    - implementation_release
+    - production_deployment
+    - extension_release
+    - merger
+    - archival
+  regime_types:
+    - stewardship
+    - governance
+    - repository_control
+    - technical_maintenance
+  participant_roles:
+    - institutional_home
+    - governing_project
+    - governing_body
+    - repository_controller
+    - technical_maintainer
+    - originator_custodian
+    - project_custodian
+    - unknown
+  regime_statuses:
+    - verified
+    - announced
+    - unknown
+    - disputed
+  transition_kinds:
+    - stewardship_transfer
+    - governance_adoption
+    - protocol_merger
+    - regime_termination
+  transition_mechanisms:
+    - donation
+    - contribution
+    - charter_adoption
+    - committee_formation
+    - merger
+    - archival
+    - other_declared
+  asset_effects:
+    - transferred
+    - retained_by_originator
+    - unchanged
+    - unresolved
+
+actors:
+  - {id: org_anthropic, name: Anthropic, type: company}
+  - {id: org_google, name: Google, type: company}
+  - {id: org_linux_foundation, name: Linux Foundation, type: foundation}
+  - {id: org_aaif, name: Agentic AI Foundation, type: foundation, parent_id: org_linux_foundation}
+  - {id: org_a2a_project, name: Agent2Agent Project, type: open_source_project, parent_id: org_linux_foundation}
+  - {id: org_ibm, name: IBM, type: company}
+  - {id: org_beeai, name: BeeAI, type: open_source_project, parent_id: org_linux_foundation}
+  - {id: org_fido, name: FIDO Alliance, type: standards_body}
+  - {id: body_fido_aatwg, name: FIDO Agentic Authentication Technical Working Group, type: standards_body, parent_id: org_fido}
+  - {id: body_fido_ptwg, name: FIDO Payments Technical Working Group, type: standards_body, parent_id: org_fido}
+  - {id: org_ucp, name: Universal Commerce Protocol project, type: open_source_project}
+  - {id: org_x402_foundation, name: x402 Foundation, type: foundation, parent_id: org_linux_foundation}
+  - {id: org_coinbase, name: Coinbase, type: company}
+  - {id: org_cloudflare, name: Cloudflare, type: company}
+  - {id: org_stripe, name: Stripe, type: company}
+  - {id: org_shopify, name: Shopify, type: company}
+  - {id: org_etsy, name: Etsy, type: company}
+  - {id: org_wayfair, name: Wayfair, type: company}
+  - {id: org_target, name: Target, type: company}
+  - {id: org_walmart, name: Walmart, type: company}
+  - {id: org_aws, name: Amazon Web Services, type: company}
+  - {id: org_cisco, name: Cisco, type: company}
+  - {id: org_microsoft, name: Microsoft, type: company}
+  - {id: org_salesforce, name: Salesforce, type: company}
+  - {id: org_sap, name: SAP, type: company}
+  - {id: org_servicenow, name: ServiceNow, type: company}
+  - {id: org_openai, name: OpenAI, type: company}
+  - {id: org_block, name: Block, type: company}
+  - {id: org_apollo, name: Apollo, type: company}
+  - {id: org_github, name: GitHub, type: company, parent_id: org_microsoft}
+  - {id: org_mastercard, name: Mastercard, type: company}
+  - {id: org_visa, name: Visa, type: company}
+  - {id: org_paypal, name: PayPal, type: company}
+  - {id: org_adyen, name: Adyen, type: company}
+  - {id: org_american_express, name: American Express, type: company}
+  - {id: org_circle, name: Circle, type: company}
+  - {id: org_ethereum_foundation, name: Ethereum Foundation, type: foundation}
+  - {id: org_metamask, name: MetaMask, type: company}
+  - {id: org_solana_foundation, name: Solana Foundation, type: foundation}
+  - {id: org_browserbase, name: Browserbase, type: company}
+  - {id: body_mcp_maintainers, name: MCP maintainer body, type: open_source_project}
+
+protocols:
+  - id: protocol_mcp
+    name: Model Context Protocol
+    acronym: MCP
+    object_type: protocol
+    layer: tool_context
+    status: active
+    certification_verdict: certified_current
+    first_public_date: 2024-11-25
+    originator_ids: [org_anthropic]
+    canonical_specification: https://modelcontextprotocol.io/specification/2026-07-28
+    canonical_repository: https://github.com/modelcontextprotocol/modelcontextprotocol
+    license: Apache-2.0
+    certification:
+      public_specification:
+        result: pass
+        evidence_ids: [src_mcp_spec_current]
+      version_history:
+        result: pass
+        evidence_ids: [src_mcp_changelog_2025_11, src_mcp_changelog_2026_07]
+      governance_surface:
+        result: pass
+        evidence_ids: [src_mcp_governance, src_mcp_governance_launch]
+      implementation:
+        result: pass
+        evidence_ids: [src_mcp_ts_sdk, src_openai_mcp, src_microsoft_mcp_ga]
+    version_ids: [mcp_2024_11_05, mcp_2025_03_26, mcp_2025_06_18, mcp_2025_11_25, mcp_2026_07_28]
+    event_ids: [evt_mcp_launch, evt_mcp_governance, evt_mcp_aaif_transfer, evt_mcp_2026_release]
+    analytical_note: >-
+      MCP has the broadest implementation surface in the certified set. Technical
+      governance is individual and maintainer-based, while institutional hosting
+      sits in AAIF. Do not infer protocol control from AAIF membership.
+
+  - id: protocol_a2a
+    name: Agent2Agent Protocol
+    acronym: A2A
+    object_type: protocol
+    layer: agent_communication
+    status: active
+    certification_verdict: certified_current
+    first_public_date: 2025-04-09
+    originator_ids: [org_google]
+    canonical_specification: https://a2a-protocol.org/latest/specification/
+    canonical_repository: https://github.com/a2aproject/A2A
+    license: Apache-2.0
+    certification:
+      public_specification: {result: pass, evidence_ids: [src_a2a_spec]}
+      version_history: {result: pass, evidence_ids: [src_a2a_releases]}
+      governance_surface: {result: pass, evidence_ids: [src_a2a_governance]}
+      implementation: {result: pass, evidence_ids: [src_a2a_sdks, src_agentgateway_a2a]}
+    version_ids: [a2a_0_1_0, a2a_0_2_6, a2a_0_3_0, a2a_1_0_0, a2a_1_0_1]
+    event_ids: [evt_a2a_launch, evt_a2a_lf_transfer, evt_a2a_0_3, evt_a2a_acp_merge, evt_a2a_1_0]
+    analytical_note: >-
+      A2A separates launch supporters from formal governors. Eight companies hold
+      startup-phase TSC seats. The launch partner list is a weaker relation and
+      must not be projected as governance.
+
+  - id: protocol_acp
+    name: Agent Communication Protocol
+    acronym: ACP
+    object_type: protocol
+    layer: agent_communication
+    status: superseded
+    certification_verdict: certified_superseded
+    first_public_date: 2025
+    date_precision: year
+    originator_ids: [org_ibm, org_beeai]
+    canonical_specification: https://agentcommunicationprotocol.dev/
+    canonical_repository: https://github.com/i-am-bee/acp
+    license: Apache-2.0
+    superseded_by: protocol_a2a
+    certification:
+      public_specification: {result: pass, evidence_ids: [src_acp_docs]}
+      version_history: {result: pass, evidence_ids: [src_acp_releases]}
+      governance_surface: {result: pass, evidence_ids: [src_acp_repo]}
+      implementation: {result: pass, evidence_ids: [src_acp_repo]}
+    version_ids: [acp_1_0_0, acp_1_0_1, acp_1_0_2, acp_1_0_3]
+    event_ids: [evt_acp_1_0, evt_a2a_acp_merge, evt_acp_archive]
+    analytical_note: >-
+      ACP is retained as a historical node because it reached 1.0, shipped Python
+      and TypeScript implementations, and then merged into A2A. Removing it would
+      erase an observed consolidation event.
+
+  - id: protocol_ap2
+    name: Agent Payments Protocol
+    acronym: AP2
+    object_type: protocol
+    layer: delegated_authority
+    status: active_standardization
+    certification_verdict: certified_current
+    first_public_date: 2025-09-16
+    originator_ids: [org_google]
+    canonical_specification: https://ap2-protocol.org/specification/
+    canonical_repository: https://github.com/google-agentic-commerce/AP2
+    license: Apache-2.0
+    certification:
+      public_specification: {result: pass, evidence_ids: [src_ap2_docs, src_ap2_repo]}
+      version_history: {result: pass, evidence_ids: [src_ap2_repo, src_ap2_fido_transfer]}
+      governance_surface: {result: pass, evidence_ids: [src_fido_agentic_work, src_fido_groups]}
+      implementation: {result: pass, evidence_ids: [src_ap2_repo, src_ap2_launch]}
+    version_ids: [ap2_0_1, ap2_0_2]
+    event_ids: [evt_ap2_launch, evt_ap2_x402_extension, evt_ap2_0_2_fido]
+    analytical_note: >-
+      AP2 specifies mandates and verifiable authority around payment. FIDO now
+      reviews and develops the contribution through member working groups. The
+      Google repository remains the implementation locus, so stewardship and
+      repository control should be monitored separately.
+
+  - id: protocol_ucp
+    name: Universal Commerce Protocol
+    acronym: UCP
+    object_type: protocol
+    layer: commerce
+    status: active
+    certification_verdict: certified_current
+    first_public_date: 2026-01-11
+    originator_ids: [org_google]
+    canonical_specification: https://ucp.dev/latest/specification/overview/
+    canonical_repository: https://github.com/Universal-Commerce-Protocol/ucp
+    license: Apache-2.0
+    certification:
+      public_specification: {result: pass, evidence_ids: [src_ucp_spec]}
+      version_history: {result: pass, evidence_ids: [src_ucp_releases]}
+      governance_surface: {result: pass, evidence_ids: [src_ucp_repo, src_ucp_maintainers]}
+      implementation: {result: pass, evidence_ids: [src_ucp_launch, src_google_ucp_deployment]}
+    version_ids: [ucp_2026_01_11, ucp_2026_01_23, ucp_2026_04_08]
+    event_ids: [evt_ucp_launch, evt_ucp_2026_01_23, evt_ucp_production, evt_ucp_2026_04_08]
+    analytical_note: >-
+      UCP governs the commerce journey rather than payment settlement alone. Its
+      co-development network is documented, and Google provides production
+      deployment evidence. The project's organisational governance remains less
+      institutionally independent than A2A or x402 and should be watched.
+
+  - id: protocol_x402
+    name: x402
+    acronym: x402
+    object_type: protocol
+    layer: machine_payment
+    status: active
+    certification_verdict: certified_current
+    first_public_date: 2025-05
+    date_precision: month
+    originator_ids: [org_coinbase]
+    canonical_specification: https://github.com/x402-foundation/x402/tree/main/specs
+    canonical_repository: https://github.com/x402-foundation/x402
+    license: Apache-2.0
+    certification:
+      public_specification: {result: pass, evidence_ids: [src_x402_repo]}
+      version_history: {result: pass, evidence_ids: [src_x402_v2, src_x402_repo]}
+      governance_surface: {result: pass, evidence_ids: [src_x402_lf_intent, src_x402_lf_operational]}
+      implementation: {result: pass, evidence_ids: [src_x402_repo, src_cloudflare_x402]}
+    version_ids: [x402_v1, x402_v2]
+    event_ids: [evt_x402_launch, evt_x402_foundation_intent, evt_x402_v2, evt_x402_lf_transfer, evt_x402_operational]
+    analytical_note: >-
+      x402 is the direct bridge between agent interfaces and programmable
+      settlement. Foundation membership indicates institutional participation,
+      not implementation. Production claims and protocol governance remain
+      separate graph layers.
+
+protocol_versions:
+  - {id: mcp_2024_11_05, protocol_id: protocol_mcp, version: '2024-11-05', released_at: 2024-11-05, stability: released, evidence_ids: [src_mcp_spec_archive]}
+  - {id: mcp_2025_03_26, protocol_id: protocol_mcp, version: '2025-03-26', released_at: 2025-03-26, stability: released, evidence_ids: [src_mcp_spec_archive]}
+  - {id: mcp_2025_06_18, protocol_id: protocol_mcp, version: '2025-06-18', released_at: 2025-06-18, stability: released, evidence_ids: [src_mcp_changelog_2025_11]}
+  - {id: mcp_2025_11_25, protocol_id: protocol_mcp, version: '2025-11-25', released_at: 2025-11-25, stability: released, evidence_ids: [src_mcp_changelog_2025_11]}
+  - {id: mcp_2026_07_28, protocol_id: protocol_mcp, version: '2026-07-28', released_at: 2026-07-28, stability: released, evidence_ids: [src_mcp_release_2026_07]}
+  - {id: a2a_0_1_0, protocol_id: protocol_a2a, version: 0.1.0, released_at: null, date_precision: unknown, stability: released, evidence_ids: [src_a2a_spec]}
+  - {id: a2a_0_2_6, protocol_id: protocol_a2a, version: 0.2.6, released_at: 2025-07-17, stability: released, evidence_ids: [src_a2a_releases]}
+  - {id: a2a_0_3_0, protocol_id: protocol_a2a, version: 0.3.0, released_at: 2025-07-30, stability: released, evidence_ids: [src_a2a_releases]}
+  - {id: a2a_1_0_0, protocol_id: protocol_a2a, version: 1.0.0, released_at: 2026-03-12, stability: stable, evidence_ids: [src_a2a_releases]}
+  - {id: a2a_1_0_1, protocol_id: protocol_a2a, version: 1.0.1, released_at: 2026-05-26, stability: stable, evidence_ids: [src_a2a_releases]}
+  - {id: acp_1_0_0, protocol_id: protocol_acp, version: 1.0.0, released_at: 2025-07-01, stability: stable, evidence_ids: [src_acp_releases]}
+  - {id: acp_1_0_1, protocol_id: protocol_acp, version: 1.0.1, released_at: 2025-07-24, stability: released, evidence_ids: [src_acp_releases]}
+  - {id: acp_1_0_2, protocol_id: protocol_acp, version: 1.0.2, released_at: 2025-08-15, stability: released, evidence_ids: [src_acp_releases]}
+  - {id: acp_1_0_3, protocol_id: protocol_acp, version: 1.0.3, released_at: 2025-08-21, stability: final, evidence_ids: [src_acp_releases]}
+  - {id: ap2_0_1, protocol_id: protocol_ap2, version: 0.1, released_at: 2025-09-16, stability: experimental, evidence_ids: [src_ap2_launch]}
+  - {id: ap2_0_2, protocol_id: protocol_ap2, version: 0.2, released_at: 2026-04-28, stability: draft_standardization, evidence_ids: [src_ap2_fido_transfer]}
+  - {id: ucp_2026_01_11, protocol_id: protocol_ucp, version: '2026-01-11', released_at: 2026-01-11, stability: released, evidence_ids: [src_ucp_releases]}
+  - {id: ucp_2026_01_23, protocol_id: protocol_ucp, version: '2026-01-23', released_at: 2026-01-23, stability: released, evidence_ids: [src_ucp_releases]}
+  - {id: ucp_2026_04_08, protocol_id: protocol_ucp, version: '2026-04-08', released_at: 2026-04-08, stability: released, evidence_ids: [src_ucp_releases]}
+  - {id: x402_v1, protocol_id: protocol_x402, version: v1, released_at: 2025-05, date_precision: month, stability: released, evidence_ids: [src_x402_v2]}
+  - {id: x402_v2, protocol_id: protocol_x402, version: v2, released_at: 2025-12-11, stability: released, evidence_ids: [src_x402_v2]}
+
+protocol_events:
+  - {id: evt_mcp_launch, protocol_id: protocol_mcp, event_type: public_launch, event_date: 2024-11-25, actor_ids: [org_anthropic], summary: Anthropic publicly introduced MCP and named early adopters and platform collaborators., evidence_ids: [src_mcp_launch]}
+  - {id: evt_mcp_governance, protocol_id: protocol_mcp, event_type: governance_adoption, event_date: 2025-07-31, actor_ids: [org_anthropic], summary: MCP adopted formal maintainer governance and the SEP change process., evidence_ids: [src_mcp_governance_launch, src_mcp_governance]}
+  - {id: evt_mcp_aaif_transfer, protocol_id: protocol_mcp, event_type: stewardship_transfer, event_date: 2025-12-09, actor_ids: [org_anthropic, org_aaif, org_linux_foundation], summary: Anthropic donated MCP to the newly formed AAIF., evidence_ids: [src_mcp_aaif_donation, src_aaif_launch]}
+  - {id: evt_mcp_2026_release, protocol_id: protocol_mcp, event_type: specification_release, event_date: 2026-07-28, version_id: mcp_2026_07_28, actor_ids: [org_aaif], summary: MCP released a stateless protocol core and aligned SDKs., evidence_ids: [src_mcp_release_2026_07]}
+  - {id: evt_a2a_launch, protocol_id: protocol_a2a, event_type: public_launch, event_date: 2025-04-09, actor_ids: [org_google], summary: Google launched A2A with more than fifty named technology and service partners., evidence_ids: [src_a2a_google_launch]}
+  - {id: evt_a2a_lf_transfer, protocol_id: protocol_a2a, event_type: stewardship_transfer, event_date: 2025-06-23, actor_ids: [org_google, org_linux_foundation, org_a2a_project], summary: 'Google contributed A2A specification, SDKs, and tooling to a Linux Foundation project.', evidence_ids: [src_a2a_lf_launch]}
+  - {id: evt_a2a_0_3, protocol_id: protocol_a2a, event_type: specification_release, event_date: 2025-07-30, version_id: a2a_0_3_0, actor_ids: [org_a2a_project], summary: A2A 0.3.0 added agent-card signatures and changed the well-known URI., evidence_ids: [src_a2a_releases]}
+  - {id: evt_a2a_acp_merge, protocol_id: protocol_a2a, event_type: merger, event_date: 2025-08-27, actor_ids: [org_a2a_project, org_beeai, org_ibm], summary: ACP development merged into A2A and a migration path was published., evidence_ids: [src_acp_repo, src_lf_acp_merge]}
+  - {id: evt_a2a_1_0, protocol_id: protocol_a2a, event_type: specification_release, event_date: 2026-03-12, version_id: a2a_1_0_0, actor_ids: [org_a2a_project], summary: A2A published its first stable major release., evidence_ids: [src_a2a_releases]}
+  - {id: evt_acp_1_0, protocol_id: protocol_acp, event_type: specification_release, event_date: 2025-07-01, version_id: acp_1_0_0, actor_ids: [org_beeai, org_ibm], summary: ACP reached version 1.0 with protocol and SDK changes., evidence_ids: [src_acp_releases]}
+  - {id: evt_acp_archive, protocol_id: protocol_acp, event_type: archival, event_date: 2025-08-27, actor_ids: [org_beeai], summary: The ACP repository was archived after the A2A merger., evidence_ids: [src_acp_repo]}
+  - {id: evt_ap2_launch, protocol_id: protocol_ap2, event_type: public_launch, event_date: 2025-09-16, actor_ids: [org_google], summary: 'Google launched AP2 with a public specification, SDK, samples, and an announced partner network.', evidence_ids: [src_ap2_launch, src_ap2_repo]}
+  - {id: evt_ap2_x402_extension, protocol_id: protocol_ap2, event_type: extension_release, event_date: 2025-09-16, actor_ids: [org_google, org_coinbase, org_ethereum_foundation, org_metamask], summary: The launch included an A2A-x402 extension for crypto payments., evidence_ids: [src_ap2_launch]}
+  - {id: evt_ap2_0_2_fido, protocol_id: protocol_ap2, event_type: stewardship_transfer, event_date: 2026-04-28, version_id: ap2_0_2, actor_ids: [org_google, org_fido, body_fido_ptwg], summary: Google published AP2 0.2 and contributed the protocol to FIDO for standards development., evidence_ids: [src_ap2_fido_transfer, src_fido_agentic_work]}
+  - {id: evt_ucp_launch, protocol_id: protocol_ucp, event_type: public_launch, event_date: 2026-01-11, actor_ids: [org_google, org_shopify, org_etsy, org_wayfair, org_target, org_walmart], summary: Google launched UCP and named five co-developing retailers and commerce platforms., evidence_ids: [src_ucp_launch]}
+  - {id: evt_ucp_2026_01_23, protocol_id: protocol_ucp, event_type: specification_release, event_date: 2026-01-23, version_id: ucp_2026_01_23, actor_ids: [org_ucp], summary: UCP published its second dated release., evidence_ids: [src_ucp_releases]}
+  - {id: evt_ucp_production, protocol_id: protocol_ucp, event_type: production_deployment, event_date: 2026-02-11, actor_ids: [org_google, org_etsy, org_wayfair], summary: Google reported UCP checkout rolling out for Etsy and Wayfair in AI Mode and Gemini., evidence_ids: [src_google_ucp_deployment]}
+  - {id: evt_ucp_2026_04_08, protocol_id: protocol_ucp, event_type: specification_release, event_date: 2026-04-08, version_id: ucp_2026_04_08, actor_ids: [org_ucp], summary: 'UCP released cart, catalogue, signing, error, and authorization changes.', evidence_ids: [src_ucp_releases]}
+  - {id: evt_x402_launch, protocol_id: protocol_x402, event_type: public_launch, event_date: 2025-05, date_precision: month, actor_ids: [org_coinbase], summary: Coinbase introduced x402 version 1 for HTTP-native payments., evidence_ids: [src_x402_v2]}
+  - {id: evt_x402_foundation_intent, protocol_id: protocol_x402, event_type: foundation_launch, event_date: 2025-09-23, actor_ids: [org_coinbase, org_cloudflare, org_x402_foundation], summary: Coinbase and Cloudflare announced their intent to form the x402 Foundation., evidence_ids: [src_cloudflare_x402]}
+  - {id: evt_x402_v2, protocol_id: protocol_x402, event_type: specification_release, event_date: 2025-12-11, version_id: x402_v2, actor_ids: [org_coinbase, org_cloudflare], summary: 'x402 version 2 expanded identity, discovery, recipients, networks, and payment schemes.', evidence_ids: [src_x402_v2]}
+  - {id: evt_x402_lf_transfer, protocol_id: protocol_x402, event_type: stewardship_transfer, event_date: 2026-04-02, actor_ids: [org_coinbase, org_x402_foundation, org_linux_foundation], summary: Linux Foundation announced the protocol contribution and neutral foundation home., evidence_ids: [src_x402_lf_intent]}
+  - {id: evt_x402_operational, protocol_id: protocol_x402, event_type: governance_adoption, event_date: 2026-07-14, actor_ids: [org_x402_foundation, org_linux_foundation], summary: The x402 Foundation became operational under formal open governance with forty member organisations., evidence_ids: [src_x402_lf_operational]}
+
+protocol_regimes:
+  - id: regime_mcp_unknown_stewardship
+    protocol_id: protocol_mcp
+    regime_type: stewardship
+    status: unknown
+    participants: []
+    valid_from: 2024-11-25
+    valid_to: 2025-12-09
+    asset_scope: [protocol_family]
+    evidence_ids: [src_mcp_launch, src_mcp_aaif_donation]
+    evidence_limitation: >-
+      The launch establishes Anthropic as originator, not institutional steward;
+      no pre-donation steward is promoted from origin alone.
+  - id: regime_mcp_aaif_stewardship
+    protocol_id: protocol_mcp
+    regime_type: stewardship
+    status: verified
+    participants:
+      - {actor_id: org_aaif, role: institutional_home}
+    valid_from: 2025-12-09
+    valid_to: null
+    asset_scope: [protocol_family]
+    evidence_ids: [src_mcp_aaif_donation, src_aaif_launch]
+  - id: regime_mcp_unknown_governance
+    protocol_id: protocol_mcp
+    regime_type: governance
+    status: unknown
+    participants: []
+    valid_from: 2024-11-25
+    valid_to: 2025-07-31
+    asset_scope: [protocol_change_process]
+    governance_instrument: null
+    evidence_ids: [src_mcp_launch, src_mcp_governance_launch]
+    evidence_limitation: The launch source does not establish a public decision process.
+  - id: regime_mcp_maintainer_governance
+    protocol_id: protocol_mcp
+    regime_type: governance
+    status: verified
+    participants:
+      - {actor_id: body_mcp_maintainers, role: governing_body}
+    valid_from: 2025-07-31
+    valid_to: null
+    asset_scope: [protocol_change_process]
+    governance_instrument: MCP maintainer governance and Specification Enhancement Proposal process
+    evidence_ids: [src_mcp_governance_launch, src_mcp_governance]
+    evidence_limitation: >-
+      The sources establish maintainer-based governance, but maintainer people
+      are outside the current actor registry and are therefore not invented as organisations.
+  - id: regime_mcp_unknown_repository_control
+    protocol_id: protocol_mcp
+    regime_type: repository_control
+    status: unknown
+    participants: []
+    valid_from: 2024-11-25
+    valid_to: null
+    asset_scope: [reference_repository]
+    evidence_ids: [src_mcp_launch, src_mcp_spec_archive]
+    evidence_limitation: Repository location is recorded, but control authority and its intervals are not.
+  - id: regime_mcp_unknown_technical_maintenance
+    protocol_id: protocol_mcp
+    regime_type: technical_maintenance
+    status: unknown
+    participants: []
+    valid_from: 2024-11-25
+    valid_to: 2025-07-31
+    asset_scope: [implementation_maintenance]
+    evidence_ids: [src_mcp_launch, src_mcp_governance_launch]
+    evidence_limitation: The public launch does not identify time-bounded technical maintainers.
+  - id: regime_mcp_maintainer_technical_maintenance
+    protocol_id: protocol_mcp
+    regime_type: technical_maintenance
+    status: verified
+    participants:
+      - {actor_id: body_mcp_maintainers, role: technical_maintainer}
+    valid_from: 2025-07-31
+    valid_to: null
+    asset_scope: [implementation_maintenance]
+    evidence_ids: [src_mcp_governance_launch, src_mcp_governance]
+    evidence_limitation: >-
+      Maintainer authority is documented, but maintainer people are outside the
+      current actor registry.
+
+  - id: regime_a2a_unknown_stewardship
+    protocol_id: protocol_a2a
+    regime_type: stewardship
+    status: unknown
+    participants: []
+    valid_from: 2025-04-09
+    valid_to: 2025-06-23
+    asset_scope: [specification, sdk, tooling]
+    evidence_ids: [src_a2a_google_launch, src_a2a_lf_launch]
+    evidence_limitation: Google origin is verified, but origin does not establish stewardship.
+  - id: regime_a2a_lf_stewardship
+    protocol_id: protocol_a2a
+    regime_type: stewardship
+    status: verified
+    participants:
+      - {actor_id: org_linux_foundation, role: institutional_home}
+      - {actor_id: org_a2a_project, role: governing_project}
+    valid_from: 2025-06-23
+    valid_to: null
+    asset_scope: [specification, sdk, tooling]
+    evidence_ids: [src_a2a_lf_launch]
+  - id: regime_a2a_unknown_governance
+    protocol_id: protocol_a2a
+    regime_type: governance
+    status: unknown
+    participants: []
+    valid_from: 2025-04-09
+    valid_to: 2025-06-23
+    asset_scope: [protocol_change_process]
+    governance_instrument: null
+    evidence_ids: [src_a2a_google_launch, src_a2a_lf_launch]
+    evidence_limitation: The launch partner network is not a governance body.
+  - id: regime_a2a_project_governance
+    protocol_id: protocol_a2a
+    regime_type: governance
+    status: verified
+    participants:
+      - {actor_id: org_a2a_project, role: governing_project}
+    valid_from: 2025-06-23
+    valid_to: null
+    asset_scope: [protocol_change_process]
+    governance_instrument: A2A GOVERNANCE.md and Technical Steering Committee process
+    evidence_ids: [src_a2a_lf_launch, src_a2a_governance]
+  - id: regime_a2a_unknown_repository_control
+    protocol_id: protocol_a2a
+    regime_type: repository_control
+    status: unknown
+    participants: []
+    valid_from: 2025-04-09
+    valid_to: null
+    asset_scope: [reference_repository]
+    evidence_ids: [src_a2a_google_launch, src_a2a_releases]
+    evidence_limitation: Repository publication does not by itself establish control authority intervals.
+  - id: regime_a2a_unknown_technical_maintenance
+    protocol_id: protocol_a2a
+    regime_type: technical_maintenance
+    status: unknown
+    participants: []
+    valid_from: 2025-04-09
+    valid_to: null
+    asset_scope: [implementation_maintenance]
+    evidence_ids: [src_a2a_google_launch, src_a2a_sdks]
+    evidence_limitation: SDK publication does not identify time-bounded technical maintainers.
+
+  - id: regime_acp_unknown_stewardship
+    protocol_id: protocol_acp
+    regime_type: stewardship
+    status: unknown
+    participants: []
+    valid_from: 2025
+    valid_to: 2025-08-27
+    date_precision: year
+    valid_to_precision: day
+    asset_scope: [protocol_family]
+    evidence_ids: [src_acp_repo, src_acp_releases]
+    evidence_limitation: IBM and BeeAI origin is not promoted to stewardship.
+  - id: regime_acp_unknown_governance
+    protocol_id: protocol_acp
+    regime_type: governance
+    status: unknown
+    participants: []
+    valid_from: 2025
+    valid_to: 2025-08-27
+    date_precision: year
+    valid_to_precision: day
+    asset_scope: [protocol_change_process]
+    governance_instrument: null
+    evidence_ids: [src_acp_repo]
+    evidence_limitation: The repository evidence does not resolve a time-bounded governing actor.
+  - id: regime_acp_unknown_repository_control
+    protocol_id: protocol_acp
+    regime_type: repository_control
+    status: unknown
+    participants: []
+    valid_from: 2025
+    valid_to: 2025-08-27
+    date_precision: year
+    valid_to_precision: day
+    asset_scope: [reference_repository]
+    evidence_ids: [src_acp_repo]
+    evidence_limitation: The repository location is known; its authority interval is not certified.
+  - id: regime_acp_unknown_technical_maintenance
+    protocol_id: protocol_acp
+    regime_type: technical_maintenance
+    status: unknown
+    participants: []
+    valid_from: 2025
+    valid_to: 2025-08-27
+    date_precision: year
+    valid_to_precision: day
+    asset_scope: [implementation_maintenance]
+    evidence_ids: [src_acp_repo, src_acp_releases]
+    evidence_limitation: Release and implementation evidence does not establish the maintainer authority interval.
+
+  - id: regime_ap2_unknown_stewardship
+    protocol_id: protocol_ap2
+    regime_type: stewardship
+    status: unknown
+    participants: []
+    valid_from: 2025-09-16
+    valid_to: 2026-04-28
+    asset_scope: [normative_specification, standards_process]
+    evidence_ids: [src_ap2_launch, src_ap2_fido_transfer]
+    evidence_limitation: Google origin is verified, but origin does not establish stewardship.
+  - id: regime_ap2_fido_stewardship
+    protocol_id: protocol_ap2
+    regime_type: stewardship
+    status: verified
+    participants:
+      - {actor_id: org_fido, role: institutional_home}
+    valid_from: 2026-04-28
+    valid_to: null
+    asset_scope: [normative_specification, standards_process]
+    evidence_ids: [src_ap2_fido_transfer, src_fido_agentic_work]
+  - id: regime_ap2_unknown_governance
+    protocol_id: protocol_ap2
+    regime_type: governance
+    status: unknown
+    participants: []
+    valid_from: 2025-09-16
+    valid_to: 2026-04-28
+    asset_scope: [normative_specification, standards_process]
+    governance_instrument: null
+    evidence_ids: [src_ap2_launch, src_fido_agentic_work]
+    evidence_limitation: The launch partner list does not establish a decision body.
+  - id: regime_ap2_ptwg_governance
+    protocol_id: protocol_ap2
+    regime_type: governance
+    status: verified
+    participants:
+      - {actor_id: body_fido_ptwg, role: governing_body}
+    valid_from: 2026-04-28
+    valid_to: null
+    asset_scope: [normative_specification, standards_process]
+    governance_instrument: FIDO Payments Technical Working Group standards process
+    evidence_ids: [src_fido_agentic_work, src_fido_groups]
+  - id: regime_ap2_google_repository_control
+    protocol_id: protocol_ap2
+    regime_type: repository_control
+    status: verified
+    participants:
+      - {actor_id: org_google, role: repository_controller}
+    valid_from: 2025-09-16
+    valid_to: null
+    asset_scope: [reference_repository]
+    evidence_ids: [src_ap2_launch, src_ap2_repo, src_ap2_fido_transfer]
+    evidence_limitation: >-
+      The retained Google-hosted repository establishes custody of this asset,
+      not control over the FIDO standards process.
+  - id: regime_ap2_unknown_technical_maintenance
+    protocol_id: protocol_ap2
+    regime_type: technical_maintenance
+    status: unknown
+    participants: []
+    valid_from: 2025-09-16
+    valid_to: null
+    asset_scope: [implementation_maintenance]
+    evidence_ids: [src_ap2_repo, src_ap2_fido_transfer]
+    evidence_limitation: The contribution does not resolve implementation-maintenance authority.
+
+  - id: regime_ucp_unknown_stewardship
+    protocol_id: protocol_ucp
+    regime_type: stewardship
+    status: unknown
+    participants: []
+    valid_from: 2026-01-11
+    valid_to: null
+    asset_scope: [protocol_family]
+    evidence_ids: [src_ucp_launch, src_ucp_repo]
+    evidence_limitation: >-
+      Google origin, co-development, and a project repository do not establish
+      a distinct institutional steward.
+  - id: regime_ucp_unknown_governance
+    protocol_id: protocol_ucp
+    regime_type: governance
+    status: unknown
+    participants: []
+    valid_from: 2026-01-11
+    valid_to: null
+    asset_scope: [protocol_change_process]
+    governance_instrument: null
+    evidence_ids: [src_ucp_repo, src_ucp_maintainers]
+    evidence_limitation: The distributed contribution and maintainer surfaces do not resolve a central decision body.
+  - id: regime_ucp_project_repository_control
+    protocol_id: protocol_ucp
+    regime_type: repository_control
+    status: verified
+    participants:
+      - {actor_id: org_ucp, role: repository_controller}
+    valid_from: 2026-01-11
+    valid_to: null
+    asset_scope: [reference_repository]
+    evidence_ids: [src_ucp_repo]
+  - id: regime_ucp_unknown_technical_maintenance
+    protocol_id: protocol_ucp
+    regime_type: technical_maintenance
+    status: unknown
+    participants: []
+    valid_from: 2026-01-11
+    valid_to: null
+    asset_scope: [implementation_maintenance]
+    evidence_ids: [src_ucp_repo, src_ucp_maintainers]
+    evidence_limitation: A maintainer file exists, but actor identities and appointment intervals are not modelled.
+
+  - id: regime_x402_unknown_stewardship
+    protocol_id: protocol_x402
+    regime_type: stewardship
+    status: unknown
+    participants: []
+    valid_from: 2025-05
+    valid_to: 2026-07-14
+    date_precision: month
+    valid_to_precision: day
+    asset_scope: [protocol_family]
+    evidence_ids: [src_x402_v2, src_x402_lf_intent, src_x402_lf_operational]
+    evidence_limitation: >-
+      Coinbase origin and the announced foundation intent do not establish one
+      effective transfer day before operational completion.
+  - id: regime_x402_lf_stewardship
+    protocol_id: protocol_x402
+    regime_type: stewardship
+    status: verified
+    participants:
+      - {actor_id: org_linux_foundation, role: institutional_home}
+      - {actor_id: org_x402_foundation, role: governing_project}
+    valid_from: 2026-07-14
+    valid_to: null
+    asset_scope: [protocol_family]
+    evidence_ids: [src_x402_lf_operational]
+  - id: regime_x402_unknown_governance
+    protocol_id: protocol_x402
+    regime_type: governance
+    status: unknown
+    participants: []
+    valid_from: 2025-05
+    valid_to: 2026-07-14
+    date_precision: month
+    valid_to_precision: day
+    asset_scope: [protocol_change_process]
+    governance_instrument: null
+    evidence_ids: [src_x402_v2, src_cloudflare_x402, src_x402_lf_operational]
+    evidence_limitation: Foundation intent is not formal operational governance.
+  - id: regime_x402_foundation_governance
+    protocol_id: protocol_x402
+    regime_type: governance
+    status: verified
+    participants:
+      - {actor_id: org_x402_foundation, role: governing_project}
+      - {actor_id: org_linux_foundation, role: institutional_home}
+    valid_from: 2026-07-14
+    valid_to: null
+    asset_scope: [protocol_change_process]
+    governance_instrument: x402 Foundation formal open-governance model
+    evidence_ids: [src_x402_lf_operational]
+  - id: regime_x402_unknown_repository_control
+    protocol_id: protocol_x402
+    regime_type: repository_control
+    status: unknown
+    participants: []
+    valid_from: 2025-05
+    valid_to: 2026-07-14
+    date_precision: month
+    valid_to_precision: day
+    asset_scope: [reference_repository]
+    evidence_ids: [src_x402_v2, src_x402_repo]
+    evidence_limitation: Repository publication does not resolve pre-transfer control authority.
+  - id: regime_x402_foundation_repository_control
+    protocol_id: protocol_x402
+    regime_type: repository_control
+    status: verified
+    participants:
+      - {actor_id: org_x402_foundation, role: repository_controller}
+    valid_from: 2026-07-14
+    valid_to: null
+    asset_scope: [reference_repository]
+    evidence_ids: [src_x402_repo, src_x402_lf_operational]
+  - id: regime_x402_unknown_technical_maintenance
+    protocol_id: protocol_x402
+    regime_type: technical_maintenance
+    status: unknown
+    participants: []
+    valid_from: 2025-05
+    valid_to: null
+    date_precision: month
+    asset_scope: [implementation_maintenance]
+    evidence_ids: [src_x402_repo]
+    evidence_limitation: Implementations are public, but maintainer authority intervals are not certified.
+
+protocol_transitions:
+  - id: transition_mcp_governance_adoption
+    event_id: evt_mcp_governance
+    kind: governance_adoption
+    from_regime_ids: [regime_mcp_unknown_governance]
+    to_regime_ids: [regime_mcp_maintainer_governance]
+    announced_at: 2025-07-31
+    effective_date: 2025-07-31
+    effective_interval: null
+    completion_confirmed_at: 2025-07-31
+    mechanism: charter_adoption
+    transfer_effect: []
+    governance_instrument: MCP maintainer governance and Specification Enhancement Proposal process
+    decision_rules: Maintainer governance and the SEP change process
+    participation_conditions: Published project governance roles and process
+    access_conditions: Public proposal process
+    continuities: []
+    discontinuities: [A formal maintainer governance and change process was adopted.]
+    evidence_ids: [src_mcp_governance_launch, src_mcp_governance]
+  - id: transition_mcp_aaif_donation
+    event_id: evt_mcp_aaif_transfer
+    kind: stewardship_transfer
+    from_regime_ids: [regime_mcp_unknown_stewardship]
+    to_regime_ids: [regime_mcp_aaif_stewardship]
+    announced_at: 2025-12-09
+    effective_date: 2025-12-09
+    effective_interval: null
+    completion_confirmed_at: 2025-12-09
+    mechanism: donation
+    transfer_effect:
+      - {asset: protocol_family, effect: transferred}
+    governance_instrument: null
+    decision_rules: null
+    participation_conditions: null
+    access_conditions: null
+    continuities: []
+    discontinuities: [AAIF became the institutional home for MCP.]
+    evidence_ids: [src_mcp_aaif_donation, src_aaif_launch]
+  - id: transition_a2a_lf_contribution
+    event_id: evt_a2a_lf_transfer
+    kind: stewardship_transfer
+    from_regime_ids: [regime_a2a_unknown_stewardship, regime_a2a_unknown_governance]
+    to_regime_ids: [regime_a2a_lf_stewardship, regime_a2a_project_governance]
+    announced_at: 2025-06-23
+    effective_date: 2025-06-23
+    effective_interval: null
+    completion_confirmed_at: 2025-06-23
+    mechanism: contribution
+    transfer_effect:
+      - {asset: specification, effect: transferred}
+      - {asset: sdk, effect: transferred}
+      - {asset: tooling, effect: transferred}
+    governance_instrument: A2A Project governance under the Linux Foundation
+    decision_rules: null
+    participation_conditions: null
+    access_conditions: null
+    continuities: [A2A continued as the same protocol family.]
+    discontinuities: ['The specification, SDKs, and tooling moved to a Linux Foundation project.']
+    evidence_ids: [src_a2a_lf_launch, src_a2a_governance]
+  - id: transition_acp_a2a_merger
+    event_id: evt_a2a_acp_merge
+    kind: protocol_merger
+    source_protocol_ids: [protocol_acp]
+    target_protocol_id: protocol_a2a
+    genealogy_relation_id: pp_acp_a2a
+    from_regime_ids: [regime_acp_unknown_stewardship]
+    to_regime_ids: [regime_a2a_lf_stewardship]
+    announced_at: 2025-08-27
+    effective_date: 2025-08-27
+    effective_interval: null
+    completion_confirmed_at: 2025-08-27
+    mechanism: merger
+    transfer_effect:
+      - {asset: protocol_development, effect: transferred}
+    governance_instrument: null
+    decision_rules: null
+    participation_conditions: null
+    access_conditions: null
+    migration_path: ACP-to-A2A migration path published
+    source_status_after: archived
+    compatibility_effect: Not otherwise established by the cited merger and archival sources.
+    continuities: [A migration path from ACP to A2A was published.]
+    discontinuities: [ACP active development ended and its repository was archived.]
+    evidence_ids: [src_acp_repo, src_lf_acp_merge]
+  - id: transition_ap2_fido_contribution
+    event_id: evt_ap2_0_2_fido
+    kind: stewardship_transfer
+    from_regime_ids: [regime_ap2_unknown_stewardship, regime_ap2_unknown_governance]
+    to_regime_ids: [regime_ap2_fido_stewardship, regime_ap2_ptwg_governance]
+    announced_at: 2026-04-28
+    effective_date: 2026-04-28
+    effective_interval: null
+    completion_confirmed_at: 2026-04-28
+    mechanism: contribution
+    transfer_effect:
+      - {asset: normative_specification, effect: transferred}
+      - {asset: standards_process, effect: transferred}
+      - {asset: reference_repository, effect: retained_by_originator}
+      - {asset: implementation_maintenance, effect: unresolved}
+    governance_instrument: FIDO Payments Technical Working Group standards process
+    decision_rules: FIDO working-group standards development
+    participation_conditions: FIDO member working-group process
+    access_conditions: null
+    continuities: [The Google repository remained the reference implementation locus.]
+    discontinuities: [Normative specification development moved into the FIDO standards process.]
+    evidence_ids: [src_ap2_fido_transfer, src_fido_agentic_work, src_fido_groups, src_ap2_repo]
+  - id: transition_x402_lf_contribution
+    event_id: evt_x402_lf_transfer
+    kind: stewardship_transfer
+    from_regime_ids: [regime_x402_unknown_stewardship, regime_x402_unknown_governance]
+    to_regime_ids: [regime_x402_lf_stewardship, regime_x402_foundation_governance]
+    announced_at: 2026-04-02
+    effective_date: null
+    effective_interval:
+      from: 2026-04-02
+      to: 2026-07-14
+    completion_confirmed_at: 2026-07-14
+    date_precision: interval
+    mechanism: contribution
+    transfer_effect:
+      - {asset: protocol_family, effect: transferred}
+    governance_instrument: x402 Foundation formal open-governance model
+    decision_rules: Formal open governance became operational at completion.
+    participation_conditions: Foundation membership and governance process
+    access_conditions: null
+    continuities: [x402 continued as the same protocol family.]
+    discontinuities: [The x402 Foundation became operational under the Linux Foundation.]
+    evidence_ids: [src_x402_lf_intent, src_x402_lf_operational]
+
+actor_protocol_relations:
+  - {id: rel_anthropic_mcp_origin, actor_id: org_anthropic, protocol_id: protocol_mcp, relation_type: ORIGINATED, valid_from: 2024-11-25, valid_to: null, evidence_state: primary_verified, confidence: high, evidence_ids: [src_mcp_launch]}
+  - {id: rel_block_mcp_early, actor_id: org_block, protocol_id: protocol_mcp, relation_type: INTEGRATES, valid_from: 2024-11-25, valid_to: null, evidence_state: announced, confidence: medium, evidence_ids: [src_mcp_launch]}
+  - {id: rel_apollo_mcp_early, actor_id: org_apollo, protocol_id: protocol_mcp, relation_type: INTEGRATES, valid_from: 2024-11-25, valid_to: null, evidence_state: announced, confidence: medium, evidence_ids: [src_mcp_launch]}
+  - {id: rel_openai_mcp, actor_id: org_openai, protocol_id: protocol_mcp, relation_type: INTEGRATES, valid_from: 2025-05-21, valid_to: null, evidence_state: primary_verified, confidence: high, evidence_ids: [src_openai_mcp]}
+  - {id: rel_microsoft_mcp, actor_id: org_microsoft, protocol_id: protocol_mcp, relation_type: DEPLOYS_IN_PRODUCTION, valid_from: 2025-05-29, valid_to: null, evidence_state: primary_verified, confidence: high, evidence_ids: [src_microsoft_mcp_ga]}
+  - {id: rel_github_mcp, actor_id: org_github, protocol_id: protocol_mcp, relation_type: DEPLOYS_IN_PRODUCTION, valid_from: 2025-09-04, valid_to: null, evidence_state: primary_verified, confidence: high, evidence_ids: [src_github_mcp_ga]}
+  - {id: rel_google_a2a_origin, actor_id: org_google, protocol_id: protocol_a2a, relation_type: ORIGINATED, valid_from: 2025-04-09, valid_to: null, evidence_state: primary_verified, confidence: high, evidence_ids: [src_a2a_google_launch]}
+  - {id: rel_a2a_google_vote, actor_id: org_google, protocol_id: protocol_a2a, relation_type: HOLDS_VOTING_SEAT, valid_from: 2025-06-23, valid_to: null, evidence_state: primary_verified, confidence: high, evidence_ids: [src_a2a_governance]}
+  - {id: rel_a2a_aws_vote, actor_id: org_aws, protocol_id: protocol_a2a, relation_type: HOLDS_VOTING_SEAT, valid_from: 2025-06-23, valid_to: null, evidence_state: primary_verified, confidence: high, evidence_ids: [src_a2a_governance]}
+  - {id: rel_a2a_cisco_vote, actor_id: org_cisco, protocol_id: protocol_a2a, relation_type: HOLDS_VOTING_SEAT, valid_from: 2025-06-23, valid_to: null, evidence_state: primary_verified, confidence: high, evidence_ids: [src_a2a_governance]}
+  - {id: rel_a2a_microsoft_vote, actor_id: org_microsoft, protocol_id: protocol_a2a, relation_type: HOLDS_VOTING_SEAT, valid_from: 2025-06-23, valid_to: null, evidence_state: primary_verified, confidence: high, evidence_ids: [src_a2a_governance]}
+  - {id: rel_a2a_salesforce_vote, actor_id: org_salesforce, protocol_id: protocol_a2a, relation_type: HOLDS_VOTING_SEAT, valid_from: 2025-06-23, valid_to: null, evidence_state: primary_verified, confidence: high, evidence_ids: [src_a2a_governance]}
+  - {id: rel_a2a_sap_vote, actor_id: org_sap, protocol_id: protocol_a2a, relation_type: HOLDS_VOTING_SEAT, valid_from: 2025-06-23, valid_to: null, evidence_state: primary_verified, confidence: high, evidence_ids: [src_a2a_governance]}
+  - {id: rel_a2a_servicenow_vote, actor_id: org_servicenow, protocol_id: protocol_a2a, relation_type: HOLDS_VOTING_SEAT, valid_from: 2025-06-23, valid_to: null, evidence_state: primary_verified, confidence: high, evidence_ids: [src_a2a_governance]}
+  - {id: rel_a2a_ibm_vote, actor_id: org_ibm, protocol_id: protocol_a2a, relation_type: HOLDS_VOTING_SEAT, valid_from: 2025, valid_to: null, date_precision: year, evidence_state: primary_verified, confidence: high, evidence_ids: [src_a2a_governance]}
+  - {id: rel_acp_a2a_merge, actor_id: org_beeai, protocol_id: protocol_a2a, relation_type: CONTRIBUTES_CODE, valid_from: 2025-08-27, valid_to: null, evidence_state: primary_verified, confidence: high, evidence_ids: [src_acp_repo, src_lf_acp_merge]}
+  - {id: rel_google_ap2_origin, actor_id: org_google, protocol_id: protocol_ap2, relation_type: ORIGINATED, valid_from: 2025-09-16, valid_to: null, evidence_state: primary_verified, confidence: high, evidence_ids: [src_ap2_launch]}
+  - {id: rel_coinbase_ap2_extend, actor_id: org_coinbase, protocol_id: protocol_ap2, relation_type: EXTENDS, valid_from: 2025-09-16, valid_to: null, evidence_state: primary_verified, confidence: high, evidence_ids: [src_ap2_launch]}
+  - {id: rel_adyen_ap2_support, actor_id: org_adyen, protocol_id: protocol_ap2, relation_type: ANNOUNCES_SUPPORT_FOR, valid_from: 2025-09-16, valid_to: null, evidence_state: announced, confidence: high, evidence_ids: [src_ap2_launch]}
+  - {id: rel_amex_ap2_support, actor_id: org_american_express, protocol_id: protocol_ap2, relation_type: ANNOUNCES_SUPPORT_FOR, valid_from: 2025-09-16, valid_to: null, evidence_state: announced, confidence: high, evidence_ids: [src_ap2_launch]}
+  - {id: rel_mastercard_ap2_support, actor_id: org_mastercard, protocol_id: protocol_ap2, relation_type: ANNOUNCES_SUPPORT_FOR, valid_from: 2025-09-16, valid_to: null, evidence_state: announced, confidence: high, evidence_ids: [src_ap2_launch]}
+  - {id: rel_metamask_ap2_extend, actor_id: org_metamask, protocol_id: protocol_ap2, relation_type: EXTENDS, valid_from: 2025-09-16, valid_to: null, evidence_state: primary_verified, confidence: high, evidence_ids: [src_ap2_launch]}
+  - {id: rel_ethereum_ap2_extend, actor_id: org_ethereum_foundation, protocol_id: protocol_ap2, relation_type: EXTENDS, valid_from: 2025-09-16, valid_to: null, evidence_state: primary_verified, confidence: high, evidence_ids: [src_ap2_launch]}
+  - {id: rel_google_ucp_origin, actor_id: org_google, protocol_id: protocol_ucp, relation_type: ORIGINATED, valid_from: 2026-01-11, valid_to: null, evidence_state: primary_verified, confidence: high, evidence_ids: [src_ucp_launch]}
+  - {id: rel_shopify_ucp_codevelop, actor_id: org_shopify, protocol_id: protocol_ucp, relation_type: CO_DEVELOPED, valid_from: 2026-01-11, valid_to: null, evidence_state: primary_verified, confidence: high, evidence_ids: [src_ucp_launch]}
+  - {id: rel_etsy_ucp_codevelop, actor_id: org_etsy, protocol_id: protocol_ucp, relation_type: CO_DEVELOPED, valid_from: 2026-01-11, valid_to: null, evidence_state: primary_verified, confidence: high, evidence_ids: [src_ucp_launch]}
+  - {id: rel_wayfair_ucp_codevelop, actor_id: org_wayfair, protocol_id: protocol_ucp, relation_type: CO_DEVELOPED, valid_from: 2026-01-11, valid_to: null, evidence_state: primary_verified, confidence: high, evidence_ids: [src_ucp_launch]}
+  - {id: rel_target_ucp_codevelop, actor_id: org_target, protocol_id: protocol_ucp, relation_type: CO_DEVELOPED, valid_from: 2026-01-11, valid_to: null, evidence_state: primary_verified, confidence: high, evidence_ids: [src_ucp_launch]}
+  - {id: rel_walmart_ucp_codevelop, actor_id: org_walmart, protocol_id: protocol_ucp, relation_type: CO_DEVELOPED, valid_from: 2026-01-11, valid_to: null, evidence_state: primary_verified, confidence: high, evidence_ids: [src_ucp_launch]}
+  - {id: rel_adyen_ucp_endorse, actor_id: org_adyen, protocol_id: protocol_ucp, relation_type: ENDORSES, valid_from: 2026-01-11, valid_to: null, evidence_state: announced, confidence: high, evidence_ids: [src_ucp_launch]}
+  - {id: rel_amex_ucp_endorse, actor_id: org_american_express, protocol_id: protocol_ucp, relation_type: ENDORSES, valid_from: 2026-01-11, valid_to: null, evidence_state: announced, confidence: high, evidence_ids: [src_ucp_launch]}
+  - {id: rel_mastercard_ucp_endorse, actor_id: org_mastercard, protocol_id: protocol_ucp, relation_type: ENDORSES, valid_from: 2026-01-11, valid_to: null, evidence_state: announced, confidence: high, evidence_ids: [src_ucp_launch]}
+  - {id: rel_stripe_ucp_endorse, actor_id: org_stripe, protocol_id: protocol_ucp, relation_type: ENDORSES, valid_from: 2026-01-11, valid_to: null, evidence_state: announced, confidence: high, evidence_ids: [src_ucp_launch]}
+  - {id: rel_visa_ucp_endorse, actor_id: org_visa, protocol_id: protocol_ucp, relation_type: ENDORSES, valid_from: 2026-01-11, valid_to: null, evidence_state: announced, confidence: high, evidence_ids: [src_ucp_launch]}
+  - {id: rel_etsy_ucp_prod, actor_id: org_etsy, protocol_id: protocol_ucp, relation_type: DEPLOYS_IN_PRODUCTION, valid_from: 2026-02-11, valid_to: null, evidence_state: primary_verified, confidence: high, evidence_ids: [src_google_ucp_deployment]}
+  - {id: rel_wayfair_ucp_prod, actor_id: org_wayfair, protocol_id: protocol_ucp, relation_type: DEPLOYS_IN_PRODUCTION, valid_from: 2026-02-11, valid_to: null, evidence_state: primary_verified, confidence: high, evidence_ids: [src_google_ucp_deployment]}
+  - {id: rel_coinbase_x402_origin, actor_id: org_coinbase, protocol_id: protocol_x402, relation_type: ORIGINATED, valid_from: 2025-05, valid_to: null, date_precision: month, evidence_state: primary_verified, confidence: high, evidence_ids: [src_x402_v2, src_x402_lf_intent]}
+  - {id: rel_cloudflare_x402_codevelop, actor_id: org_cloudflare, protocol_id: protocol_x402, relation_type: CO_DEVELOPED, valid_from: 2025-09-23, valid_to: null, evidence_state: primary_verified, confidence: high, evidence_ids: [src_cloudflare_x402, src_x402_lf_intent]}
+  - {id: rel_stripe_x402_codevelop, actor_id: org_stripe, protocol_id: protocol_x402, relation_type: CO_DEVELOPED, valid_from: 2026-04-02, valid_to: null, evidence_state: primary_verified, confidence: medium, evidence_ids: [src_x402_lf_intent]}
+  - {id: rel_cloudflare_x402_impl, actor_id: org_cloudflare, protocol_id: protocol_x402, relation_type: DEPLOYS_IN_PRODUCTION, valid_from: 2025-09-23, valid_to: null, evidence_state: primary_verified, confidence: high, evidence_ids: [src_cloudflare_x402]}
+  - {id: rel_adyen_x402_member, actor_id: org_adyen, protocol_id: protocol_x402, relation_type: MEMBER_OF_STEWARD, valid_from: 2026-07-14, valid_to: null, evidence_state: primary_verified, confidence: high, evidence_ids: [src_x402_lf_operational]}
+  - {id: rel_aws_x402_member, actor_id: org_aws, protocol_id: protocol_x402, relation_type: MEMBER_OF_STEWARD, valid_from: 2026-07-14, valid_to: null, evidence_state: primary_verified, confidence: high, evidence_ids: [src_x402_lf_operational]}
+  - {id: rel_amex_x402_member, actor_id: org_american_express, protocol_id: protocol_x402, relation_type: MEMBER_OF_STEWARD, valid_from: 2026-07-14, valid_to: null, evidence_state: primary_verified, confidence: high, evidence_ids: [src_x402_lf_operational]}
+  - {id: rel_circle_x402_member, actor_id: org_circle, protocol_id: protocol_x402, relation_type: MEMBER_OF_STEWARD, valid_from: 2026-07-14, valid_to: null, evidence_state: primary_verified, confidence: high, evidence_ids: [src_x402_lf_operational]}
+  - {id: rel_cloudflare_x402_member, actor_id: org_cloudflare, protocol_id: protocol_x402, relation_type: MEMBER_OF_STEWARD, valid_from: 2026-07-14, valid_to: null, evidence_state: primary_verified, confidence: high, evidence_ids: [src_x402_lf_operational]}
+  - {id: rel_coinbase_x402_member, actor_id: org_coinbase, protocol_id: protocol_x402, relation_type: MEMBER_OF_STEWARD, valid_from: 2026-07-14, valid_to: null, evidence_state: primary_verified, confidence: high, evidence_ids: [src_x402_lf_operational]}
+  - {id: rel_google_x402_member, actor_id: org_google, protocol_id: protocol_x402, relation_type: MEMBER_OF_STEWARD, valid_from: 2026-07-14, valid_to: null, evidence_state: primary_verified, confidence: high, evidence_ids: [src_x402_lf_operational]}
+  - {id: rel_mastercard_x402_member, actor_id: org_mastercard, protocol_id: protocol_x402, relation_type: MEMBER_OF_STEWARD, valid_from: 2026-07-14, valid_to: null, evidence_state: primary_verified, confidence: high, evidence_ids: [src_x402_lf_operational]}
+  - {id: rel_shopify_x402_member, actor_id: org_shopify, protocol_id: protocol_x402, relation_type: MEMBER_OF_STEWARD, valid_from: 2026-07-14, valid_to: null, evidence_state: primary_verified, confidence: high, evidence_ids: [src_x402_lf_operational]}
+  - {id: rel_solana_x402_member, actor_id: org_solana_foundation, protocol_id: protocol_x402, relation_type: MEMBER_OF_STEWARD, valid_from: 2026-07-14, valid_to: null, evidence_state: primary_verified, confidence: high, evidence_ids: [src_x402_lf_operational]}
+  - {id: rel_stripe_x402_member, actor_id: org_stripe, protocol_id: protocol_x402, relation_type: MEMBER_OF_STEWARD, valid_from: 2026-07-14, valid_to: null, evidence_state: primary_verified, confidence: high, evidence_ids: [src_x402_lf_operational]}
+  - {id: rel_visa_x402_member, actor_id: org_visa, protocol_id: protocol_x402, relation_type: MEMBER_OF_STEWARD, valid_from: 2026-07-14, valid_to: null, evidence_state: primary_verified, confidence: high, evidence_ids: [src_x402_lf_operational]}
+
+protocol_protocol_relations:
+  - {id: pp_acp_a2a, source_protocol_id: protocol_acp, target_protocol_id: protocol_a2a, relation_type: MERGED_INTO, valid_from: 2025-08-27, evidence_ids: [src_acp_repo, src_lf_acp_merge]}
+  - {id: pp_ap2_a2a, source_protocol_id: protocol_ap2, target_protocol_id: protocol_a2a, relation_type: EXTENDS, valid_from: 2025-09-16, evidence_ids: [src_ap2_docs]}
+  - {id: pp_ap2_x402, source_protocol_id: protocol_ap2, target_protocol_id: protocol_x402, relation_type: INTEROPERATES_WITH, valid_from: 2025-09-16, evidence_ids: [src_ap2_launch]}
+  - {id: pp_ucp_mcp, source_protocol_id: protocol_ucp, target_protocol_id: protocol_mcp, relation_type: INTEROPERATES_WITH, valid_from: 2026-01-11, evidence_ids: [src_ucp_repo]}
+  - {id: pp_ucp_a2a, source_protocol_id: protocol_ucp, target_protocol_id: protocol_a2a, relation_type: INTEROPERATES_WITH, valid_from: 2026-01-11, evidence_ids: [src_ucp_repo]}
+  - {id: pp_ucp_ap2, source_protocol_id: protocol_ucp, target_protocol_id: protocol_ap2, relation_type: INTEROPERATES_WITH, valid_from: 2026-01-11, evidence_ids: [src_ucp_repo, src_ap2_docs]}
+  - {id: pp_x402_mcp, source_protocol_id: protocol_x402, target_protocol_id: protocol_mcp, relation_type: INTEROPERATES_WITH, valid_from: 2025-09-23, evidence_ids: [src_cloudflare_x402, src_x402_repo]}
+
+frontier_candidates:
+  - id: candidate_mpp
+    name: Machine Payments Protocol
+    verdict: held_frontier
+    layer: machine_payment
+    first_public_date: 2026-03-18
+    gate_results:
+      public_specification: pass
+      version_history: fail
+      governance_surface: fail
+      implementation: pass
+    reason: >-
+      Stripe and Tempo published a specification and live implementations, but a
+      protocol-level release history and independent public decision process are
+      not yet established.
+    evidence_ids: [src_mpp_launch, src_mpp_docs]
+  - id: candidate_webmcp
+    name: WebMCP
+    verdict: held_frontier
+    layer: tool_context
+    gate_results:
+      public_specification: pass
+      version_history: fail
+      governance_surface: pass
+      implementation: partial
+    reason: W3C incubation supplies governance, but stable protocol versions and broad implementations remain immature.
+    evidence_ids: []
+  - id: candidate_agntcy
+    name: AGNTCY
+    verdict: held_frontier
+    layer: agent_communication
+    gate_results:
+      public_specification: partial
+      version_history: partial
+      governance_surface: pass
+      implementation: pass
+    reason: >-
+      AGNTCY is a governed protocol suite containing discovery, identity,
+      messaging, schema, and observability components. Certify OASF, SLIM, and
+      Directory separately before adding protocol nodes.
+    evidence_ids: [src_agntcy_lf, src_agntcy_docs]
+  - id: candidate_anp
+    name: Agent Network Protocol
+    verdict: held_frontier
+    layer: agent_communication
+    reason: Insufficient evidence collected for all four gates; retain for a later frontier pass.
+    evidence_ids: []
+  - id: candidate_erc8004
+    name: ERC-8004 Trustless Agents
+    verdict: held_frontier
+    layer: delegated_authority
+    reason: Draft Ethereum standard with implementations, but still a proposal rather than a certified mature protocol in this registry.
+    evidence_ids: []
+
+evidence_sources:
+  - {id: src_mcp_launch, title: Introducing the Model Context Protocol, publisher: Anthropic, authority: originator_primary, published_at: 2024-11-25, url: https://www.anthropic.com/news/model-context-protocol, supports: [launch, originator, early_adopters]}
+  - {id: src_mcp_spec_current, title: MCP specification 2026-07-28, publisher: MCP project, authority: protocol_primary, url: https://modelcontextprotocol.io/specification/2026-07-28, supports: [specification]}
+  - {id: src_mcp_spec_archive, title: MCP specification archive, publisher: MCP project, authority: protocol_primary, url: https://modelcontextprotocol.io/specification, supports: [versions]}
+  - {id: src_mcp_changelog_2025_11, title: MCP 2025-11-25 key changes, publisher: MCP project, authority: protocol_primary, url: https://modelcontextprotocol.io/specification/2025-11-25/changelog, supports: [versions, changelog]}
+  - {id: src_mcp_changelog_2026_07, title: MCP 2026-07-28 key changes, publisher: MCP project, authority: protocol_primary, url: https://modelcontextprotocol.io/specification/2026-07-28/changelog, supports: [versions, changelog]}
+  - {id: src_mcp_release_2026_07, title: The 2026-07-28 Specification, publisher: MCP project, authority: protocol_primary, published_at: 2026-07-28, url: https://blog.modelcontextprotocol.io/posts/2026-07-28/, supports: [release, sdk_alignment]}
+  - {id: src_mcp_governance_launch, title: Building to Last, publisher: MCP project, authority: protocol_primary, published_at: 2025-07-31, url: https://blog.modelcontextprotocol.io/posts/2025-07-31-governance-for-mcp/, supports: [governance_adoption, sep_process]}
+  - {id: src_mcp_governance, title: Governance and Stewardship, publisher: MCP project, authority: protocol_primary, url: https://modelcontextprotocol.io/community/governance, supports: [maintainer_roles, decision_authority]}
+  - {id: src_mcp_ts_sdk, title: MCP TypeScript SDK, publisher: MCP project, authority: protocol_primary, url: https://github.com/modelcontextprotocol/typescript-sdk, supports: [implementation, sdk]}
+  - {id: src_mcp_aaif_donation, title: Donating MCP and establishing AAIF, publisher: Anthropic, authority: originator_primary, published_at: 2025-12-09, url: https://www.anthropic.com/news/donating-the-model-context-protocol-and-establishing-of-the-agentic-ai-foundation, supports: [donation, adoption_metrics]}
+  - {id: src_aaif_launch, title: Linux Foundation announces AAIF, publisher: Linux Foundation, authority: steward_primary, published_at: 2025-12-09, url: https://www.linuxfoundation.org/press/linux-foundation-announces-the-formation-of-the-agentic-ai-foundation, supports: [foundation_launch, institutional_members]}
+  - {id: src_openai_mcp, title: Responses API remote MCP support, publisher: OpenAI, authority: implementer_primary, published_at: 2025-05-21, url: https://openai.com/index/new-tools-and-features-in-the-responses-api/, supports: [integration]}
+  - {id: src_microsoft_mcp_ga, title: MCP generally available in Copilot Studio, publisher: Microsoft, authority: implementer_primary, published_at: 2025-05-29, url: https://www.microsoft.com/en-us/microsoft-copilot/blog/copilot-studio/model-context-protocol-mcp-is-now-generally-available-in-microsoft-copilot-studio/, supports: [production_deployment]}
+  - {id: src_github_mcp_ga, title: Remote GitHub MCP Server generally available, publisher: GitHub, authority: implementer_primary, published_at: 2025-09-04, url: https://github.blog/changelog/2025-09-04-remote-github-mcp-server-is-now-generally-available/, supports: [production_deployment]}
+  - {id: src_a2a_google_launch, title: A2A launch announcement, publisher: Google, authority: originator_primary, published_at: 2025-04-09, url: https://developers.googleblog.com/en/a2a-a-new-era-of-agent-interoperability/, supports: [launch, partner_network]}
+  - {id: src_a2a_lf_launch, title: Linux Foundation launches A2A project, publisher: Linux Foundation, authority: steward_primary, published_at: 2025-06-23, url: https://www.linuxfoundation.org/press/linux-foundation-launches-the-agent2agent-protocol-project-to-enable-secure-intelligent-communication-between-ai-agents, supports: [donation, founding_organisations, governance]}
+  - {id: src_a2a_spec, title: A2A official specification, publisher: A2A Project, authority: protocol_primary, url: https://a2a-protocol.org/latest/specification/, supports: [specification, version_index]}
+  - {id: src_a2a_releases, title: A2A releases, publisher: A2A Project, authority: protocol_primary, url: https://github.com/a2aproject/A2A/releases, supports: [version_dates, changelog]}
+  - {id: src_a2a_governance, title: A2A governance, publisher: A2A Project, authority: protocol_primary, url: https://github.com/a2aproject/A2A/blob/main/GOVERNANCE.md, supports: [tsc, voting_seats, decision_process]}
+  - {id: src_a2a_sdks, title: A2A SDK index, publisher: A2A Project, authority: protocol_primary, url: https://a2a-protocol.org/latest/sdk/, supports: [implementations, sdks]}
+  - {id: src_agentgateway_a2a, title: Agentgateway Linux Foundation announcement, publisher: Linux Foundation, authority: implementer_primary, published_at: 2025-08-25, url: https://www.linuxfoundation.org/press/linux-foundation-welcomes-agentgateway-project-to-accelerate-ai-agent-adoption-while-maintaining-security-observability-and-governance, supports: [independent_implementation]}
+  - {id: src_acp_docs, title: ACP documentation, publisher: BeeAI, authority: protocol_primary, url: https://agentcommunicationprotocol.dev/introduction/welcome, supports: [specification, architecture]}
+  - {id: src_acp_repo, title: ACP repository, publisher: BeeAI, authority: protocol_primary, url: https://github.com/i-am-bee/acp, supports: [governance, implementations, merger, archival]}
+  - {id: src_acp_releases, title: ACP releases, publisher: BeeAI, authority: protocol_primary, url: https://github.com/i-am-bee/acp/releases, supports: [version_dates, changelog]}
+  - {id: src_lf_acp_merge, title: Linux Foundation September 2025 newsletter, publisher: Linux Foundation, authority: steward_primary, published_at: 2025-09-17, url: https://www.linuxfoundation.org/blog/linux-foundation-newsletter-september-2025, supports: [acp_a2a_merger]}
+  - {id: src_ap2_launch, title: Announcing Agent Payments Protocol, publisher: Google Cloud, authority: originator_primary, published_at: 2025-09-16, url: https://cloud.google.com/blog/products/ai-machine-learning/announcing-agents-to-payments-ap2-protocol, supports: [launch, partners, x402_extension, reference_implementation]}
+  - {id: src_ap2_docs, title: AP2 protocol documentation, publisher: AP2 project, authority: protocol_primary, url: https://ap2-protocol.org/, supports: [specification, interoperability]}
+  - {id: src_ap2_repo, title: AP2 repository, publisher: Google Agentic Commerce, authority: protocol_primary, url: https://github.com/google-agentic-commerce/AP2, supports: [specification, sdk, samples, versions]}
+  - {id: src_ap2_fido_transfer, title: Google donates AP2 to FIDO Alliance, publisher: Google, authority: originator_primary, published_at: 2026-04-28, url: https://blog.google/products-and-platforms/platforms/google-pay/agent-payments-protocol-fido-alliance/, supports: [donation, version_0_2]}
+  - {id: src_fido_agentic_work, title: FIDO standards for trusted agent interactions, publisher: FIDO Alliance, authority: standards_body_primary, published_at: 2026-04-28, url: https://fidoalliance.org/fido-alliance-to-develop-standards-for-trusted-ai-agent-interactions/, supports: [working_groups, chairs, contributions, standards_process]}
+  - {id: src_fido_groups, title: FIDO working groups, publisher: FIDO Alliance, authority: standards_body_primary, url: https://fidoalliance.org/members/working-groups/, supports: [working_group_mandates]}
+  - {id: src_ucp_launch, title: New tools for agentic commerce, publisher: Google, authority: originator_primary, published_at: 2026-01-11, url: https://blog.google/products/ads-commerce/agentic-commerce-ai-tools-protocol-retailers-platforms/, supports: [launch, codevelopers, endorsers]}
+  - {id: src_ucp_spec, title: UCP official specification, publisher: UCP Authors, authority: protocol_primary, url: https://ucp.dev/2026-04-08/specification/overview/, supports: [specification]}
+  - {id: src_ucp_repo, title: UCP repository, publisher: UCP Authors, authority: protocol_primary, url: https://github.com/Universal-Commerce-Protocol/ucp, supports: [specification, implementations, interoperability, contribution_process]}
+  - {id: src_ucp_releases, title: UCP releases, publisher: UCP Authors, authority: protocol_primary, url: https://github.com/Universal-Commerce-Protocol/ucp/releases, supports: [version_dates, changelog]}
+  - {id: src_ucp_maintainers, title: UCP maintainers, publisher: UCP Authors, authority: protocol_primary, url: https://github.com/Universal-Commerce-Protocol/ucp/blob/main/MAINTAINERS.md, supports: [maintenance_surface]}
+  - {id: src_google_ucp_deployment, title: UCP checkout rollout, publisher: Google, authority: deployer_primary, published_at: 2026-02-11, url: https://blog.google/products/ads-commerce/digital-advertising-commerce-2026/, supports: [production_deployment]}
+  - {id: src_x402_repo, title: x402 specification and implementations, publisher: x402 Foundation, authority: protocol_primary, url: https://github.com/x402-foundation/x402, supports: [specification, sdk, implementations]}
+  - {id: src_x402_v2, title: Introducing x402 V2, publisher: x402 project, authority: protocol_primary, published_at: 2025-12-11, url: https://x402.org/x402-v2-launch/, supports: [launch_date, version_2, production_claim]}
+  - {id: src_cloudflare_x402, title: Launching x402 Foundation and Cloudflare support, publisher: Cloudflare, authority: co_developer_primary, published_at: 2025-09-23, url: https://blog.cloudflare.com/x402/, supports: [foundation_intent, implementation, mcp_integration]}
+  - {id: src_x402_lf_intent, title: Linux Foundation launching x402 Foundation, publisher: Linux Foundation, authority: steward_primary, published_at: 2026-04-02, url: https://www.linuxfoundation.org/press/linux-foundation-is-launching-the-x402-foundation-and-welcoming-the-contribution-of-the-x402-protocol, supports: [donation, founding_supporters, governance_intent]}
+  - {id: src_x402_lf_operational, title: Operational launch of x402 Foundation, publisher: Linux Foundation, authority: steward_primary, published_at: 2026-07-14, url: https://www.linuxfoundation.org/press/linux-foundation-announces-operational-launch-of-x402-foundation-to-standardize-internet-native-payments-for-ai-agents-and-applications, supports: [formal_governance, members, completed_transfer]}
+  - {id: src_mpp_launch, title: Introducing the Machine Payments Protocol, publisher: Stripe, authority: originator_primary, published_at: 2026-03-18, url: https://stripe.com/blog/machine-payments-protocol, supports: [launch, implementations]}
+  - {id: src_mpp_docs, title: MPP overview, publisher: MPP Authors, authority: protocol_primary, url: https://mpp.dev/overview, supports: [specification]}
+  - {id: src_agntcy_lf, title: Linux Foundation welcomes AGNTCY, publisher: Linux Foundation, authority: steward_primary, published_at: 2025-07-29, url: https://www.linuxfoundation.org/press/linux-foundation-welcomes-the-agntcy-project-to-standardize-open-multi-agent-system-infrastructure-and-break-down-ai-agent-silos, supports: [governance, formative_members, suite_scope]}
+  - {id: src_agntcy_docs, title: AGNTCY documentation, publisher: AGNTCY, authority: project_primary, url: https://docs.agntcy.org/, supports: [components, implementations]}
+
+validation_rules:
+  schema_rules:
+    - All ids must be globally unique.
+    - Every referenced actor, protocol, version, event, relation, and evidence id must resolve.
+    - Every certified protocol must have exactly four certification gates and all must pass.
+    - Every relation must carry at least one evidence id, an evidence state, and confidence.
+    - A null valid_to means open-ended, not permanent.
+    - Dates with less than day precision must declare date_precision.
+    - Membership must never be transformed into governance, funding, implementation, or endorsement.
+    - ANNOUNCES_SUPPORT_FOR must never be transformed into HOLDS_VOTING_SEAT or DEPLOYS_IN_PRODUCTION.
+    - Repository contribution must never imply organisational policy unless affiliation is separately evidenced.
+  certification_queries:
+    certified_protocols: protocol.certification_verdict in [certified_current, certified_superseded]
+    current_protocols: protocol.certification_verdict == certified_current
+    formal_governors: relation_type in [GOVERNED_BY, HOLDS_VOTING_SEAT, CHAIRS]
+    operational_backers: relation_type in [REFERENCE_IMPLEMENTS, INDEPENDENTLY_IMPLEMENTS, INTEGRATES, DEPLOYS_IN_PRODUCTION]
+    narrative_backers: relation_type in [ENDORSES, ANNOUNCES_SUPPORT_FOR]
+
+artifact_generation:
+  timeline:
+    source_collection: protocol_events
+    sort: [event_date, protocol_id, event_type]
+    lanes: [tool_context, agent_communication, delegated_authority, commerce, machine_payment]
+    required_labels: [protocol_name, event_type, summary]
+    uncertainty_style:
+      month: reduced_opacity
+      year: dashed_outline
+      unknown: omit_from_chronological_axis
+    show_events:
+      - public_launch
+      - governance_adoption
+      - stewardship_transfer
+      - specification_release
+      - merger
+      - archival
+      - production_deployment
+  multiplex_graph:
+    node_collections: [actors, protocols]
+    edge_collection: actor_protocol_relations
+    layers:
+      origin: [ORIGINATED, CO_DEVELOPED]
+      institutional: [DONATED_TO, STEWARDED_BY, MEMBER_OF_STEWARD, FUNDS]
+      governance: [GOVERNED_BY, HOLDS_VOTING_SEAT, CHAIRS, MAINTAINS]
+      technical: [CONTRIBUTES_CODE, PUBLISHES_SDK, REFERENCE_IMPLEMENTS, INDEPENDENTLY_IMPLEMENTS]
+      adoption: [INTEGRATES, DEPLOYS_IN_PRODUCTION]
+      narrative: [ENDORSES, ANNOUNCES_SUPPORT_FOR]
+    edge_weight_policy: >-
+      Do not collapse layers into one support score. If a summary scalar is
+      unavoidable, publish the layer vector beside it and expose the weights.
+  genealogy:
+    source_collection: protocol_protocol_relations
+    show_relation_types: [MERGED_INTO, SUPERSEDES, EXTENDS, INTEROPERATES_WITH]
+
+known_gaps:
+  - A2A version 0.1.0 release date remains unresolved in this seed.
+  - MCP maintainer-person affiliations require a separate time-bounded people layer.
+  - UCP's central governance file is distributed across its organisation repositories and needs a dedicated extraction pass.
+  - AP2 partner claims need reciprocal partner announcements before being promoted from announced support.
+  - x402 member status must be separated from protocol implementation and contribution histories.
+  - Production-use claims need independent corroboration and comparable usage measures.
+  - Privacy, provenance, licensing, and public-interest impact are outside certification and belong in protocol impact cards.
+
+change_policy:
+  monitor_daily:
+    - canonical specification pages
+    - release feeds
+    - governance and maintainer files
+  monitor_weekly:
+    - TSC membership
+    - working-group chairs
+    - independent implementation announcements
+    - production deployment claims
+  snapshot: true
+  compute_content_hash: true
+  retain_removed_records: true
+  close_validity_intervals_on_removal: true
+  never_delete_historical_events: true

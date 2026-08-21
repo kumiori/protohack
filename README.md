@@ -68,7 +68,7 @@ Set `MOSAIC_STATEMENT_URL` to the published Google Doc URL to expose the
 - `/commons-map` — public strategic distribution and participant-theme graph;
 - `/commons-host` — access-code-protected strategic, coordination, and diagnostic views;
 - `/test-timeline-benchmarks` — scenario-first onboarding laboratory with eight game-like levels, challenge cards, a hidden impossible benchmark, and sidebar experiment briefs that hand selected horizons into the trajectory game;
-- `/test-timeline-game` — session-only 3D trajectory sandbox using twelve event and planning primitives as hard piecewise-Hermite nodes, a continuous time/date preview slider, Smooth/Kink geometry, separate local uncertainty envelopes that never move the centreline, preserved camera orientation, simulated convergence traces, and a three-move integration gate without record writes;
+- `/test-timeline-game` — session-only `(time, energy, uncertainty)` trajectory sandbox using event and planning primitives as hard piecewise-Hermite nodes, a continuous time/date preview slider, gradual/abrupt geometry, separate local uncertainty envelopes that never move the centreline, preserved camera orientation, simulated convergence traces, and a three-move integration gate without record writes;
 - `/test-timeline-style-lab` — visual-only comparison of Instrument, Playground, and Gallery treatments over the exact same trajectory game, with oversized event objects, subtle motion, and a trajectory-first scene;
 - `/test-landing-primitives` — landing-page study composed from native Streamlit primitives and scoped styled containers, without authored HTML markup;
 - `/test-smokegun` — preserved first local smoke-test interface, grouped under `Tests` in navigation.

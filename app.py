@@ -22,6 +22,13 @@ navigation = st.navigation(
                 icon="🧬",
                 url_path="protocol-lab",
             ),
+            st.Page(
+                "views/protocol_lab_connection.py",
+                title="The Handshake",
+                icon="🧪",
+                url_path="protocol-lab-connection",
+                visibility="hidden",
+            ),
         ],
         "Commons": [
             st.Page(
@@ -63,6 +70,14 @@ navigation = st.navigation(
                 url_path="mosaic",
             ),
         ],
+        "Observatory": [
+            st.Page(
+                "views/agentic_protocol_map.py",
+                title="Agentic protocol map",
+                icon="🕸️",
+                url_path="agentic-protocol-map",
+            ),
+        ],
         "Operations": [
             st.Page(
                 "views/commons_host.py",
@@ -78,6 +93,12 @@ navigation = st.navigation(
             ),
         ],
         "Tests": [
+            st.Page(
+                "views/shared_goals.py",
+                title="Shared goals",
+                icon="🫱🏽‍🫲🏻",
+                url_path="shared-goals",
+            ),
             st.Page(
                 "views/test_sketch_plan.py",
                 title="Sketch a new plan",

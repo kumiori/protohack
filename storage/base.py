@@ -6,6 +6,23 @@ from typing import Any, Protocol
 
 
 class Repository(Protocol):
+    def create_shared_goal(self, goal: dict[str, Any]) -> dict[str, Any]: ...
+
+    def list_shared_goals(self) -> list[dict[str, Any]]: ...
+
+    def get_shared_goal(self, goal_id: str) -> dict[str, Any] | None: ...
+
+    def record_goal_trajectory(
+        self,
+        trajectory: dict[str, Any],
+        *,
+        update_existing: bool = False,
+    ) -> dict[str, Any]: ...
+
+    def list_goal_trajectories(self, goal_id: str) -> list[dict[str, Any]]: ...
+
+    def get_goal_trajectory(self, trajectory_id: str) -> dict[str, Any] | None: ...
+
     def record_protocol_lab_field_note(
         self, note: dict[str, Any]
     ) -> dict[str, Any]: ...

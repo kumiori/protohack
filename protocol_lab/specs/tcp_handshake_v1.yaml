@@ -1,6 +1,6 @@
 schema_version: protocol_lab_experiment_v1
 id: experiment_01_tcp_handshake
-version: 1.0.0-pilot
+version: 1.1.0-pilot
 status: pilot
 experiment_number: 1
 title: TCP Handshake
@@ -10,6 +10,12 @@ atlas_functions:
   - Synchronisation
 question: How do two endpoints establish compatible connection state before exchanging a reliable byte stream?
 human_question: How do two parties establish enough shared state to begin communicating?
+rationale_question: How little must two strangers share before they can begin communicating?
+rationale:
+  - We can establish a shared coordinate system for what we send and what we have received.
+  - TCP does this with two independent sequence spaces and acknowledgements of what comes next.
+shared_capability: We can both count, independently, and acknowledge where the other is in their count.
+reveal: Surprisingly little. They do not need the same starting point. They need a shared rule for interpreting and acknowledging each other's position.
 situation:
   - Two parties want to communicate.
   - Neither knows whether the other is ready.
@@ -87,38 +93,44 @@ participants:
 messages:
   - id: syn
     label: SYN
+    human_label: Knock
     sender: client
     receiver: server
-    technical: Synchronises the client's initial sequence number and proposes the beginning of its sequence space.
+    technical: SYN means synchronise sequence numbers. It proposes the client's initial sequence number and consumes one position, so the first subsequent byte is 101.
     expanded:
-      - "You: I want to begin. Here is where my sequence starts."
+      - "You: I want to open a connection."
+      - "You: I will begin counting my stream from 100."
     metadata:
       flags: SYN
       sequence: "100"
   - id: syn_ack
     label: SYN–ACK
+    human_label: Answer the knock
     sender: server
     receiver: client
-    technical: Acknowledges the client's next expected sequence number and synchronises the server's initial sequence number.
+    technical: Acknowledges 101 as the next expected client sequence number and synchronises the server's independent sequence space at 500.
     expanded:
-      - "Other side: I heard your beginning. Here is mine."
+      - "Other side: I heard you starting at 100, so I expect 101 from you."
+      - "Other side: I also want to communicate, and I will begin my own count from 500."
     metadata:
       flags: SYN,ACK
-      sequence: "300"
+      sequence: "500"
       acknowledgement: "101"
   - id: ack
     label: ACK
+    human_label: Confirm
     sender: client
     receiver: server
-    technical: Acknowledges the server's next expected sequence number, completing compatible connection state.
+    technical: Acknowledges 501 as the next expected server sequence number, completing compatible connection state.
     expanded:
-      - "You: I heard yours. We are ready to begin."
+      - "You: I heard that you start at 500, so I expect 501 from you."
     metadata:
       flags: ACK
       sequence: "101"
-      acknowledgement: "301"
+      acknowledgement: "501"
   - id: server_syn
     label: SYN
+    human_label: Simultaneous knock
     sender: server
     receiver: client
     technical: A simultaneous active open from the server side.
@@ -128,9 +140,10 @@ messages:
       - "Server: Can our two requests converge?"
     metadata:
       flags: SYN
-      sequence: "300"
+      sequence: "500"
   - id: client_syn_ack
     label: SYN–ACK
+    human_label: Reconcile both knocks
     sender: client
     receiver: server
     technical: Acknowledges a simultaneous open while retaining the client's initial sequence.
@@ -141,9 +154,10 @@ messages:
     metadata:
       flags: SYN,ACK
       sequence: "100"
-      acknowledgement: "301"
+      acknowledgement: "501"
   - id: rst
     label: RST
+    human_label: Refuse
     sender: server
     receiver: client
     technical: Refuses or resets the attempted connection.
@@ -420,7 +434,7 @@ hidden_state_rules:
     trigger_event: message_delivered:syn_ack
     level: partial
     actor: client
-    observation: The reply shows that both sides can refer to the same opening, not authenticated identity or intent.
+    observation: The reply shows that both sides can interpret and acknowledge each other's position, not authenticated identity or intent.
     provenance: interpretive_hypothesis
   - id: risk_timeout
     dimension: Risk
@@ -441,7 +455,7 @@ hidden_state_rules:
     trigger_event: status:established
     level: bounded
     actor: both
-    observation: Both peers share connection state, while identity and confidentiality remain unresolved.
+    observation: Both peers know where the other begins and what to expect next, while identity and confidentiality remain unresolved.
     provenance: interpretive_hypothesis
 
 reflection_prompts:
