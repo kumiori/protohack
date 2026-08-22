@@ -1,0 +1,171 @@
+commons_first_move:
+  type: question
+  title: What should happen first?
+  context: >-
+    A shared resource is being reused by people and AI agents, but its
+    contributors are becoming invisible. Where should the protocol intervene first?
+  mode: single_choice
+  options:
+    - Reveal provenance
+    - Ask contributors
+    - Track value flows
+    - Define return conditions
+    - Do nothing yet
+  allow_comment: true
+
+necessity_or_project:
+  type: question
+  title: Is this a project, or does it answer a necessity?
+  context: >-
+    A group proposes an ambitious collective action. The people involved agree
+    that it would be valuable, but disagree about whether it responds to a shared
+    necessity or simply to someone's preferred project. What should happen?
+  mode: single_choice
+  options:
+    - Act and discover the necessity through practice
+    - Expose the claimed necessity and its conditions first
+    - Ask who is affected
+    - Search for competing necessities
+    - The distinction does not matter
+  allow_comment: true
+
+authority_without_center:
+  type: question
+  title: Who gets to authorize the next move?
+  context: >-
+    Humans and AI agents have gathered enough information to act, but no single
+    participant has legitimate authority over the whole situation. How should
+    authorization emerge?
+  mode: single_choice
+  options:
+    - From the initiator
+    - From those most affected
+    - From explicit collective consent
+    - From an established steward or institution
+    - From the protocol's predefined rules
+    - No action should occur yet
+  allow_comment: true
+
+attribution_under_transformation:
+  type: question
+  title: When does a contribution stop being yours?
+  context: >-
+    Your contribution has been combined with hundreds of others, transformed
+    several times by AI agents, and incorporated into something substantially new.
+    What should persist?
+  mode: multiple_choice
+  options:
+    - My identity
+    - The original contribution
+    - The chain of transformations
+    - My conditions of reuse
+    - My share in generated value
+    - Nothing necessarily
+  allow_comment: true
+
+consent_after_transformation:
+  type: question
+  title: Does consent travel with a contribution?
+  context: >-
+    You consented to one use of your contribution. An AI agent now discovers a
+    valuable use that nobody anticipated when you contributed it. What should
+    happen?
+  mode: single_choice
+  options:
+    - Original consent is sufficient
+    - Ask for consent again
+    - Follow conditions attached to the contribution
+    - Proceed, but notify contributors
+    - Proceed if the resulting value returns to the commons
+    - It depends on the transformation
+  allow_comment: true
+
+value_return:
+  type: question
+  title: What counts as returning value?
+  context: >-
+    A private actor creates substantial value using knowledge, infrastructure,
+    labour, and data originating in a commons. What would constitute a meaningful
+    return?
+  mode: multiple_choice
+  options:
+    - Money
+    - Improved data or knowledge
+    - Infrastructure
+    - Attribution and visibility
+    - Corrections and derived results
+    - Labour or expertise
+    - New access or capabilities
+    - Nothing should be required
+  allow_comment: true
+
+closure_test:
+  type: question
+  title: When is an interaction actually finished?
+  context: >-
+    An AI agent has answered a question and the human has successfully used the
+    answer. From the perspective of the protocol, has the interaction reached
+    closure?
+  mode: single_choice
+  options:
+    - Yes, the requested task is complete
+    - Only when the outcome is known
+    - Only when contributors can be traced
+    - Only when consequences can be verified
+    - Only when reusable value is returned
+    - There may be no final closure
+  allow_comment: true
+
+commons_or_extraction:
+  type: question
+  title: When does circulation become extraction?
+  context: >-
+    A contribution is openly available, legally reusable, correctly attributed,
+    and becomes an essential input to a highly profitable AI service. No rule has
+    been violated. Has something nevertheless gone wrong?
+  mode: single_choice
+  options:
+    - No, openness includes commercial reuse
+    - Yes, value has ceased to circulate
+    - Only if contributors object
+    - Only if the commons is weakened
+    - It depends on what returns
+    - The protocol cannot decide this
+  allow_comment: true
+
+protocol_politics:
+  type: question
+  title: Where is the power hiding?
+  context: >-
+    The protocol transparently records attribution, consent, actions, and outcomes.
+    Everyone follows its rules. Where could power still concentrate?
+  mode: multiple_choice
+  options:
+    - In who defines the protocol
+    - In who controls the infrastructure
+    - In who can refuse participation
+    - In who interprets necessities
+    - In who has the capacity to act
+    - In who verifies outcomes
+    - In the protocol itself
+    - Somewhere else
+  allow_comment: true
+
+protocol_engagement:
+  type: question
+  title: What would you do with this protocol?
+  context: >-
+    You have encountered the proposition through this document. The protocol is
+    deliberately unfinished and is being exposed early enough to be changed.
+    What relationship would you like to have with it?
+  mode: multiple_choice
+  options:
+    - Support it
+    - Challenge it
+    - Test it
+    - Break it
+    - Contribute a use case
+    - Help specify it
+    - Build with it
+    - Observe for now
+  allow_comment: true

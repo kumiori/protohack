@@ -2,6 +2,7 @@
 
 | Feature | Route | Status | Owning module | Acceptance test | Dependencies | Class |
 |---|---|---|---|---|---|---|
+| Markdown-authored protocol aperture with separate trace events | `/test-markdown-aperture` | Implemented | `content/experiments/`, `protocol/aperture/`, `views/test_markdown_aperture.py` | `tests/test_markdown_aperture.py` | PyYAML, native Streamlit widgets, local JSONL | Experimental |
 | Independently installable deterministic protocol engine | Build artifact | Implemented | `packages/protocol-lab` | `packages/protocol-lab/tests/test_public_api.py` | PyYAML only | Required |
 | Independently installable trajectory reasoning engine | Build artifact | Implemented | `packages/trajectory-engine` | `packages/trajectory-engine/tests/test_public_api.py` | PyYAML only | Required |
 | Protocol Atlas organised by human function | `/protocol-lab` | Implemented | `views/protocol_lab.py`, `protocol_lab/atlas.py` | `tests/test_protocol_lab_ui.py` | Versioned experiment definitions | Required |

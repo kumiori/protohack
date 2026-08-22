@@ -94,6 +94,12 @@ navigation = st.navigation(
         ],
         "Tests": [
             st.Page(
+                "views/test_markdown_aperture.py",
+                title="Markdown aperture",
+                icon="📝",
+                url_path="test-markdown-aperture",
+            ),
+            st.Page(
                 "views/shared_goals.py",
                 title="Shared goals",
                 icon="🫱🏽‍🫲🏻",
