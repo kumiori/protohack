@@ -9,6 +9,7 @@ from typing import Any
 
 class InMemoryRepository:
     def __init__(self) -> None:
+        self._probe_trajectories: dict[str, dict[str, Any]] = {}
         self._strategies: dict[tuple[str, str, str], dict[str, Any]] = {}
         self._question_events: dict[tuple[str, str, str], dict[str, Any]] = {}
         self._question_set_submissions: dict[tuple[str, str, str], dict[str, Any]] = {}
@@ -19,6 +20,21 @@ class InMemoryRepository:
         self._shared_goals: dict[str, dict[str, Any]] = {}
         self._goal_trajectories: dict[str, dict[str, Any]] = {}
         self._lock = RLock()
+
+    def save_probe_trajectory(
+        self, trajectory: dict[str, Any]
+    ) -> dict[str, Any]:
+        participation_id = str(trajectory["participation_id"])
+        with self._lock:
+            self._probe_trajectories[participation_id] = deepcopy(trajectory)
+            return deepcopy(self._probe_trajectories[participation_id])
+
+    def get_probe_trajectory(
+        self, participation_id: str
+    ) -> dict[str, Any] | None:
+        with self._lock:
+            value = self._probe_trajectories.get(participation_id)
+            return deepcopy(value) if value else None
 
     def create_shared_goal(self, goal: dict[str, Any]) -> dict[str, Any]:
         goal_id = str(goal["goal_id"])

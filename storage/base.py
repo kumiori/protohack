@@ -6,6 +6,14 @@ from typing import Any, Protocol
 
 
 class Repository(Protocol):
+    def save_probe_trajectory(
+        self, trajectory: dict[str, Any]
+    ) -> dict[str, Any]: ...
+
+    def get_probe_trajectory(
+        self, participation_id: str
+    ) -> dict[str, Any] | None: ...
+
     def create_shared_goal(self, goal: dict[str, Any]) -> dict[str, Any]: ...
 
     def list_shared_goals(self) -> list[dict[str, Any]]: ...
