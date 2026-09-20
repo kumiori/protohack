@@ -17,6 +17,18 @@ def test_application_root_renders_home_without_redirecting_to_commons() -> None:
     assert 'class="landing-shell"' in home_source
 
 
+def test_landing_sidebar_is_local_only_and_preserves_deployed_chrome() -> None:
+    app_source = APP_ENTRY.read_text(encoding="utf-8")
+    source = HOME_VIEW.read_text(encoding="utf-8")
+
+    assert 'initial_sidebar_state="collapsed"' in app_source
+    assert 'data-testid="stSidebarCollapsedControl"' in app_source
+    assert "local_debug_enabled(request_url)" in source
+    assert "render_local_landing_debug(request_url)" in source
+    assert "if not show_local_debug" in source
+    assert "__LANDING_SIDEBAR_VISIBILITY__" in source
+
+
 def test_home_uses_a_living_network_instead_of_a_centralized_orbit() -> None:
     source = HOME_VIEW.read_text(encoding="utf-8")
 
