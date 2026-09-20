@@ -11,9 +11,18 @@ st.set_page_config(
     page_title="Protocol Laboratory · Commons",
     page_icon="🧬",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
 apply_theme()
+st.html(
+    """
+    <style>
+    [data-testid="stSidebarCollapsedControl"] {
+      display: none !important;
+    }
+    </style>
+    """
+)
 
 navigation = st.navigation(
     {

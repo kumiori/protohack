@@ -98,7 +98,7 @@ def test_benchmark_page_is_registered_and_guided_in_the_main_scene() -> None:
 
     assert '"views/test_timeline_benchmarks.py"' in app_source
     assert 'url_path="test-timeline-benchmarks"' in app_source
-    assert 'initial_sidebar_state="expanded"' in app_source
+    assert 'initial_sidebar_state="collapsed"' in app_source
     assert "with st.sidebar:" not in view_source
     assert "Where are you starting?" in view_source
     assert "Where do you plan to arrive?" in view_source
