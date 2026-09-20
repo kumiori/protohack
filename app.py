@@ -2,6 +2,8 @@
 
 import streamlit as st
 
+from event_ui import page_for_event
+from protocol.probe_registry import registered_events
 from ui import apply_theme
 
 
@@ -50,6 +52,7 @@ navigation = st.navigation(
                 url_path="commons-map",
             ),
         ],
+        "Events": [page_for_event(event) for event in registered_events()],
         "Tracks": [
             st.Page(
                 "views/capacity.py",
@@ -93,6 +96,12 @@ navigation = st.navigation(
             ),
         ],
         "Tests": [
+            st.Page(
+                "views/test_markdown_aperture.py",
+                title="Markdown aperture",
+                icon="📝",
+                url_path="test-markdown-aperture",
+            ),
             st.Page(
                 "views/shared_goals.py",
                 title="Shared goals",

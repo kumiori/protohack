@@ -1,0 +1,724 @@
+schema: probe-authoring/v1
+questionnaire:
+  id: montreal_initial_conditions_2026
+  revision: 1
+  status: review
+  language: fr
+  default_mode: standard
+  show_mode_selection: false
+  show_welcome_step: true
+  review:
+    change_note: 'Block 0 / Initial Conditions. Proof of concept for the Montréal handshake: establish the field
+      before the Forum and expose capacities, needs, authority, constraints, unknowns, prior action and timeline.'
+step_order:
+- welcome
+- event_time
+- desired_difference
+- actors
+- themes
+- capacity_need
+- contribution
+- authority
+- friction
+- unknowns
+- already_done
+- timeline
+- handshake
+- review
+- done
+flow_modes:
+  standard:
+    title: Commons Montréal — Conditions initiales
+    detail: ~10–15 minutes
+    steps:
+    - event_time
+    - desired_difference
+    - actors
+    - themes
+    - capacity_need
+    - contribution
+    - authority
+    - friction
+    - unknowns
+    - already_done
+    - timeline
+    - handshake
+sections:
+- id: orientation
+  title: Quand commençons-nous ?
+  steps:
+  - event_time
+  - desired_difference
+  process:
+    checkpoint: true
+- id: field
+  title: Le champ initial
+  steps:
+  - actors
+  - themes
+  - capacity_need
+  - contribution
+  - authority
+  - friction
+  - unknowns
+  process:
+    checkpoint: true
+    sync_point: initial_field
+- id: trajectory
+  title: Ce qui est déjà en mouvement
+  steps:
+  - already_done
+  - timeline
+  - handshake
+  process:
+    checkpoint: true
+    sync_point: initial_handshakes
+step_copy:
+  welcome:
+    title: Le Forum commence-t-il déjà ?
+    body: 'Le programme contient déjà une trajectoire implicite, de la compréhension vers l’action. Cette première
+      passe nous sert à établir les conditions initiales : ce que nous voyons, ce que nous pouvons faire, ce dont
+      nous avons besoin, ce qui nous contraint et ce qui est déjà en mouvement. L’objectif n’est pas de produire
+      un document de plus, mais de rendre possibles des handshakes exécutables avant Montréal.
+
+
+      Sauf indication contraire, plusieurs réponses peuvent être sélectionnées. Nous pouvons passer ou signaler
+      chaque question. Nous pourrons relire et faire évoluer nos réponses.'
+    cta: Commencer
+  event_time:
+    title: Quand est-ce que le Forum commence ?
+    body: Choisissons ce qui décrit le mieux notre intuition aujourd’hui.
+    cta: Continuer
+  desired_difference:
+    title: Qu’est-ce qui devrait exister après le 29 octobre qui n’existe pas aujourd’hui ?
+    body: Pensons en termes de différence observable, pas seulement de livrable.
+    cta: Continuer
+  actors:
+    title: Qui agit dans ce Forum ?
+    body: Cartographions les acteurs que nous voyons déjà, puis ceux qui manquent.
+    cta: Continuer
+  themes:
+    title: Où se situent aujourd’hui notre capacité et notre besoin ?
+    body: Utilisons les quatre thèmes du programme comme premier repère commun.
+    cta: Continuer
+  capacity_need:
+    title: Que pouvons-nous faire, et de quoi avons-nous besoin ?
+    body: Cherchons les premières complémentarités possibles.
+    cta: Continuer
+  contribution:
+    title: Qu’est-ce que je peux mettre sur la table maintenant ?
+    body: Une capacité concrète, mobilisable avant ou pendant Montréal.
+    cta: Continuer
+  authority:
+    title: Qu’est-ce que je peux décider ou autoriser ?
+    body: Distinguons capacité et autorité. Une action possible techniquement peut dépendre de quelqu’un d’autre.
+    cta: Continuer
+  friction:
+    title: Qu’est-ce qui m’empêche aujourd’hui d’agir comme je le voudrais ?
+    body: Identifions les contraintes plutôt que de les confondre avec les besoins.
+    cta: Continuer
+  unknowns:
+    title: Qu’est-ce que nous ne savons pas encore ?
+    body: 'Une inconnue bien posée peut devenir une action : qui pourrait la lever ?'
+    cta: Continuer
+  already_done:
+    title: Qu’est-ce qui a déjà été fait ?
+    body: Partons de ce qui existe réellement. Si possible, indiquons aussi ce qui s’est passé ensuite.
+    cta: Continuer
+  timeline:
+    title: Qu’est-ce qui contraint déjà notre calendrier ?
+    body: Dates, décisions, réunions, appels, échéances ou événements qui structurent la trajectoire jusqu’à Montréal
+      et au-delà.
+    cta: Continuer
+  handshake:
+    title: Quel premier handshake pourrait déjà avoir lieu ?
+    body: Un lien n’est pas seulement « A rencontre B ». Un handshake apparaît lorsqu’une capacité rencontre un
+      besoin, qu’une dépendance est reconnue et qu’une prochaine opération devient possible.
+    cta: Continuer
+  review:
+    title: Relire nos conditions initiales
+    body: Relisons, corrigeons et réalignons avant d’intégrer cette trajectoire au paysage commun.
+    cta: Intégrer au paysage commun
+  done:
+    title: Le champ initial existe
+    body: Cette contribution peut maintenant rencontrer celles des autres et rendre visibles des dépendances, des
+      complémentarités et de premiers handshakes.
+    cta: Voir le paysage
+taxonomies:
+  forum_themes:
+    options:
+    - value: governance
+      label: Gouvernance des données
+    - value: openness
+      label: Conditions d’ouverture et de réciprocité
+    - value: infrastructure
+      label: Infrastructures d’accès, protocoles et standards
+    - value: collective_action
+      label: Stratégies d’action collective
+    - value: other
+      label: Autre
+  actor_types:
+    options:
+    - value: public_authority
+      label: Autorité publique / administration
+    - value: cultural_institution
+      label: Institution culturelle, patrimoniale ou éducative
+    - value: research
+      label: Recherche / enseignement supérieur
+    - value: commons
+      label: Mouvement des communs / savoir libre
+    - value: civil_society
+      label: Société civile / communauté / collectif
+    - value: technical_builder
+      label: Constructeur·ice d’infrastructure / développeur·euse
+    - value: operator
+      label: Opérateur·ice / personne en charge de la mise en œuvre
+    - value: legal_policy
+      label: Droit / politiques publiques / gouvernance
+    - value: artist_creator
+      label: Artiste / créateur·ice
+    - value: funder
+      label: Financeur / soutien
+    - value: ai_company
+      label: Entreprise d’IA / acteur commercial
+    - value: international_org
+      label: Organisation internationale
+    - value: other
+      label: Autre
+  capacity_types:
+    options:
+    - value: knowledge
+      label: Expertise / connaissance
+    - value: data
+      label: Données / collections / corpus
+    - value: infrastructure
+      label: Infrastructure / outil / code
+    - value: network
+      label: Réseau / mise en relation
+    - value: institutional_access
+      label: Accès institutionnel
+    - value: decision_power
+      label: Pouvoir de décision / mandat
+    - value: legal_policy
+      label: Expertise juridique / politique publique
+    - value: facilitation
+      label: Facilitation / organisation
+    - value: communication
+      label: Communication / mobilisation
+    - value: funding
+      label: Financement / ressources
+    - value: documentation
+      label: Documentation / recherche / évaluation
+    - value: other
+      label: Autre
+  friction_types:
+    options:
+    - value: authority
+      label: Mandat / pouvoir de décision
+    - value: knowledge
+      label: Expertise / connaissances
+    - value: data
+      label: Accès aux données
+    - value: legal
+      label: Cadre juridique / droits
+    - value: infrastructure
+      label: Infrastructure / outils
+    - value: funding
+      label: Financement
+    - value: time
+      label: Temps / disponibilité
+    - value: coordination
+      label: Coordination entre acteurs
+    - value: institutional_support
+      label: Soutien institutionnel
+    - value: missing_actor
+      label: Acteur nécessaire absent
+    - value: uncertainty
+      label: Information insuffisante / incertitude
+    - value: other
+      label: Autre
+  unknown_types:
+    options:
+    - value: facts
+      label: Faits / données
+    - value: actors
+      label: Acteurs
+    - value: intentions
+      label: Intentions / positions
+    - value: authority
+      label: Autorité / mandat
+    - value: capabilities
+      label: Capacités disponibles
+    - value: constraints
+      label: Contraintes
+    - value: consequences
+      label: Conséquences possibles
+    - value: terms
+      label: Sens des termes / langage commun
+    - value: timeline
+      label: Dates / décisions à venir
+    - value: other
+      label: Autre
+questions:
+- step: event_time
+  field: event_start
+  id: event_start
+  revision: 1
+  prompt: Quand est-ce que le Forum commence ?
+  input_type: multi_with_other
+  required: false
+  max_select: 2
+  options:
+  - value: arrival
+    label: Quand nous arrivons à Montréal
+  - value: preparation
+    label: Pendant la préparation
+  - value: already
+    label: Il a déjà commencé
+  - value: first_action
+    label: Quand une première action arrive à cause du Forum
+  - value: never_really_starts
+    label: Il n’a pas de début net
+  - value: dont_know
+    label: Je ne sais pas encore
+  - value: other
+    label: Autre
+  free_text:
+    field: event_start_other
+    prompt: Précisons si nous le souhaitons
+- step: desired_difference
+  field: desired_difference
+  id: desired_difference
+  revision: 1
+  prompt: Qu’est-ce qui devrait exister après le 29 octobre qui n’existe pas aujourd’hui ?
+  input_type: multi_with_other
+  required: false
+  max_select: 5
+  options:
+  - value: shared_language
+    label: Un langage commun plus précis
+  - value: legible_disagreements
+    label: Des désaccords rendus lisibles
+  - value: new_relationships
+    label: De nouvelles relations utiles
+  - value: decisions
+    label: Des décisions
+  - value: commitments
+    label: Des engagements
+  - value: experiments
+    label: Des expérimentations en cours
+  - value: infrastructure
+    label: Un outil ou une infrastructure
+  - value: coalition
+    label: Une coalition / capacité collective
+  - value: action
+    label: Des actions déjà engagées
+  - value: new_questions
+    label: De nouvelles questions devenues visibles
+  - value: other
+    label: Autre
+  free_text:
+    field: desired_difference_other
+    prompt: Autre différence observable
+- step: actors
+  field: actors_present
+  id: actors_present
+  revision: 1
+  prompt: Quels acteurs sont déjà dans le champ ?
+  input_type: grouped_multi
+  required: false
+  taxonomy: actor_types
+  free_text:
+    field: actors_present_other
+    prompt: Autres acteurs
+- step: actors
+  field: actors_missing
+  id: actors_missing
+  revision: 1
+  prompt: Qui manque aujourd’hui ?
+  input_type: grouped_multi
+  required: false
+  taxonomy: actor_types
+  free_text:
+    field: actors_missing_other
+    prompt: Qui manque précisément ?
+- step: themes
+  field: theme_capacity
+  id: theme_capacity
+  revision: 1
+  prompt: Sur quels thèmes avons-nous aujourd’hui le plus de capacité d’action ?
+  input_type: grouped_multi
+  required: false
+  max_select: 2
+  taxonomy: forum_themes
+- step: themes
+  field: theme_need
+  id: theme_need
+  revision: 1
+  prompt: Sur quels thèmes avons-nous aujourd’hui le plus besoin d’appui ?
+  input_type: grouped_multi
+  required: false
+  max_select: 2
+  taxonomy: forum_themes
+- step: capacity_need
+  field: capacities
+  id: capacities
+  revision: 1
+  prompt: Quelles capacités pouvons-nous mobiliser ?
+  input_type: grouped_multi
+  required: false
+  max_select: 5
+  taxonomy: capacity_types
+  companion:
+    field: capacities_example
+    prompt: Un exemple concret, si nous le souhaitons
+- step: capacity_need
+  field: needs
+  id: needs
+  revision: 1
+  prompt: De quelles capacités avons-nous besoin ?
+  input_type: grouped_multi
+  required: false
+  max_select: 5
+  taxonomy: capacity_types
+  companion:
+    field: needs_example
+    prompt: Un besoin concret, si nous le souhaitons
+- step: contribution
+  field: contribution
+  id: contribution
+  revision: 1
+  prompt: Qu’est-ce que je peux mettre sur la table maintenant ?
+  input_type: multi_with_other
+  required: false
+  max_select: 5
+  options:
+  - value: expertise
+    label: Partager une expertise
+  - value: data
+    label: Partager des données / ressources
+  - value: tool
+    label: Mettre à disposition un outil / code
+  - value: prototype
+    label: Construire ou tester un prototype
+  - value: network
+    label: Mettre des personnes en relation
+  - value: facilitate
+    label: Faciliter / organiser
+  - value: document
+    label: Documenter / évaluer
+  - value: institutional
+    label: Porter quelque chose dans mon organisation
+  - value: advocacy
+    label: Plaider / mobiliser
+  - value: funding
+    label: Soutenir / financer
+  - value: other
+    label: Autre
+  free_text:
+    field: contribution_other
+    prompt: Précisons la contribution
+- step: authority
+  field: authority
+  id: authority
+  revision: 1
+  prompt: Qu’est-ce que je peux réellement décider ou autoriser ?
+  input_type: multi_with_other
+  required: false
+  max_select: 4
+  options:
+  - value: own_work
+    label: Ma propre manière de travailler
+  - value: share_resource
+    label: Partager une ressource / donnée / document
+  - value: technical_change
+    label: Faire ou autoriser un changement technique
+  - value: convene
+    label: Convoquer / organiser une rencontre
+  - value: commit_time
+    label: Engager du temps / des personnes
+  - value: institutional_practice
+    label: Modifier une pratique institutionnelle
+  - value: partnership
+    label: Engager / proposer un partenariat
+  - value: budget
+    label: Engager des ressources / un budget
+  - value: policy
+    label: Décider / influencer une règle ou politique
+  - value: none_clear
+    label: Mon autorité n’est pas claire
+  - value: other
+    label: Autre
+  free_text:
+    field: authority_other
+    prompt: Précisons si utile
+- step: authority
+  field: authority_dependency
+  id: authority_dependency
+  revision: 1
+  prompt: Qu’est-ce qui exige l’autorité de quelqu’un d’autre ?
+  input_type: repeatable_group
+  required: false
+  min_items: 0
+  fields:
+  - field: authority_action
+    prompt: Action / décision
+    input_type: text_with_suggestions
+    required: false
+    suggestions:
+    - Accès ou ouverture de données
+    - Modification d’une politique
+    - Engagement de ressources
+    - Partenariat
+    - Publication / communication
+    - Choix technique / infrastructure
+    - Autre
+  - field: authority_actors
+    prompt: De qui cela dépend-il ?
+    input_type: grouped_multi
+    required: false
+    taxonomy: actor_types
+- step: friction
+  field: frictions
+  id: frictions
+  revision: 1
+  prompt: Qu’est-ce qui m’empêche aujourd’hui d’agir comme je le voudrais ?
+  input_type: grouped_multi
+  required: false
+  max_select: 5
+  taxonomy: friction_types
+  companion:
+    field: friction_example
+    prompt: Un exemple concret, si nous le souhaitons
+- step: unknowns
+  field: unknowns
+  id: unknowns
+  revision: 1
+  prompt: Qu’est-ce que nous ne savons pas encore ?
+  input_type: grouped_multi
+  required: false
+  max_select: 5
+  taxonomy: unknown_types
+  companion:
+    field: unknown_detail
+    prompt: Quelle inconnue faudrait-il lever en premier ?
+- step: unknowns
+  field: unknown_resolver
+  id: unknown_resolver
+  revision: 1
+  prompt: Qui pourrait nous aider à lever cette inconnue ?
+  input_type: grouped_multi
+  required: false
+  taxonomy: actor_types
+- step: already_done
+  field: already_done
+  id: already_done
+  revision: 1
+  prompt: Qu’est-ce qui a déjà été fait ?
+  input_type: repeatable_group
+  required: false
+  min_items: 0
+  fields:
+  - field: already_done_action
+    prompt: Action déjà réalisée
+    input_type: text_with_suggestions
+    required: false
+    suggestions:
+    - Réunion / discussion
+    - Cartographie
+    - Document / note
+    - Prototype
+    - Prise de contact
+    - Partenariat
+    - Décision
+    - Expérimentation
+    - Autre
+  - field: already_done_consequence
+    prompt: Qu’est-ce qui s’est passé ensuite ?
+    input_type: text
+    required: false
+- step: timeline
+  field: timeline_constraints
+  id: timeline_constraints
+  revision: 1
+  prompt: Quelles dates, décisions ou événements contraignent déjà notre trajectoire ?
+  input_type: repeatable_group
+  required: false
+  min_items: 0
+  fields:
+  - field: date
+    prompt: Date ou période
+    input_type: text
+    required: false
+  - field: event
+    prompt: Décision / événement / échéance
+    input_type: text_with_suggestions
+    required: false
+    suggestions:
+    - Réunion
+    - Appel / financement
+    - Décision institutionnelle
+    - Publication
+    - Événement public
+    - Montréal 28–29 octobre
+    - Genève
+    - Autre
+  - field: effect
+    prompt: Pourquoi cela compte ?
+    input_type: text
+    required: false
+- step: handshake
+  field: handshake
+  id: handshake
+  revision: 1
+  prompt: Quel premier handshake pourrait déjà avoir lieu ?
+  input_type: repeatable_group
+  required: false
+  min_items: 0
+  fields:
+  - field: need
+    prompt: Besoin / nécessité
+    input_type: text_with_suggestions
+    required: false
+    suggestions:
+    - Expertise
+    - Données
+    - Infrastructure
+    - Autorité
+    - Mise en relation
+    - Financement
+    - Information
+    - Autre
+  - field: capacity
+    prompt: Capacité qui pourrait y répondre
+    input_type: text_with_suggestions
+    required: false
+    suggestions:
+    - Expertise
+    - Données
+    - Infrastructure
+    - Autorité
+    - Réseau
+    - Financement
+    - Temps / organisation
+    - Autre
+  - field: with_whom
+    prompt: Avec qui ?
+    input_type: grouped_multi
+    required: false
+    taxonomy: actor_types
+  - field: next_operation
+    prompt: Prochaine opération possible
+    input_type: text_with_suggestions
+    required: false
+    suggestions:
+    - Prendre contact
+    - Partager une ressource
+    - Organiser une réunion
+    - Tester un outil
+    - Vérifier une contrainte
+    - Demander une autorisation
+    - Formuler une proposition
+    - Autre
+  - field: trace
+    prompt: Quelle trace nous dira que cela a eu lieu ?
+    input_type: text_with_suggestions
+    required: false
+    suggestions:
+    - Message / introduction
+    - Document partagé
+    - Décision
+    - Prototype
+    - Rendez-vous
+    - Commit / issue
+    - Compte rendu
+    - Autre
+interaction:
+  question_resolution:
+  - answer
+  - skip
+  - flag
+  answer_before_meta_actions: true
+  subordinate_fields_inherit_parent_resolution: true
+  nothing_substantively_mandatory: true
+  skip:
+    enabled: true
+    reason_prompt: Pourquoi est-ce que je passe cette question ?
+    reasons:
+    - value: not_applicable
+      label: Non applicable
+    - value: dont_know
+      label: Je ne sais pas
+    - value: prefer_not
+      label: Je préfère ne pas répondre
+    - value: cannot_answer
+      label: La question ne me permet pas de répondre correctement
+    - value: other
+      label: Autre
+    note_optional: true
+  flag:
+    enabled: true
+    prompt: Signalons positivement ou négativement ce qui fonctionne, ce qui ne fonctionne pas ou mérite attention.
+    options:
+    - value: interesting
+      label: Intéressante
+    - value: useful
+      label: Utile
+    - value: thought_provoking
+      label: Stimulante
+    - value: well_framed
+      label: Bien formulée
+    - value: incomplete
+      label: Incomplète
+    - value: misleading
+      label: Trompeuse
+    - value: too_narrow
+      label: Trop étroite
+    - value: unclear
+      label: Peu claire
+    - value: missing_option
+      label: Option manquante
+    note_optional: true
+  review_editable: true
+representations:
+- id: theme_capacity_need
+  type: comparison
+  scope: collective
+  sources:
+  - field: theme_capacity
+    role: capacity
+  - field: theme_need
+    role: need
+- id: capacity_need
+  type: comparison
+  scope: collective
+  sources:
+  - field: capacities
+    role: capacity
+  - field: needs
+    role: need
+- id: initial_field
+  type: composite
+  scope: collective
+  components:
+  - type: distribution
+    source:
+      field: event_start
+  - representation: theme_capacity_need
+  - representation: capacity_need
+  - type: distribution
+    source:
+      field: frictions
+  - type: distribution
+    source:
+      field: unknowns
+- id: handshake_candidates
+  type: records
+  scope: collective
+  source:
+    field: handshake
+- id: trajectory_constraints
+  type: records
+  scope: collective
+  source:
+    field: timeline_constraints
