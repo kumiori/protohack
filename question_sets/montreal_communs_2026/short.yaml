@@ -1,7 +1,7 @@
 schema: probe-authoring/v1
 questionnaire:
     id: montreal_communs_data_ai_short_2026
-    revision: 3
+    revision: 4
     status: review
     language: fr
     default_mode: standard
@@ -141,60 +141,24 @@ step_copy:
         cta: Commencer
     participation_information:
         title: Informations sur ma participation
-        body: '
-
-            Les informations recueillies serviront à préparer l’organisation du Forum Communs de données et IA des 28-29 octobre 2026. Elles pourront également nourrir des publications qui découleront de cet évènement (synthèse, article scientifique).
-
-
-            Votre nom ne sera pas mentionné dans les publications qui découleront du projet.
-
-
-            Vos réponses seront conservées de façon sécurisée durant 5 ans et ne seront accessibles qu’à l équipe de recherche.
-
-
-            Certaines informations d’identification professionnelle seront partagées avec les autres participants de l’événement pour faciliter le réseautage. /* */conse
-
-
-            Vous êtes libres de répondre ou non à une question posée, et vous pourrez quitter à tout moment le sondage. Dans ce cas, vos données ne seront pas utilisées.
-
-
-            Si vous souhaitez retirer vos réponses, vous pouvez contacter les personnes responsables (ci-dessous).
-
-
-            ------
-
-            Les informations recueillies servent à préparer et documenter le Forum Communs de données et IA des 28–29 octobre 2026. Elles pourront également contribuer aux productions issues de cette expérimentation, notamment une synthèse du Forum ou des publications scientifiques.
-
+        body: |
+            Les informations recueillies servent à préparer et documenter le Forum Communs de données et IA des 28–29 octobre 2026. Elles pourront également contribuer aux productions issues de cette expérimentation, notamment une présentation anonymisée des résultats lors du Forum, une synthèse ou des publications scientifiques.
 
             Mes réponses et mon identité sont traitées séparément. Mon nom n’est pas associé publiquement à mes réponses et n’est pas mentionné dans les publications issues du projet, sauf si je choisis explicitement de l’autoriser.
 
+            Après intégration, mes réponses sont conservées dans une base de données du projet sécurisée hébergée à distance ([notion.so](http://notion.so)). Les données permettant de m’identifier sont conservées séparément des réponses au questionnaire et seront détruites après 5 ans.
 
-            Après intégration, mes réponses sont conservées dans une base de données du projet sécurisée hébergée à distance (notion.so). Les données permettant de m’identifier sont conservées séparément des réponses au questionnaire. Les réponses peuvent ainsi être analysées sans qu’il soit nécessaire d’y associer directement mon identité.
+            Je reste libre de répondre ou non à chaque question. Je peux interrompre le questionnaire à tout moment.
 
+            Avant cette intégration, je peux examiner les données qui seront transmises.
 
-            Certaines informations professionnelles peuvent être utiles pour permettre aux personnes participant au Forum de se retrouver, d’échanger et de poursuivre des collaborations. Ce partage fera l’objet d’un choix explicite de ma part. De même, l’utilisation de mes coordonnées pour la coordination ou le suivi du Forum nécessite mon accord.
+            Lors de l’intégration, une clé d’accès personnelle me sera remise. Elle me permettra de retrouver et, selon les fonctionnalités proposées, de modifier mes réponses ou de les supprimer. Je conserverai cette clé soigneusement. Pour toute question concernant la méthodologie, la conception du questionnaire, le traitement des données ou cette expérimentation, je peux contacter les personnes responsables indiquées ci-dessous.
 
+            **Responsables de l’enquête dans le cadre du projet Communs-IA**
 
-            Je reste libre de répondre ou non à chaque question. Je peux interrompre le questionnaire à tout moment. Des points de sauvegarde me permettent de conserver l’état de mon parcours dans ma session et d’en télécharger une copie personnelle au format YAML afin de pouvoir le reprendre ultérieurement.
-
-
-            Tant que je n’ai pas choisi l’action finale « Intégrer mes réponses », mon brouillon n’est pas transmis à la base de données du Forum. Avant cette intégration, je peux examiner les données qui seront transmises.
-
-
-            Lors de l’intégration, une clé d’accès personnelle me sera remise. Elle me permettra de retrouver et, selon les fonctionnalités proposées, de modifier mes réponses sans besoin d’intervention de quelqu’un•e à ma place. Je conserverai cette clé soigneusement.
-
-            Pour toute question concernant la méthodologie, la conception du questionnaire, le traitement des données ou cette expérimentation, je peux contacter les personnes responsables indiquées ci-dessous.
-
-
-            **Responsables**
-
-            - Nathalie Casemajor, professeure à l’INRS — nathalie.casemajor@inrs.ca
-
-            - Marta Severo, professeure à l’Université Paris Nanterre — msevero@parisnanterre.fr
-
-            - Andrés A. León Baldelli, chargé de recherche CNRS — leon.baldelli@cnrs.fr
-
-            '
+            - Nathalie Casemajor, professeure à l’INRS; nathalie.casemajor@inrs.ca
+            - Marta Severo, professeure à l’Université Paris Nanterre; msevero@parisnanterre.fr
+            - Andrés A. León Baldelli, chargé de recherche CNRS; leon.baldelli@cnrs.fr
         cta: Continuer
     participation:
         title: Ma participation
@@ -531,16 +495,13 @@ questions:
     - step: participation_information
       field: participation_acknowledgement
       id: participation_acknowledgement
-      revision: 3
-      prompt:
-          Je reconnais avoir lu les informations ci-dessus. Les modalités me paraissent raisonnables et j’accepte de participer
-          à cette recherche et de répondre au présent questionnaire, selon les modalités décrites, afin que mes données soient utilisées
-          pour les objectifs énoncés.
+      revision: 4
+      prompt: 'Modalités de participation :'
       input_type: single
       required: true
       options:
           - value: accept
-            label: J’accepte
+            label: J’ai lu et j’accepte de participer à cette recherche selon les modalités décrites
           - value: decline
             label: Je n’accepte pas
           - value: read_not_understood
