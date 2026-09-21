@@ -128,15 +128,29 @@ def _render_multiple(
         option_values = [option.value for option in options]
         if field.other.enabled and "other" not in option_values:
             option_values.append("other")
+        current_selection = list(st.session_state.get(key, saved_selected))
+        for shortcut in field.shortcuts:
+            shortcut_values = list(shortcut.select)
+            shortcut_selected = bool(shortcut_values) and set(shortcut_values) <= set(
+                current_selection
+            )
+            if st.button(
+                ("✓ " if shortcut_selected else "")
+                + (shortcut.label or shortcut.id or "Tout sélectionner"),
+                type="secondary",
+                key=f"{key}_shortcut_{shortcut.id}",
+            ):
+                current_selection = shortcut_values
+                st.session_state[key] = shortcut_values
         selected = list(
             st.pills(
                 field.prompt,
                 options=option_values,
-                default=saved_selected,
                 selection_mode="multi",
                 format_func=lambda value: labels.get(value, value),
                 label_visibility="collapsed",
                 key=key,
+                **({} if key in st.session_state else {"default": current_selection}),
             )
         )
     if field.max_select is not None:
@@ -572,6 +586,34 @@ def _render_viewport_notice() -> None:
     )
 
 
+def _render_probe_styles() -> None:
+    """Apply a responsive hierarchy without changing canonical Probe content."""
+    st.markdown(
+        """
+        <style>
+        [data-testid="stAppViewContainer"] h1 {
+            font-size: clamp(2.35rem, 7vw, 5.5rem);
+            line-height: .96;
+        }
+        [data-testid="stAppViewContainer"] h4 {
+            font-size: clamp(1.25rem, 2.6vw, 1.75rem);
+            line-height: 1.18;
+        }
+        [data-testid="stBaseButton-secondary"] {
+            background: transparent;
+            box-shadow: none;
+        }
+        @media (max-width: 700px) {
+            [data-testid="stAppViewContainer"] h1 {
+                font-size: clamp(2rem, 11vw, 3.4rem);
+            }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def _render_review_editor(
     *,
     probe: ProbeDefinition,
@@ -983,6 +1025,10 @@ def _render_checkpoint_surface(
     st.caption(section.title.upper())
     st.title("Enregistrer cette étape")
     st.write("Mes réponses restent modifiables. Rien n’est encore soumis à la base de données.")
+    st.write(
+        "Vous pouvez ci-dessous télécharger un fichier contenant vos réponses "
+        "jusqu’à cette étape."
+    )
     boundary_rows = []
     for authored_section in probe.sections:
         saved = any(
@@ -1124,6 +1170,7 @@ def render_registered_probe(
     draft_repository: Repository | None = None,
     test_mode: bool = False,
 ) -> None:
+    _render_probe_styles()
     participant_id = participant_uuid()
     participation_key = f"probe_participation_{registration.session_code}"
     derived_participation_id = uuid.uuid5(
@@ -1272,15 +1319,25 @@ def render_registered_probe(
         return
 
     if stage == "done":
-        if st.session_state.get(f"probe_terminal_reason_{participation_id}") == "skipped_consent":
+        terminal_reason = st.session_state.get(
+            f"probe_terminal_reason_{participation_id}"
+        )
+        if terminal_reason in {"skipped_consent", "consent_not_accepted"}:
             st.info(
-                "Vous avez passé la question de consentement. Votre participation "
+                "Vous n’avez pas accepté les modalités de participation. Votre participation "
                 "n’est pas considérée comme consentie et aucune réponse ne sera soumise."
             )
         elif test_mode:
             st.success("Simulation terminée. Aucune écriture de production n’a été effectuée.")
+        elif st.session_state.get(f"probe_submission_receipt_{participation_id}"):
+            done = probe.step("done")
+            st.title(done.title)
+            st.write(done.body)
         else:
-            st.success("Merci. Vos réponses ont bien été enregistrées.")
+            st.warning(
+                "Aucun reçu de persistance n’est disponible. "
+                "Les réponses ne sont pas présentées comme enregistrées."
+            )
         return
 
     if stage == "review":
@@ -1372,12 +1429,27 @@ def render_registered_probe(
                 idempotency_key=participation_id,
                 prepared=prepared,
             )
+            if not test_mode:
+                st.session_state[f"probe_submission_receipt_{participation_id}"] = True
             st.session_state[stage_key] = "done"
             st.rerun()
         return
 
+    informational_key = f"probe_information_steps_{participation_id}"
+    visited_information_steps = set(st.session_state.get(informational_key, ()))
     step_index = 0
     for index, step in enumerate(probe.steps):
+        authored_section = next(
+            (item for item in probe.sections if step.id in item.step_ids),
+            None,
+        )
+        if (
+            authored_section is not None
+            and not step.field_ids
+            and step.id not in visited_information_steps
+        ):
+            step_index = index
+            break
         visible_ids = [
             field_id
             for field_id in step.field_ids
@@ -1636,6 +1708,9 @@ def render_registered_probe(
             None,
         )
         st.session_state[trajectory_key] = scratch.trajectory
+        if not step.field_ids:
+            visited_information_steps.add(step.id)
+            st.session_state[informational_key] = sorted(visited_information_steps)
         record_persistence(
             {
                 "operation": "session.mutation",
@@ -1649,6 +1724,14 @@ def render_registered_probe(
             }
         )
         if terminal:
+            if any(
+                field.id == "participation_acknowledgement"
+                and draft.get(field.id) != "accept"
+                for field in visible_fields
+            ):
+                st.session_state[
+                    f"probe_terminal_reason_{participation_id}"
+                ] = "consent_not_accepted"
             st.session_state[stage_key] = "done"
         elif section and section.checkpoint:
             st.session_state[pending_checkpoint_key] = section.id

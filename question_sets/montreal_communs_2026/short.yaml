@@ -1,7 +1,7 @@
 schema: probe-authoring/v1
 questionnaire:
     id: montreal_communs_data_ai_short_2026
-    revision: 3
+    revision: 4
     status: review
     language: fr
     default_mode: standard
@@ -10,9 +10,8 @@ questionnaire:
     identity_position: first
     review:
         change_note:
-            'Itération de test du 20 septembre 2026. Corrections éditoriales et d’interface issues du dry run : consentement
-            explicite, disponibilité simplifiée, voix je/nous, groupes repliables, localisation assistée, calibration de l’inspiration,
-            clarification des champs complémentaires, prévisualisation du payload avant écriture.'
+            'Révision collaborative : informations de participation, courriel, disponibilité, position de participation, fonctions,
+            précision des freins, contexte Genève 2027 et écran de fin.'
 step_order:
     - welcome
     - participation_information
@@ -141,60 +140,24 @@ step_copy:
         cta: Commencer
     participation_information:
         title: Informations sur ma participation
-        body: '
-
-            Les informations recueillies serviront à préparer l’organisation du Forum Communs de données et IA des 28-29 octobre 2026. Elles pourront également nourrir des publications qui découleront de cet évènement (synthèse, article scientifique).
-
-
-            Votre nom ne sera pas mentionné dans les publications qui découleront du projet.
-
-
-            Vos réponses seront conservées de façon sécurisée durant 5 ans et ne seront accessibles qu’à l équipe de recherche.
-
-
-            Certaines informations d’identification professionnelle seront partagées avec les autres participants de l’événement pour faciliter le réseautage. /* */conse
-
-
-            Vous êtes libres de répondre ou non à une question posée, et vous pourrez quitter à tout moment le sondage. Dans ce cas, vos données ne seront pas utilisées.
-
-
-            Si vous souhaitez retirer vos réponses, vous pouvez contacter les personnes responsables (ci-dessous).
-
-
-            ------
-
-            Les informations recueillies servent à préparer et documenter le Forum Communs de données et IA des 28–29 octobre 2026. Elles pourront également contribuer aux productions issues de cette expérimentation, notamment une synthèse du Forum ou des publications scientifiques.
-
+        body: |
+            Les informations recueillies servent à préparer et documenter le Forum Communs de données et IA des 28–29 octobre 2026. Elles pourront également contribuer aux productions issues de cette expérimentation, notamment une présentation anonymisée des résultats lors du Forum, une synthèse ou des publications scientifiques.
 
             Mes réponses et mon identité sont traitées séparément. Mon nom n’est pas associé publiquement à mes réponses et n’est pas mentionné dans les publications issues du projet, sauf si je choisis explicitement de l’autoriser.
 
+            Après intégration, mes réponses sont conservées dans une base de données du projet sécurisée hébergée à distance ([notion.so](http://notion.so)). Les données permettant de m’identifier sont conservées séparément des réponses au questionnaire et seront détruites après 5 ans.
 
-            Après intégration, mes réponses sont conservées dans une base de données du projet sécurisée hébergée à distance (notion.so). Les données permettant de m’identifier sont conservées séparément des réponses au questionnaire. Les réponses peuvent ainsi être analysées sans qu’il soit nécessaire d’y associer directement mon identité.
+            Je reste libre de répondre ou non à chaque question. Je peux interrompre le questionnaire à tout moment.
 
+            Avant cette intégration, je peux examiner les données qui seront transmises.
 
-            Certaines informations professionnelles peuvent être utiles pour permettre aux personnes participant au Forum de se retrouver, d’échanger et de poursuivre des collaborations. Ce partage fera l’objet d’un choix explicite de ma part. De même, l’utilisation de mes coordonnées pour la coordination ou le suivi du Forum nécessite mon accord.
+            Lors de l’intégration, une clé d’accès personnelle me sera remise. Elle me permettra de retrouver et, selon les fonctionnalités proposées, de modifier mes réponses ou de les supprimer. Je conserverai cette clé soigneusement. Pour toute question concernant la méthodologie, la conception du questionnaire, le traitement des données ou cette expérimentation, je peux contacter les personnes responsables indiquées ci-dessous.
 
+            **Responsables de l’enquête dans le cadre du projet Communs-IA**
 
-            Je reste libre de répondre ou non à chaque question. Je peux interrompre le questionnaire à tout moment. Des points de sauvegarde me permettent de conserver l’état de mon parcours dans ma session et d’en télécharger une copie personnelle au format YAML afin de pouvoir le reprendre ultérieurement.
-
-
-            Tant que je n’ai pas choisi l’action finale « Intégrer mes réponses », mon brouillon n’est pas transmis à la base de données du Forum. Avant cette intégration, je peux examiner les données qui seront transmises.
-
-
-            Lors de l’intégration, une clé d’accès personnelle me sera remise. Elle me permettra de retrouver et, selon les fonctionnalités proposées, de modifier mes réponses sans besoin d’intervention de quelqu’un•e à ma place. Je conserverai cette clé soigneusement.
-
-            Pour toute question concernant la méthodologie, la conception du questionnaire, le traitement des données ou cette expérimentation, je peux contacter les personnes responsables indiquées ci-dessous.
-
-
-            **Responsables**
-
-            - Nathalie Casemajor, professeure à l’INRS — nathalie.casemajor@inrs.ca
-
-            - Marta Severo, professeure à l’Université Paris Nanterre — msevero@parisnanterre.fr
-
-            - Andrés A. León Baldelli, chargé de recherche CNRS — leon.baldelli@cnrs.fr
-
-            '
+            - Nathalie Casemajor, professeure à l’INRS; nathalie.casemajor@inrs.ca
+            - Marta Severo, professeure à l’Université Paris Nanterre; msevero@parisnanterre.fr
+            - Andrés A. León Baldelli, chargé de recherche CNRS; leon.baldelli@cnrs.fr
         cta: Continuer
     participation:
         title: Ma participation
@@ -240,21 +203,16 @@ step_copy:
         body: Une initiative, un outil, une communauté ou une expérience peut ouvrir une piste inattendue.
         cta: Continuer
     future_intro:
-        title: Vision du futur
-        body:
-            'Nous cherchons ici des pistes d’action par rétroplanification à partir d’un futur souhaité pour les communs de
-            données, qui sera approfondi lors du Forum.
+        title: Genève 2027
+        body: |
+            En 2027, Genève accueillera le prochain sommet mondial sur l’IA, dans la continuité des sommets de Bletchley Park (2023), Séoul (2024), Paris (2025) et New Delhi (2026).
 
+            Ce sommet intergouvernemental réunit des représentants des gouvernements, des organisations internationales, du secteur privé, du monde académique et de la société civile, dans le but de coordonner des positions sur l’usage responsable de l’IA, sa gouvernance et sa régulation à l’échelle internationale.
 
-            En 2027, Genève accueillera un prochain sommet international sur l’IA, dans la continuité des sommets de Bletchley Park
-            (2023), Séoul (2024), Paris (2025) et New Delhi (2026). Prenons Genève comme horizon de travail et projetons-nous au
-            lendemain de ce rendez-vous, dans un scénario favorable aux communs de données.
+            Les éditions précédentes ont donné lieu à différents types de résultats : déclarations politiques multilatérales, rapports scientifiques indépendants, engagements volontaires du secteur privé, annonces de financement et d’infrastructure, coalitions thématiques permanentes, jalons vers une gouvernance mondiale institutionnalisée.
 
-
-            Les résultats possibles ne sont pas limités à des productions institutionnelles : ils peuvent aussi prendre la forme
-            d’une expérimentation, d’une nouvelle collaboration, d’un désaccord devenu plus clair, d’un apprentissage issu d’un
-            échec ou d’une initiative inattendue.'
-        cta: Nous projeter
+            Projetons-nous au lendemain du sommet de Genève, dans un scénario favorable aux communs de données.
+        cta: Je me projette
     future_outcome:
         title: Ce que nous aimerions voir émerger
         body: À quoi pourrait ressembler, pour nous, un résultat positif pour les communs de données ?
@@ -285,10 +243,14 @@ step_copy:
         cta: Intégrer au paysage commun
     done:
         title: Merci
-        body:
-            'Merci d’avoir pris le temps de contribuer. Mes réponses ont été enregistrées et peuvent maintenant participer à
-            une représentation collective du Forum. Des informations pratiques concernant le déroulement de l’événement suivront.
-            Pour une précision ou une demande de retrait : nathalie.casemajor@inrs.ca et msevero@parisnanterre.fr.'
+        body: |
+            Merci d’avoir pris le temps de remplir ce questionnaire.
+
+            Vos réponses ont bien été enregistrées. Vous recevrez prochainement d’autres informations pratiques concernant le déroulement de l’événement.
+
+            Une question ? Écrivez-nous à nathalie.casemajor@inrs.ca, msevero@parisnanterre.fr.
+
+            Au plaisir de vous accueillir à l’INRS en octobre.
         cta: Voir le paysage commun
 taxonomies:
     sectors:
@@ -316,107 +278,25 @@ taxonomies:
             - value: other
               label: Autre
     functions:
-        groups:
-            - id: leadership
-              label: Direction et gouvernance
-              options:
-                  - value: general_management
-                    label: Direction générale
-                  - value: scientific_management
-                    label: Direction scientifique
-                  - value: presidency
-                    label: Présidence
-                  - value: collection_management
-                    label: Direction de collection
-                  - value: programme_management
-                    label: Direction de programme
-            - id: research_teaching
-              label: Recherche et enseignement
-              options:
-                  - value: teaching
-                    label: Enseignement
-                  - value: research
-                    label: Recherche
-                  - value: graduate_studies
-                    label: Études supérieures / doctorat
-                  - value: postdoc
-                    label: Postdoctorat
-            - id: collections
-              label: Collections
-              options:
-                  - value: library
-                    label: Bibliothèque
-                  - value: archives
-                    label: Archives
-                  - value: conservation
-                    label: Conservation
-                  - value: documentation
-                    label: Documentation
-                  - value: museology
-                    label: Muséologie
-            - id: data_tech
-              label: Données, technologies et infrastructures
-              options:
-                  - value: data
-                    label: Données
-                  - value: data_architecture
-                    label: Architecture / administration des données
-                  - value: it
-                    label: TI
-                  - value: development
-                    label: Développement
-                  - value: data_science
-                    label: Data science
-            - id: law_policy
-              label: Droit, politiques publiques et gouvernance
-              options:
-                  - value: legal
-                    label: Juridique
-                  - value: public_policy
-                    label: Politiques publiques
-                  - value: data_governance
-                    label: Gouvernance des données
-                  - value: compliance
-                    label: Conformité
-            - id: communication_publics
-              label: Communication, médiation et publics
-              options:
-                  - value: communication
-                    label: Communication
-                  - value: cultural_mediation
-                    label: Médiation culturelle
-                  - value: public_relations
-                    label: Relations avec les publics
-                  - value: civic_engagement
-                    label: Engagement citoyen
-            - id: partnerships_funding
-              label: Partenariats, développement et financement
-              options:
-                  - value: partnerships
-                    label: Partenariats
-                  - value: development
-                    label: Développement
-                  - value: funding
-                    label: Financement
-            - id: communities
-              label: Communautés et société civile
-              options:
-                  - value: community_of_practice
-                    label: Communauté de pratique
-                  - value: open_knowledge
-                    label: Savoir libre
-                  - value: civil_society
-                    label: Société civile
-                  - value: volunteering
-                    label: Bénévolat
         options:
+            - value: leadership
+              label: Direction et gouvernance
+            - value: research_teaching
+              label: Recherche et enseignement
+            - value: collections
+              label: Collections
+            - value: data_tech
+              label: Données, technologies et infrastructures
+            - value: law_policy
+              label: Droit, politiques publiques et gouvernance
+            - value: communication_publics
+              label: Communication, médiation et publics
+            - value: partnerships_funding
+              label: Partenariats, développement et financement
+            - value: communities
+              label: Communautés et société civile
             - value: other
               label: Autre
-        presentation:
-            groups: expanders
-            default_state: collapsed
-            show_selected_count: true
-            keep_multiple_open: true
     commons_ai_topics:
         groups:
             - id: governance
@@ -531,16 +411,13 @@ questions:
     - step: participation_information
       field: participation_acknowledgement
       id: participation_acknowledgement
-      revision: 3
-      prompt:
-          Je reconnais avoir lu les informations ci-dessus. Les modalités me paraissent raisonnables et j’accepte de participer
-          à cette recherche et de répondre au présent questionnaire, selon les modalités décrites, afin que mes données soient utilisées
-          pour les objectifs énoncés.
+      revision: 4
+      prompt: Modalités de participation
       input_type: single
       required: true
       options:
           - value: accept
-            label: J’accepte
+            label: J’ai lu et j’accepte de participer à cette recherche selon les modalités décrites
           - value: decline
             label: Je n’accepte pas
           - value: read_not_understood
@@ -564,14 +441,14 @@ questions:
     - step: participation
       field: availability
       id: availability
-      revision: 3
+      revision: 4
       prompt: Quand puis-je être présent·e ?
-      context: Je sélectionne toutes les plages pendant lesquelles je suis disponible.
+      context: Une participation aux deux journées consécutives est souhaitée.
       input_type: multi
       required: false
       shortcuts:
           - id: both_full_days
-            label: Les deux journées complètes · 28 et 29 octobre
+            label: Les deux journées
             select:
                 - oct28_am_online
                 - oct28_pm_inrs
@@ -579,13 +456,13 @@ questions:
                 - oct29_pm_inrs
       options:
           - value: oct28_am_online
-            label: 28 octobre · matin · en ligne
+            label: 28 octobre, matin
           - value: oct28_pm_inrs
-            label: 28 octobre · après-midi · présentiel, INRS Montréal
+            label: 28 octobre, après-midi
           - value: oct29_am_inrs
-            label: 29 octobre · matin · présentiel, INRS Montréal
+            label: 29 octobre, matin
           - value: oct29_pm_inrs
-            label: 29 octobre · après-midi · présentiel, INRS Montréal
+            label: 29 octobre, après-midi
     - step: participation
       field: dietary_preferences
       id: dietary_preferences
@@ -628,17 +505,29 @@ questions:
       input_type: text
       required: false
     - step: portrait
+      field: email
+      id: email
+      revision: 1
+      prompt: Mon adresse courriel
+      context:
+          Elle pourra notamment être utilisée pour me transmettre les informations relatives au Forum et, lorsque cette fonctionnalité
+          sera activée, les informations nécessaires pour retrouver mes réponses.
+      input_type: text
+      required: false
+    - step: portrait
       field: participation_position
       id: participation_position
-      revision: 2
-      prompt: Dans quelle(s) position(s) est-ce que je participe ?
-      input_type: multi_with_other
+      revision: 3
+      prompt: Dans quelle position est-ce que je participe ?
+      input_type: single_with_other
       required: false
       options:
           - value: individual
             label: À titre individuel
           - value: organisation
-            label: Au nom d’une organisation
+            label: Au nom d’une organisation GLAM
+          - value: data_organisation
+            label: Au nom d’une organisation impliquée dans la production, la gestion ou la gouvernance de données culturelles
           - value: other
             label: Autre
       free_text:
@@ -671,15 +560,19 @@ questions:
     - step: portrait
       field: functions
       id: functions
-      revision: 2
+      revision: 3
       prompt: Quelles fonctions est-ce que j’exerce ?
       context: Plusieurs choix possibles.
-      input_type: grouped_multi
+      input_type: multi_with_other
       required: false
       taxonomy: functions
       free_text:
           field: functions_other
           prompt: Autre fonction
+      companion:
+          field: function_title
+          prompt: Intitulé de ma fonction
+          required: false
     - step: organisation
       field: organisation_name
       id: organisation_name
@@ -688,8 +581,11 @@ questions:
       input_type: text
       required: false
       show_if:
-          field: participation_position
-          contains: organisation
+          any:
+              - field: participation_position
+                equals: organisation
+              - field: participation_position
+                equals: data_organisation
     - step: organisation
       field: organisation_size
       id: organisation_size
@@ -705,8 +601,11 @@ questions:
           - value: 100_plus
             label: 100 personnes et plus
       show_if:
-          field: participation_position
-          contains: organisation
+          any:
+              - field: participation_position
+                equals: organisation
+              - field: participation_position
+                equals: data_organisation
     - step: organisation
       field: organisation_territory
       id: organisation_territory
@@ -731,8 +630,11 @@ questions:
           field: organisation_territory_other
           prompt: Je précise le territoire
       show_if:
-          field: participation_position
-          contains: organisation
+          any:
+              - field: participation_position
+                equals: organisation
+              - field: participation_position
+                equals: data_organisation
     - step: project
       field: document_project
       id: document_project
@@ -749,8 +651,11 @@ questions:
           - value: not_applicable
             label: Ne s’applique pas
       show_if:
-          field: participation_position
-          contains: organisation
+          any:
+              - field: participation_position
+                equals: organisation
+              - field: participation_position
+                equals: data_organisation
     - step: project
       field: project_name
       id: project_name
@@ -814,7 +719,7 @@ questions:
     - step: friction
       field: frictions
       id: frictions
-      revision: 1
+      revision: 2
       prompt: Qu’est-ce qui freine aujourd’hui ma capacité à avancer ?
       input_type: multi_with_other
       required: false
@@ -823,6 +728,10 @@ questions:
       free_text:
           field: frictions_other
           prompt: Autre frein
+      companion:
+          field: frictions_detail
+          prompt: Je précise si je le souhaite
+          required: false
     - step: inspiration
       field: inspiration
       id: inspiration
@@ -1122,6 +1031,7 @@ interaction:
         dry_run_must_never_write: true
 profile_fields:
     - name
+    - email
     - participation_position
     - base_location
     - sectors
@@ -1150,6 +1060,7 @@ deferrable_fields:
     - availability
     - dietary_preferences
     - name
+    - email
     - participation_position
     - base_location
     - sectors
@@ -1245,6 +1156,11 @@ representations:
             source:
                 field: scenario_position
 editorial_review:
+    - id: geneva_2027_source_verification
+      status: open
+      note:
+          Le texte contextuel « Genève 2027 » est reproduit comme fourni pour cette révision. Ses affirmations sur les sommets
+          internationaux sur l’IA et leurs résultats doivent être vérifiées et sourcées avant la mise en production.
     - id: consent_legal_review
       status: open
       note:
