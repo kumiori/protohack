@@ -412,7 +412,7 @@ questions:
       field: participation_acknowledgement
       id: participation_acknowledgement
       revision: 4
-      prompt: Modalités de participation
+      prompt: 'Modalités de participation :'
       input_type: single
       required: true
       options:
