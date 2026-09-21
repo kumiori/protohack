@@ -595,9 +595,22 @@ def _render_probe_styles() -> None:
             font-size: clamp(2.35rem, 7vw, 5.5rem);
             line-height: .96;
         }
+        [data-testid="stAppViewContainer"] h2 {
+            font-size: clamp(1.65rem, 3.6vw, 2.6rem);
+            line-height: 1.05;
+        }
+        [data-testid="stAppViewContainer"] h3,
+        [data-testid="stAppViewContainer"] details summary {
+            font-size: clamp(1.05rem, 2vw, 1.3rem);
+            line-height: 1.2;
+        }
         [data-testid="stAppViewContainer"] h4 {
             font-size: clamp(1.25rem, 2.6vw, 1.75rem);
             line-height: 1.18;
+        }
+        [data-testid="stAppViewContainer"] [data-testid="stCaptionContainer"] {
+            font-size: clamp(.82rem, 1.2vw, .95rem);
+            line-height: 1.35;
         }
         [data-testid="stBaseButton-secondary"] {
             background: transparent;
