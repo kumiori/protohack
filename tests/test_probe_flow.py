@@ -40,7 +40,12 @@ def test_montreal_resolves_through_the_generic_probe_registry() -> None:
     assert probe.id == registration.probe_id
     assert registration.source_path == ROOT / "question_sets" / "montreal_communs_2026" / "short.yaml"
     assert len(probe.steps) == 18
-    assert probe.step("portrait").field_ids[:2] == ("name", "participation_position")
+    assert probe.revision == 4
+    assert probe.step("portrait").field_ids[:3] == (
+        "name",
+        "email",
+        "participation_position",
+    )
 
 
 def test_both_montreal_sources_are_local_network_free_and_registered() -> None:
@@ -158,7 +163,7 @@ def test_authored_step_and_field_copy_crosses_the_canonical_boundary() -> None:
     probe = _probe()
 
     assert len(source["step_copy"]) == len(probe.steps) == 18
-    assert len(source["questions"]) == len(probe.questions) == 24
+    assert len(source["questions"]) == len(probe.questions) == 25
     for step_id, authored_step in source["step_copy"].items():
         step = probe.step(step_id)
         assert (step.title, step.body, step.cta) == (
@@ -172,29 +177,33 @@ def test_authored_step_and_field_copy_crosses_the_canonical_boundary() -> None:
         assert field.revision == authored_field["revision"]
 
 
-def test_participation_position_is_composable_and_controls_organisation_fields() -> None:
+def test_participation_position_is_single_and_controls_organisation_fields() -> None:
     probe = _probe()
     position = probe.question("participation_position")
-    assert position.input_type.value == "multi_with_other"
+    assert position.input_type.value == "single_with_other"
     assert [option.value for option in position.options] == [
         "individual",
         "organisation",
+        "data_organisation",
         "other",
     ]
     condition = probe.question("organisation_name").visible_if
     assert condition is not None
-    assert (condition.field_id, condition.operator, condition.value) == (
-        "participation_position",
-        "contains",
-        "organisation",
-    )
+    assert condition.operator == "any"
+    assert {
+        (clause.field_id, clause.operator, clause.value)
+        for clause in condition.clauses
+    } == {
+        ("participation_position", "equals", "organisation"),
+        ("participation_position", "equals", "data_organisation"),
+    }
 
     runtime = ProbeRuntime(
         probe,
         participant_id="participant-position",
         scope_id="montreal_communs_2026",
     )
-    runtime.answer("participation_position", ["individual", "organisation"])
+    runtime.answer("participation_position", "organisation")
     runtime.answer("organisation_name", "Organisation test")
 
 
@@ -214,15 +223,127 @@ def test_optional_companion_may_be_empty_without_invalidating_parent_answer() ->
     ] == value
 
 
-def test_grouped_taxonomy_presentation_uses_collapsed_expanders() -> None:
+def test_functions_are_flat_families_while_topics_remain_grouped_expanders() -> None:
     source = (ROOT / "probe_ui.py").read_text(encoding="utf-8")
     probe = _probe()
 
-    assert probe.taxonomy("functions").presentation["groups"] == "expanders"
+    functions = probe.taxonomy("functions")
+    assert functions.groups == ()
+    assert [option.value for option in functions.options] == [
+        "leadership",
+        "research_teaching",
+        "collections",
+        "data_tech",
+        "law_policy",
+        "communication_publics",
+        "partnerships_funding",
+        "communities",
+        "other",
+    ]
     assert probe.taxonomy("commons_ai_topics").presentation["groups"] == "expanders"
     assert 'taxonomy_presentation.get("groups") == "expanders"' in source
     assert "st.expander(" in source
     assert "group_title" in source
+
+
+def test_collaborator_revision_preserves_identity_and_companion_semantics() -> None:
+    probe = _probe()
+    source = _source_text()
+
+    assert "email" in probe.authoring.profile_fields
+    assert "email" not in probe.authoring.session_fields
+    email = probe.question("email")
+    assert email.prompt == "Mon adresse courriel"
+    assert "clé" not in email.context.casefold()
+    assert "retrouver mes réponses" in email.context
+
+    functions = probe.question("functions")
+    assert [(item.id, item.required) for item in functions.companions] == [
+        ("function_title", False)
+    ]
+    frictions = probe.question("frictions")
+    assert [(item.id, item.required) for item in frictions.companions] == [
+        ("frictions_detail", False)
+    ]
+    assert functions.other.required is True
+    assert frictions.other.required is True
+
+    assert "présentation anonymisée des résultats" in source
+    assert "seront détruites après 5 ans" in source
+    assert "geneva_2027_source_verification" in source
+
+
+def test_availability_keeps_stable_values_and_exposes_select_all_shortcut() -> None:
+    availability = _probe().question("availability")
+    assert [option.value for option in availability.options] == [
+        "oct28_am_online",
+        "oct28_pm_inrs",
+        "oct29_am_inrs",
+        "oct29_pm_inrs",
+    ]
+    assert [option.label for option in availability.options] == [
+        "28 octobre, matin",
+        "28 octobre, après-midi",
+        "29 octobre, matin",
+        "29 octobre, après-midi",
+    ]
+    shortcut = availability.shortcuts[0]
+    assert (shortcut.id, shortcut.label, shortcut.select) == (
+        "both_full_days",
+        "Les deux journées",
+        (
+            "oct28_am_online",
+            "oct28_pm_inrs",
+            "oct29_am_inrs",
+            "oct29_pm_inrs",
+        ),
+    )
+    ui_source = (ROOT / "probe_ui.py").read_text(encoding="utf-8")
+    assert "for shortcut in field.shortcuts" in ui_source
+    assert "set(shortcut_values) <= set(" in ui_source
+
+
+def test_information_steps_checkpoint_copy_and_truthful_done_are_rendered_generically() -> None:
+    probe = _probe()
+    ui_source = (ROOT / "probe_ui.py").read_text(encoding="utf-8")
+
+    assert probe.step("future_intro").field_ids == ()
+    assert probe.step("future_intro").title == "Genève 2027"
+    assert probe.step("future_intro").cta == "Je me projette"
+    assert "not step.field_ids" in ui_source
+    assert "visited_information_steps" in ui_source
+    assert (
+        "Vous pouvez ci-dessous télécharger un fichier contenant vos réponses "
+        in ui_source
+    )
+    assert 'probe_submission_receipt_{participation_id}' in ui_source
+    assert "Les réponses ne sont pas présentées comme enregistrées" in ui_source
+    assert 'font-size: clamp(2.35rem, 7vw, 5.5rem)' in ui_source
+
+
+@pytest.mark.parametrize(
+    "field_id,value",
+    [
+        ("knowledge_offer", ["governance_models"]),
+        ("knowledge_need", ["apis_ai"]),
+        ("inspiration", ["practice_method"]),
+        ("future_outcome", ["coalition"]),
+    ],
+)
+def test_substantive_questions_require_answer_or_explicit_skip(
+    field_id: str, value: list[str]
+) -> None:
+    probe = _probe()
+    field = probe.question(field_id)
+    assert field.independently_answerable is True
+
+    answered = ProbeRuntime(probe, participant_id="answered", scope_id="montreal")
+    answered.answer(field_id, value)
+    assert answered.resolution(field_id).state == ResolutionState.ANSWERED
+
+    skipped = ProbeRuntime(probe, participant_id="skipped", scope_id="montreal")
+    skipped.skip(field_id, reason_codes=["prefer_not"])
+    assert skipped.resolution(field_id).state == ResolutionState.SKIPPED
 
 
 def test_canonical_values_survive_checkpoint_restart_and_hydration() -> None:
@@ -244,7 +365,7 @@ def test_canonical_values_survive_checkpoint_restart_and_hydration() -> None:
         "name": "Ada Lovelace",
         "availability": ["oct28_am_online"],
         "knowledge_offer": ["governance_models", "apis_ai"],
-        "participation_position": ["organisation"],
+        "participation_position": "organisation",
         "document_project": "yes",
         "project_name": "Communs IA",
         "future_conditions": [
