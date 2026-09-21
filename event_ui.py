@@ -33,6 +33,12 @@ def _debug_repository(event_id: str) -> InMemoryRepository:
     return InMemoryRepository()
 
 
+@st.cache_resource
+def _draft_repository(event_id: str) -> InMemoryRepository:
+    """Keep checkpoints outside the production submission repository."""
+    return InMemoryRepository()
+
+
 def _test_mode() -> bool:
     return (
         str(st.query_params.get("test") or "") == "1"
@@ -90,6 +96,13 @@ def _render_results(event: RegisteredEvent, *, test_mode: bool) -> None:
             trajectories = _synthetic_trajectories(probe, registration.session_code)
             st.warning("SYNTHETIC TEST DATA · generated on this render · not persisted")
     st.subheader("Canonical representations")
+    if not probe.representations:
+        st.info("Aucune représentation n’est définie pour cette Probe.")
+        return
+    if not trajectories:
+        st.info(
+            "Les représentations sont définies, mais aucune donnée n’est encore disponible."
+        )
     if probe.results is not None and trajectories:
         projection = evaluate_results(probe, trajectories)
         st.markdown(f"### {projection.title}")
@@ -232,9 +245,11 @@ def render_event(event: RegisteredEvent) -> None:
             st.exception(exc)
         return
     repository = _debug_repository(event.id) if test_mode else get_repository()
+    draft_repository = repository if test_mode else _draft_repository(event.id)
     render_registered_probe(
         registration=registration,
         probe=probe,
         repository=repository,
+        draft_repository=draft_repository,
         test_mode=test_mode,
     )

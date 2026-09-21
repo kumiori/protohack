@@ -2,9 +2,17 @@ from pathlib import Path
 
 import pytest
 import yaml
-from probe_engine import EventKind, ProbeRuntime
+from probe_engine import (
+    EventKind,
+    ProbeRuntime,
+    ResolutionState,
+    RuntimeError as ProbeRuntimeError,
+    evaluate_representation,
+)
 
+from event_ui import _synthetic_trajectories
 from protocol.probe_registry import registered_events, resolve_event, resolve_probe
+from protocol.probe_draft import dump_checkpoint_draft, load_checkpoint_draft
 from protocol.probe_store import ProbeRepositoryStore
 from storage.memory import InMemoryRepository
 
@@ -116,11 +124,33 @@ def test_event_registration_drives_canonical_surface_family() -> None:
 
 def test_test_results_restore_ephemeral_canonical_generation() -> None:
     source = (ROOT / "event_ui.py").read_text(encoding="utf-8")
+    probe = _probe()
 
     assert "Generate ephemeral synthetic test data" in source
     assert "evaluate_representation" in source
     assert "generated on this render · not persisted" in source
     assert "if test_mode:" in source
+    assert [representation.id for representation in probe.representations] == [
+        "participation_overview",
+        "participant_portrait",
+        "knowledge_exchange",
+        "future_landscape",
+    ]
+    assert "Aucune représentation n’est définie pour cette Probe." in source
+    assert "Les représentations sont définies, mais aucune donnée n’est encore disponible." in source
+    assert "Representation placeholder" not in source
+
+    trajectories = _synthetic_trajectories(probe, "montreal-test")
+    assert trajectories
+    assert [
+        evaluate_representation(probe, representation, trajectories).representation_id
+        for representation in probe.representations
+    ] == [
+        "participation_overview",
+        "participant_portrait",
+        "knowledge_exchange",
+        "future_landscape",
+    ]
 
 
 def test_authored_step_and_field_copy_crosses_the_canonical_boundary() -> None:
@@ -186,9 +216,13 @@ def test_optional_companion_may_be_empty_without_invalidating_parent_answer() ->
 
 def test_grouped_taxonomy_presentation_uses_collapsed_expanders() -> None:
     source = (ROOT / "probe_ui.py").read_text(encoding="utf-8")
+    probe = _probe()
 
-    assert "collapse_groups = bool(taxonomy and taxonomy.groups)" in source
-    assert "st.expander(group.label, expanded=False)" in source
+    assert probe.taxonomy("functions").presentation["groups"] == "expanders"
+    assert probe.taxonomy("commons_ai_topics").presentation["groups"] == "expanders"
+    assert 'taxonomy_presentation.get("groups") == "expanders"' in source
+    assert "st.expander(" in source
+    assert "group_title" in source
 
 
 def test_canonical_values_survive_checkpoint_restart_and_hydration() -> None:
@@ -331,7 +365,10 @@ def test_probe_store_reports_persistence_boundary_metadata() -> None:
     runtime.checkpoint(store)
     store.load("participation-1")
 
-    assert [item["operation"] for item in diagnostics] == ["upsert", "load"]
+    assert [item["operation"] for item in diagnostics] == [
+        "draft.session.save",
+        "draft.hydrate",
+    ]
     assert diagnostics[0]["target"] == "test:probe_trajectories"
     assert diagnostics[0]["record_identity"] == "participation-1"
     assert diagnostics[0]["trajectory_event_count"] == 1
@@ -350,7 +387,7 @@ def test_answer_skip_flag_and_review_revision_remain_distinct_events() -> None:
     )
 
     runtime.answer("availability", ["oct28_am_online"])
-    runtime.skip("dietary_preferences", reason="participant_skip")
+    runtime.skip("dietary_preferences", reason_codes=["prefer_not"])
     runtime.answer("name", "Première réponse")
     runtime.flag(
         "name",
@@ -418,7 +455,7 @@ def test_composed_other_survives_checkpoint_hydration_and_review() -> None:
         participation_id="participation-1",
     )
     value = {
-        "selected": ["group", "other"],
+        "selected": ["person_collective", "other"],
         "companions": {"inspiration_detail": "Un laboratoire citoyen"},
     }
 
@@ -460,3 +497,321 @@ def test_nested_composed_other_survives_repeatable_answer() -> None:
 
     review = {item.question_id: item for item in runtime.review()}
     assert review["future_conditions"].value == value
+
+
+def test_other_text_is_required_only_when_other_is_selected() -> None:
+    probe = _probe()
+    runtime = ProbeRuntime(probe, participant_id="participant", scope_id="montreal")
+
+    runtime.answer("future_outcome", ["coalition"])
+    with pytest.raises(ProbeRuntimeError, match="requires other text"):
+        runtime.answer(
+            "future_outcome",
+            {"selected": ["other"], "other": {"value": ""}},
+        )
+    value = {
+        "selected": ["coalition", "other"],
+        "other": {"value": "Une institution durable"},
+    }
+    runtime.answer("future_outcome", value)
+    assert {item.question_id: item.value for item in runtime.review()}[
+        "future_outcome"
+    ] == value
+
+
+def test_max_select_rejects_the_exact_over_limit_state() -> None:
+    runtime = ProbeRuntime(_probe(), participant_id="participant", scope_id="montreal")
+
+    with pytest.raises(ProbeRuntimeError, match="allows at most 3 selections"):
+        runtime.answer(
+            "inspiration",
+            [
+                "person_collective",
+                "practice_method",
+                "tool_infrastructure",
+                "project_experiment",
+            ],
+        )
+
+
+def test_every_authored_skip_reason_uses_the_canonical_registry() -> None:
+    probe = _probe()
+    authored_codes = [option.value for option in probe.resolution.skip_reasons.options]
+
+    for code in authored_codes:
+        runtime = ProbeRuntime(probe, participant_id=f"participant-{code}", scope_id="montreal")
+        runtime.skip(
+            "dietary_preferences",
+            reason_codes=[code],
+            note="Mon motif" if code == "other" else "",
+        )
+        event = runtime.trajectory.events[-1]
+        assert event.kind == EventKind.SKIPPED
+        assert event.reason_codes == (code,)
+
+    ui_source = (ROOT / "probe_ui.py").read_text(encoding="utf-8")
+    assert "runtime.probe.resolution.skip_reasons.options" in ui_source
+    assert "no_option_fits" not in ui_source
+
+
+def test_consent_skip_ends_without_becoming_affirmative_consent() -> None:
+    probe = _probe()
+    consent = probe.question("participation_acknowledgement")
+    assert consent.skippable is True
+    assert consent.skip_action == "end"
+    assert [option.value for option in consent.options] == [
+        "accept",
+        "decline",
+        "read_not_understood",
+        "not_read",
+    ]
+    assert {route.action for route in consent.routes} == {
+        "end",
+        "show_contact",
+        "return_to_information",
+    }
+    runtime = ProbeRuntime(probe, participant_id="participant", scope_id="montreal")
+    runtime.skip("participation_acknowledgement", reason_codes=["prefer_not"])
+    resolution = runtime.resolution("participation_acknowledgement")
+    assert resolution.state == ResolutionState.SKIPPED
+    assert resolution.event is not None
+    assert resolution.event.value is None
+
+
+def test_preview_is_side_effect_free_and_equals_the_committed_payload() -> None:
+    probe = _probe()
+
+    class CaptureRepository(InMemoryRepository):
+        def __init__(self) -> None:
+            super().__init__()
+            self.saved: list[dict] = []
+
+        def save_probe_trajectory(self, trajectory: dict) -> dict:
+            self.saved.append(trajectory)
+            return super().save_probe_trajectory(trajectory)
+
+    repository = CaptureRepository()
+    store = ProbeRepositoryStore(
+        repository,
+        probe_id=probe.id,
+        participant_id="participant",
+        scope_id="montreal",
+    )
+    runtime = ProbeRuntime(
+        probe,
+        participant_id="participant",
+        scope_id="montreal",
+        participation_id="participation",
+    )
+    runtime.answer("name", "Ada")
+    prepared = runtime.prepare_finalisation(idempotency_key="participation")
+    preview = store.preview_payload(
+        prepared,
+        idempotency_key="participation",
+    )
+
+    assert repository.saved == []
+    runtime.finalise(
+        store,
+        idempotency_key="participation",
+        prepared=prepared,
+    )
+    assert repository.saved == [preview]
+
+
+def test_authored_checkpoint_capabilities_drive_the_generic_surface() -> None:
+    probe = _probe()
+    for section in probe.sections:
+        assert section.checkpoint_config.enabled is True
+        assert section.checkpoint_config.review is True
+        assert section.checkpoint_config.draft_save is True
+        assert section.checkpoint_config.export_yaml is True
+
+    source = (ROOT / "probe_ui.py").read_text(encoding="utf-8")
+    event_source = (ROOT / "event_ui.py").read_text(encoding="utf-8")
+    assert "section.checkpoint_config" in source
+    assert "Enregistrer cette étape" in source
+    assert "Enregistrer et télécharger" in source
+    assert "on_click=save_checkpoint" in source
+    assert "Étape enregistrée. Une copie YAML a été téléchargée sur votre appareil." in source
+    assert "Modifications non enregistrées" in source
+    assert "draft_repository=draft_repository" in event_source
+    assert "draft_repository = repository if test_mode else _draft_repository(event.id)" in event_source
+
+
+def test_checkpoint_retains_answer_skip_and_flag_without_becoming_submission() -> None:
+    probe = _probe()
+    repository = InMemoryRepository()
+    store = ProbeRepositoryStore(
+        repository,
+        probe_id=probe.id,
+        participant_id="participant",
+        scope_id="montreal",
+    )
+    runtime = ProbeRuntime(
+        probe,
+        participant_id="participant",
+        scope_id="montreal",
+        participation_id="participation",
+    )
+    runtime.answer("availability", ["oct28_am_online"])
+    runtime.skip("dietary_preferences", reason_codes=["prefer_not"])
+    runtime.flag("availability", reason_codes=["useful"])
+
+    runtime.reach_checkpoint("participation", store)
+    saved = repository.get_probe_trajectory("participation")
+    assert saved is not None
+    assert saved["integrated"] is False
+    assert not any(
+        event["kind"] == "integrated" for event in saved["trajectory"]["events"]
+    )
+    restored = store.load("participation")
+    assert restored == runtime.trajectory
+
+
+def test_yaml_checkpoint_draft_round_trips_and_rejects_revision_drift() -> None:
+    probe = _probe()
+    runtime = ProbeRuntime(
+        probe,
+        participant_id="participant",
+        scope_id="montreal",
+        participation_id="participation",
+    )
+    runtime.answer("availability", ["oct28_am_online"])
+    runtime.reach_checkpoint(
+        "participation",
+        ProbeRepositoryStore(
+            InMemoryRepository(),
+            probe_id=probe.id,
+            participant_id="participant",
+            scope_id="montreal",
+        ),
+    )
+    exported = dump_checkpoint_draft(
+        probe,
+        runtime.trajectory,
+        section_id="participation",
+    )
+    assert load_checkpoint_draft(exported, probe=probe) == runtime.trajectory
+    exported_payload = yaml.safe_load(exported)
+    assert "trajectory" not in exported_payload
+    assert set(exported_payload) == {
+        "schema",
+        "probe",
+        "participation",
+        "checkpoint",
+        "answers",
+        "skips",
+        "flags",
+    }
+    assert "token" not in exported.casefold()
+    assert "notion" not in exported.casefold()
+
+    payload = exported_payload
+    payload["probe"]["revision"] = probe.revision - 1
+    with pytest.raises(ValueError, match="explicit migration"):
+        load_checkpoint_draft(payload, probe=probe)
+
+
+def test_resaved_yaml_snapshot_keeps_the_latest_canonical_answer_state() -> None:
+    probe = _probe()
+    store = ProbeRepositoryStore(
+        InMemoryRepository(),
+        probe_id=probe.id,
+        participant_id="participant",
+        scope_id="montreal",
+    )
+    runtime = ProbeRuntime(
+        probe,
+        participant_id="participant",
+        scope_id="montreal",
+        participation_id="participation",
+    )
+    runtime.answer("availability", ["oct28_am_online"])
+    runtime.reach_checkpoint("participation", store)
+    runtime.answer("availability", ["oct29_pm_inrs"])
+    runtime.reach_checkpoint("participation", store)
+
+    restored = load_checkpoint_draft(
+        dump_checkpoint_draft(
+            probe,
+            runtime.trajectory,
+            section_id="participation",
+        ),
+        probe=probe,
+    )
+    hydrated = ProbeRuntime.hydrate(
+        probe,
+        restored,
+        participant_id="participant",
+        scope_id="montreal",
+    )
+    assert {item.question_id: item.value for item in hydrated.review()}[
+        "availability"
+    ] == ["oct29_pm_inrs"]
+
+
+def test_checkpoint_and_sync_are_independent_runtime_operations() -> None:
+    probe = _probe()
+    diagnostics: list[dict] = []
+    store = ProbeRepositoryStore(
+        InMemoryRepository(),
+        probe_id=probe.id,
+        participant_id="participant",
+        scope_id="montreal",
+        diagnostic_sink=diagnostics.append,
+    )
+    runtime = ProbeRuntime(
+        probe,
+        participant_id="participant",
+        scope_id="montreal",
+        participation_id="participation",
+    )
+    runtime.reach_checkpoint("exchange", store)
+    assert [event.kind for event in runtime.trajectory.events] == [EventKind.CHECKPOINT]
+    runtime.reach_sync_point("exchange", store)
+    assert [event.kind for event in runtime.trajectory.events] == [
+        EventKind.CHECKPOINT,
+        EventKind.SYNC_POINT_REACHED,
+    ]
+    assert [item["operation"] for item in diagnostics] == [
+        "draft.session.save",
+        "sync.arrival",
+    ]
+
+
+def test_debug_palette_is_copyable_and_has_aa_code_contrast() -> None:
+    source = (ROOT / "probe_ui.py").read_text(encoding="utf-8")
+
+    def luminance(hex_colour: str) -> float:
+        channels = [int(hex_colour[index : index + 2], 16) / 255 for index in (1, 3, 5)]
+        linear = [
+            value / 12.92 if value <= 0.04045 else ((value + 0.055) / 1.055) ** 2.4
+            for value in channels
+        ]
+        return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+
+    foreground = luminance("#f7fff9")
+    background = luminance("#081d18")
+    contrast = (max(foreground, background) + 0.05) / (
+        min(foreground, background) + 0.05
+    )
+    assert contrast >= 4.5
+    assert "Developer · Copy debug state" in source
+    assert 'language="json"' in source
+    assert '"checkpointed.draft"' in source
+    assert '"committed.submission"' in source
+    assert '"notion_api_requests_so_far"' in source
+    assert '"supposed production-equivalent"' in source
+    assert '"estimated real"' in source
+    assert "state: saved" not in source
+    for operation in (
+        "draft.session.save",
+        "draft.yaml.export",
+        "draft.hydrate",
+        "submission.preview",
+        "submission.commit",
+    ):
+        assert operation in source or operation in (
+            ROOT / "protocol" / "probe_store.py"
+        ).read_text(encoding="utf-8")
