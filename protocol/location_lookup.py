@@ -133,8 +133,10 @@ def lookup_locations(query: str, *, api_key: str) -> list[LocationValue]:
     return opencage_location_options(response.json())
 
 
-def render_location_lookup(*, label: str, value: Any, key: str) -> dict[str, Any]:
-    """Render explicit lookup with a durable manual-entry fallback."""
+def render_location_lookup(
+    *, label: str, value: Any, key: str, automatic: bool = False
+) -> dict[str, Any]:
+    """Suggest interpreted locations after typing; preserve manual input until confirmation."""
     current = dict(value) if isinstance(value, Mapping) else {}
     query = st.text_input(
         label,
@@ -145,12 +147,17 @@ def render_location_lookup(*, label: str, value: Any, key: str) -> dict[str, Any
     )
     token = str(query or "").strip()
     state_key = f"{key}_options"
+    lookup_query_key = f"{key}_lookup_query"
     api_key = opencage_api_key()
-    if st.button(
-        "Rechercher ce lieu",
-        key=f"{key}_lookup",
-        disabled=len(token) < 3 or not api_key,
-    ):
+    lookup_requested = automatic and len(token) >= 3
+    if not automatic:
+        lookup_requested = st.button(
+            "Rechercher ce lieu",
+            key=f"{key}_lookup",
+            disabled=len(token) < 3 or not api_key,
+        )
+    if api_key and lookup_requested and st.session_state.get(lookup_query_key) != token:
+        st.session_state[lookup_query_key] = token
         try:
             st.session_state[state_key] = lookup_locations(token, api_key=api_key)
         except Exception:
@@ -160,15 +167,22 @@ def render_location_lookup(*, label: str, value: Any, key: str) -> dict[str, Any
             )
     if not api_key:
         st.caption("Recherche indisponible; la saisie manuelle reste possible.")
-    options = st.session_state.get(state_key, [])
-    selected = st.selectbox(
-        "Choisir un lieu",
-        options=options,
-        format_func=lambda item: item.display_label,
-        index=None,
-        placeholder="Sélectionnez une proposition",
-        key=f"{key}_choice",
-    ) if options else None
+    options = list(st.session_state.get(state_key, []))[:5]
+    selected = None
+    if options:
+        st.markdown("**Est-ce bien ce lieu ?**")
+        selected = st.pills(
+            "Est-ce bien ce lieu ?",
+            options=options,
+            format_func=lambda item: item.display_label,
+            selection_mode="single",
+            label_visibility="collapsed",
+            key=f"{key}_choice",
+        )
+        if st.button("Modifier ma recherche", key=f"{key}_modify"):
+            st.session_state[state_key] = []
+            st.session_state.pop(lookup_query_key, None)
+            st.rerun()
     if isinstance(selected, LocationValue):
         return selected.as_dict()
     if token == str(current.get("display_label") or "") and current.get("place_id"):

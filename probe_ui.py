@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import re
 import uuid
 from importlib.metadata import version as package_version
 from typing import Any, Mapping
@@ -17,6 +19,7 @@ from probe_engine import (
 )
 
 from protocol.probe_registry import PROBE_ENGINE_COMMIT, RegisteredProbe, resolve_event
+from protocol.probe_draft import dump_checkpoint_draft
 from protocol.location_lookup import render_location_lookup
 from protocol.probe_store import ProbeRepositoryStore
 from storage.base import Repository
@@ -32,24 +35,21 @@ def _answers(runtime: ProbeRuntime) -> dict[str, Any]:
     }
 
 
+def _condition_matches(condition: Any, answers: Mapping[str, Any]) -> bool:
+    if condition.operator == "any":
+        return any(_condition_matches(clause, answers) for clause in condition.clauses)
+    actual = answers.get(condition.field_id)
+    if isinstance(actual, Mapping) and "selected" in actual:
+        actual = actual.get("selected")
+    if condition.operator == "contains":
+        return isinstance(actual, (list, tuple, set)) and condition.value in actual
+    if isinstance(actual, (list, tuple, set)):
+        return condition.value in actual
+    return actual == condition.value
+
+
 def _is_visible(field: QuestionDefinition, answers: dict[str, Any]) -> bool:
-    condition = field.visible_if
-    if condition is None:
-        return True
-
-    def evaluate(item: Any) -> bool:
-        if item.operator == "any":
-            return any(evaluate(clause) for clause in item.clauses)
-        actual = answers.get(item.field_id)
-        if isinstance(actual, Mapping) and "selected" in actual:
-            actual = actual.get("selected")
-        if item.operator == "contains":
-            return isinstance(actual, (list, tuple, set)) and item.value in actual
-        if isinstance(actual, (list, tuple, set)):
-            return item.value in actual
-        return actual == item.value
-
-    return evaluate(condition)
+    return field.visible_if is None or _condition_matches(field.visible_if, answers)
 
 
 def _options(probe: ProbeDefinition, field: Any) -> tuple[Any, ...]:
@@ -80,12 +80,21 @@ def _render_multiple(
     selected: list[str] = []
     taxonomy = probe.taxonomy(field.taxonomy_id) if field.taxonomy_id else None
     groups = field.option_groups or (taxonomy.groups if taxonomy else ())
-    collapse_groups = bool(taxonomy and taxonomy.groups)
+    taxonomy_presentation = dict(taxonomy.presentation) if taxonomy else {}
+    collapse_groups = taxonomy_presentation.get("groups") == "expanders"
     if field.input_type == InputType.GROUPED_MULTIPLE and groups:
         for group in groups:
             current = [value for value in saved_selected if value in group.option_values]
+            current = list(st.session_state.get(f"{key}_{group.id}", current))
+            selected_count = len(current)
+            group_title = group.label
+            if taxonomy_presentation.get("show_selected_count"):
+                group_title += f" · {selected_count} sélectionné{'s' if selected_count != 1 else ''}"
             target = (
-                st.expander(group.label, expanded=False)
+                st.expander(
+                    group_title,
+                    expanded=taxonomy_presentation.get("default_state") == "expanded",
+                )
                 if collapse_groups
                 else st.container()
             )
@@ -131,7 +140,23 @@ def _render_multiple(
             )
         )
     if field.max_select is not None:
-        st.caption(f"Maximum : {field.max_select} choix")
+        feedback = dict(field.presentation.get("selection_feedback") or {})
+        count = len(selected)
+        if count > field.max_select:
+            message = str(
+                feedback.get("message")
+                or f"Maximum : {field.max_select} choix. Retirez un choix pour continuer."
+            )
+            if feedback.get("over_limit") == "spectacular_soft_block":
+                st.markdown(f"### ✨ {message} ✨")
+            else:
+                st.warning(message)
+        elif count == field.max_select:
+            st.info(
+                str(feedback.get("at_limit") or f"Maximum atteint : {field.max_select} choix")
+            )
+        else:
+            st.caption(f"Maximum : {field.max_select} choix")
     if field.other.enabled and "other" in selected:
         other_text = st.text_input(
             field.other.label or "Autre",
@@ -168,7 +193,7 @@ def _render_field(
         if field.suggestions:
             values = [item.value for item in field.suggestions]
             suggestion = st.selectbox(
-                "Suggestions",
+                str(field.presentation.get("suggestion_label") or "Suggestions"),
                 options=values,
                 index=values.index(saved) if saved in values else None,
                 placeholder="Choisir une suggestion ou écrire librement",
@@ -178,11 +203,25 @@ def _render_field(
                 key=f"{key}_suggestion",
             ) or ""
         typed = st.text_input(
-            field.prompt,
+            str(field.presentation.get("detail_prompt") or field.prompt),
             value=("" if saved in [item.value for item in field.suggestions] else str(saved or "")),
-            label_visibility="collapsed",
+            placeholder=str(field.presentation.get("detail_placeholder") or "") or None,
+            label_visibility=(
+                "visible" if field.presentation.get("detail_prompt") else "collapsed"
+            ),
             key=key,
         )
+        voice_note = field.presentation.get("voice_note") or {}
+        if voice_note:
+            st.button(
+                str(voice_note.get("label") or "Message vocal"),
+                icon=":material/mic:",
+                disabled=not bool(voice_note.get("enabled")),
+                help=str(voice_note.get("disabled_note") or "") or None,
+                key=f"{key}_voice_note",
+            )
+            if not voice_note.get("enabled") and voice_note.get("disabled_note"):
+                st.caption(str(voice_note["disabled_note"]))
         return str(typed or "").strip() or suggestion
     if field.input_type in single_types:
         options = _options(probe, field)
@@ -264,12 +303,21 @@ def _render_field(
     if field.input_type in repeatable_types:
         return _render_repeatable(probe, field, key=key, saved=saved)
     if field.input_type == InputType.LOCATION:
-        return render_location_lookup(label=field.prompt, value=saved, key=key)
+        return render_location_lookup(
+            label=field.prompt,
+            value=saved,
+            key=key,
+            automatic=bool(
+                field.capabilities
+                and field.capabilities.lookup_trigger == "after_text_input"
+            ),
+        )
     st.error(f"Primitive canonique non prise en charge : {field.input_type.value}")
     return None
 
 
 def _render_question_actions(
+    probe: ProbeDefinition,
     field: QuestionDefinition,
     *,
     key: str,
@@ -290,15 +338,8 @@ def _render_question_actions(
                 "ne fonctionne pas ou mérite attention."
             )
             labels = {
-                "interesting_question": "Intéressante",
-                "useful_for_coordination": "Utile",
-                "thought_provoking": "Stimulante",
-                "well_framed": "Bien formulée",
-                "incomplete": "Incomplète",
-                "misleading": "Trompeuse",
-                "too_narrow": "Trop étroite",
-                "unclear": "Peu claire",
-                "missing_option": "Option manquante",
+                option.value: option.label
+                for option in probe.resolution.flag_reasons.options
             }
             result["flags"] = list(
                 st.pills(
@@ -376,6 +417,8 @@ def _render_skip_dialog(
     participation_id: str,
     runtime: ProbeRuntime,
     store: ProbeRepositoryStore,
+    trajectory_key: str,
+    stage_key: str,
 ) -> None:
     open_key = f"probe_skip_dialog_{participation_id}_{field.id}"
     if not st.session_state.get(open_key):
@@ -385,12 +428,8 @@ def _render_skip_dialog(
     def dialog() -> None:
         st.markdown(f"### {field.prompt}")
         reasons = {
-            "not_relevant": "Non applicable",
-            "dont_know": "Je ne sais pas",
-            "no_option_fits": (
-                "La question ne me permet pas de répondre correctement"
-            ),
-            "other": "Autre",
+            option.value: option.label
+            for option in runtime.probe.resolution.skip_reasons.options
         }
         selected = st.radio(
             "Pourquoi souhaitez-vous passer ?",
@@ -399,20 +438,25 @@ def _render_skip_dialog(
             index=None,
             key=f"probe_skip_reason_choice_{participation_id}_{field.id}",
         )
-        note = st.text_input(
-            "Note facultative",
-            key=f"probe_skip_reason_note_{participation_id}_{field.id}",
-        )
+        note = ""
+        if selected is not None:
+            note = st.text_input(
+                "Précisons pourquoi" if selected == "other" else "Note facultative",
+                key=f"probe_skip_reason_note_{participation_id}_{field.id}",
+            )
         confirm_column, cancel_column = st.columns(2)
         if confirm_column.button(
             "Passer et continuer",
-            type="primary",
+            type="secondary",
             width="stretch",
-            disabled=selected is None,
+            disabled=selected is None or (selected == "other" and not note.strip()),
             key=f"probe_skip_confirm_{participation_id}_{field.id}",
         ):
             runtime.skip(field.id, reason_codes=[str(selected)], note=note)
-            runtime.checkpoint(store)
+            st.session_state[trajectory_key] = runtime.trajectory
+            if field.skip_action == "end":
+                st.session_state[stage_key] = "done"
+                st.session_state[f"probe_terminal_reason_{participation_id}"] = "skipped_consent"
             st.session_state[open_key] = False
             st.rerun()
         if cancel_column.button(
@@ -441,6 +485,13 @@ def _has_resolved_value(field: QuestionDefinition, value: Any) -> bool:
             return bool(
                 isinstance(other, Mapping) and str(other.get("value") or "").strip()
             )
+    selected = value.get("selected") if isinstance(value, Mapping) else value
+    if (
+        field.max_select is not None
+        and isinstance(selected, (list, tuple, set))
+        and len(selected) > field.max_select
+    ):
+        return False
     if field.input_type not in {InputType.REPEATABLE, InputType.REPEATABLE_GROUP}:
         return True
     if not isinstance(value, list) or not value:
@@ -457,7 +508,35 @@ def _has_resolved_value(field: QuestionDefinition, value: Any) -> bool:
 
 def _participant_runtime_error(exc: Exception) -> str:
     message = str(exc)
-    if "item" in message and "required fields" in message:
+    code = str(getattr(exc, "code", ""))
+    if code == "other_detail_required" or "requires other text" in message:
+        return "Précisez votre réponse « Autre » avant de continuer."
+    if "other text without selecting other" in message:
+        return "Le texte « Autre » ne peut être conservé que si « Autre » est sélectionné."
+    if "requires a collection of options" in message:
+        return "Sélectionnez un ou plusieurs choix proposés."
+    if "Invalid option for question" in message:
+        return "Un choix ne fait pas partie des options proposées pour cette question."
+    if "requires a non-empty answer" in message:
+        return "Ajoutez une réponse ou choisissez Passer."
+    if code == "max_select" or "allows at most" in message:
+        limit = re.search(r"allows at most (\d+)", message)
+        return (
+            f"Sélectionnons au maximum {limit.group(1)} réponses."
+            if limit
+            else "Réduisons le nombre de réponses sélectionnées."
+        )
+    if code == "min_select" or (
+        "requires at least" in message and "selections" in message
+    ):
+        return message.replace("Question `", "La question « ").replace(
+            "` requires at least ", " » demande au moins "
+        ).replace(" selections.", " choix.")
+    if code == "repeatable_required_field" and "actors" in message:
+        return "Ajoutons au moins un acteur à cette étape."
+    if code == "repeatable_required_field" or (
+        "item" in message and "required fields" in message
+    ):
         return (
             "Une étape est incomplète. Choisissez une suggestion ou saisissez "
             "une action, puis sélectionnez les éléments demandés."
@@ -467,16 +546,8 @@ def _participant_runtime_error(exc: Exception) -> str:
     return message
 
 
-def _skip_summary(event: Any) -> str:
-    labels = {
-        "not_relevant": "Non applicable",
-        "dont_know": "Je ne sais pas",
-        "prefer_not_to_answer": "Je préfère ne pas répondre",
-        "dont_understand": "Je ne comprends pas la question",
-        "no_option_fits": "Aucune option ne convient",
-        "too_difficult_briefly": "Trop difficile à résumer",
-        "other": "Autre",
-    }
+def _skip_summary(probe: ProbeDefinition, event: Any) -> str:
+    labels = {item.value: item.label for item in probe.resolution.skip_reasons.options}
     reasons = [labels.get(code, code) for code in event.reason_codes]
     if event.reason_note:
         reasons.append(event.reason_note)
@@ -508,6 +579,7 @@ def _render_review_editor(
     store: ProbeRepositoryStore,
     field: QuestionDefinition,
     participation_id: str,
+    trajectory_key: str,
 ) -> None:
     item = next(row for row in runtime.review() if row.question_id == field.id)
     latest = next(
@@ -529,12 +601,26 @@ def _render_review_editor(
             key=f"probe_review_edit_{participation_id}_{field.id}",
             saved=item.value,
         )
-        skip_reason = st.text_input(
+        skip_reasons = {
+            option.value: option.label
+            for option in probe.resolution.skip_reasons.options
+        }
+        skip_reason = st.selectbox(
             "Motif si vous souhaitez passer cette question",
-            value=(latest.reason if latest and latest.kind.value == "skipped" else ""),
+            options=list(skip_reasons),
+            index=None,
+            format_func=skip_reasons.get,
+            placeholder="Choisir un motif canonique",
             key=f"probe_review_skip_reason_{participation_id}_{field.id}",
         )
+        skip_note = ""
+        if skip_reason == "other":
+            skip_note = st.text_input(
+                "Précisons pourquoi",
+                key=f"probe_review_skip_note_{participation_id}_{field.id}",
+            )
         flag_action = _render_question_actions(
+            probe,
             field,
             key=f"probe_review_flag_{participation_id}_{field.id}",
             label="Ajouter un signalement",
@@ -551,7 +637,7 @@ def _render_review_editor(
                     raise ProbeRuntimeError("Ajoutez une réponse ou choisissez Passer.")
                 runtime.answer(field.id, value)
                 _append_flags(runtime, field, flag_action)
-                runtime.checkpoint(store)
+                st.session_state[trajectory_key] = runtime.trajectory
             except ProbeRuntimeError as exc:
                 st.error(_participant_runtime_error(exc))
             else:
@@ -559,12 +645,21 @@ def _render_review_editor(
                 st.rerun()
         if skip_column.button(
             "Passer",
+            type="secondary",
             width="stretch",
-            disabled=not field.skippable,
+            disabled=(
+                not field.skippable
+                or skip_reason is None
+                or (skip_reason == "other" and not skip_note.strip())
+            ),
             key=f"probe_review_skip_{field.id}",
         ):
-            runtime.skip(field.id, reason=skip_reason or "participant_skip")
-            runtime.checkpoint(store)
+            runtime.skip(
+                field.id,
+                reason_codes=[str(skip_reason)],
+                note=skip_note,
+            )
+            st.session_state[trajectory_key] = runtime.trajectory
             st.session_state.pop(f"probe_edit_{participation_id}", None)
             st.rerun()
         if cancel_column.button(
@@ -678,40 +773,156 @@ def _sidebar_debug(
         (
             item
             for item in reversed(persistence_log)
-            if item["operation"] in {"upsert", "integrate"}
+            if item["operation"]
+            in {"draft.session.save", "sync.arrival", "submission.commit"}
         ),
         None,
     )
-    with st.sidebar.expander("Developer · Identity", expanded=True):
+    st.sidebar.markdown(
+        """
+        <style>
+        [data-testid="stSidebar"] [data-testid="stCode"] {background:#081d18;color:#f7fff9;border:1px solid #78998f}
+        [data-testid="stSidebar"] code {color:#f7fff9!important}
+        [data-testid="stSidebar"] summary {color:#f7fff9!important;font-weight:650}
+        [data-testid="stSidebar"] [data-testid="stAlert"] {color:#07130f}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    identity_debug = {
+        "event_id": registration.event_id,
+        "event_slug": registration.event_slug,
+        "session": registration.session_code,
+        "probe": f"{probe.id}@{probe.revision}",
+        "probe_engine": package_version("probe-engine"),
+        "pinned_commit": PROBE_ENGINE_COMMIT,
+        "participation": runtime.trajectory.participation.id,
+        "participant": runtime.trajectory.participation.participant_id,
+        "section": current_section.id if current_section else "complete",
+        "step": current_step.id if current_step else "complete",
+        "test_mode": test_mode,
+    }
+    state = "ephemeral.session"
+    if hydrated:
+        state = "checkpoint.hydrated"
+    latest_operation = persistence_log[-1] if persistence_log else None
+    if latest_operation and latest_operation.get("success"):
+        state = {
+            "session.mutation": "ephemeral.session.mutated",
+            "draft.hydrate": "checkpoint.hydrated",
+            "draft.session.save": "checkpointed.draft",
+            "draft.yaml.export": "checkpointed.draft.exported",
+            "sync.arrival": "sync.arrival.recorded",
+            "submission.preview": "submission.previewed",
+            "submission.commit": "committed.submission",
+        }.get(latest_operation["operation"], state)
+    submission_commits = sum(
+        1
+        for item in persistence_log
+        if item.get("operation") == "submission.commit" and item.get("success")
+    )
+    notion_request_count = submission_commits * 2
+    notion_request_mode = (
+        "estimated real"
+        if "submission=NotionRepository" in backend and not test_mode
+        else "supposed production-equivalent"
+    )
+    persistence_debug = {
+        "backend": backend,
+        "target": (
+            "debug dry-run memory"
+            if test_mode
+            else "separate draft checkpoint and final submission stores"
+        ),
+        "participant": runtime.trajectory.participation.participant_id,
+        "trajectory": runtime.trajectory.participation.id,
+        "probe_revision": probe.revision,
+        "last_persisted_event_count": (latest_write or {}).get("trajectory_event_count"),
+        "last_checkpoint": last_checkpoint,
+        "hydrated": hydrated,
+        "state": state,
+        "notion_api_requests_so_far": notion_request_count,
+        "notion_api_request_count_mode": notion_request_mode,
+        "notion_api_request_basis": (
+            "2 requests per final commit: lookup plus create/update; pagination retries excluded"
+        ),
+    }
+    with st.sidebar.expander("Developer · Identity", expanded=False):
         st.code(
-            f"event id: {registration.event_id}\n"
-            f"event slug: {registration.event_slug}\n"
-            f"session: {registration.session_code}\n"
-            f"probe: {probe.id}@{probe.revision}\n"
-            f"Probe Engine: {package_version('probe-engine')}\n"
-            f"pinned commit: {PROBE_ENGINE_COMMIT}\n"
-            f"participation: {runtime.trajectory.participation.id}\n"
-            f"run/participant: {runtime.trajectory.participation.participant_id}\n"
-            f"section: {current_section.id if current_section else 'complete'}\n"
-            f"step: {current_step.id if current_step else 'complete'}\n"
-            f"TEST MODE: {'YES' if test_mode else 'NO'}"
+            json.dumps(identity_debug, indent=2, ensure_ascii=False),
+            language="json",
         )
-    with st.sidebar.expander("Developer · Persistence", expanded=True):
+    with st.sidebar.expander("Developer · Persistence", expanded=False):
         st.code(
-            f"backend: {backend}\n"
-            f"target: {'debug dry-run memory (no database query)' if test_mode else 'responses collection'}\n"
-            f"participant/profile: {runtime.trajectory.participation.participant_id}\n"
-            f"trajectory/submission: {runtime.trajectory.participation.id}\n"
-            f"probe revision: {probe.revision}\n"
-            f"last persisted event count: {(latest_write or {}).get('trajectory_event_count', 'none')}\n"
-            f"last checkpoint: {last_checkpoint}\n"
-            f"hydrated/resumed: {'YES' if hydrated else 'NO'}\n"
-            f"state: {'saved' if latest_write and latest_write.get('success') else 'not yet saved'}"
+            json.dumps(persistence_debug, indent=2, ensure_ascii=False),
+            language="json",
         )
         for item in reversed(persistence_log):
             label = f"{item['timestamp']} · {item['operation']} · {'OK' if item['success'] else 'FAILED'}"
             with st.expander(label):
                 st.json(item)
+    checkpoint_events = [
+        (index, event)
+        for index, event in enumerate(events)
+        if event.kind.value == "checkpoint"
+    ]
+    latest_checkpoint_event = checkpoint_events[-1] if checkpoint_events else None
+    draft_state = "never_saved"
+    if latest_checkpoint_event:
+        draft_state = (
+            "dirty"
+            if any(
+                event.kind.value in {"answered", "skipped", "flagged"}
+                for event in events[latest_checkpoint_event[0] + 1 :]
+            )
+            else "saved"
+        )
+    reviewed = runtime.review()
+    with st.sidebar.expander("Developer · Draft", expanded=False):
+        st.code(
+            json.dumps(
+                {
+                    "section": current_section.id if current_section else "complete",
+                    "checkpoint": (
+                        latest_checkpoint_event[1].metadata.get("section_id")
+                        if latest_checkpoint_event
+                        else None
+                    ),
+                    "checkpoint_state": draft_state,
+                    "checkpoint_revision": probe.revision if latest_checkpoint_event else None,
+                    "checkpoint_timestamp": (
+                        latest_checkpoint_event[1].timestamp
+                        if latest_checkpoint_event
+                        else None
+                    ),
+                    "answers": sum(item.state.startswith("answered") for item in reviewed),
+                    "skipped": sum(item.state.startswith("skipped") for item in reviewed),
+                    "flagged": sum(event.kind.value == "flagged" for event in events),
+                    "yaml_export": (
+                        "generated"
+                        if any(
+                            item.get("operation") == "draft.yaml.export"
+                            and item.get("success")
+                            for item in persistence_log
+                        )
+                        else "not_generated"
+                    ),
+                },
+                indent=2,
+                ensure_ascii=False,
+            ),
+            language="json",
+        )
+    with st.sidebar.expander("Developer · Copy debug state", expanded=False):
+        st.caption("Use the copy action on this code block.")
+        st.code(
+            json.dumps(
+                {"identity": identity_debug, "persistence": persistence_debug},
+                indent=2,
+                ensure_ascii=False,
+            ),
+            language="json",
+        )
     with st.sidebar.expander("Developer · Canonical event log", expanded=False):
         chronological = st.toggle("Chronological", value=False, key="probe_event_order")
         ordered = events if chronological else list(reversed(events))
@@ -757,11 +968,160 @@ def _sidebar_debug(
         )
 
 
+def _render_checkpoint_surface(
+    *,
+    probe: ProbeDefinition,
+    runtime: ProbeRuntime,
+    store: ProbeRepositoryStore,
+    section: Any,
+    participation_id: str,
+    trajectory_key: str,
+    pending_key: str,
+    stage_key: str,
+) -> None:
+    config = section.checkpoint_config
+    st.caption(section.title.upper())
+    st.title("Enregistrer cette étape")
+    st.write("Mes réponses restent modifiables. Rien n’est encore soumis à la base de données.")
+    boundary_rows = []
+    for authored_section in probe.sections:
+        saved = any(
+            event.kind.value == "checkpoint"
+            and event.metadata.get("section_id") == authored_section.id
+            for event in runtime.trajectory.events
+        )
+        marker = "●" if saved else "○"
+        suffix = "saved" if saved else ""
+        if authored_section.id == section.id:
+            suffix = "checkpoint"
+        boundary_rows.append(
+            f"{authored_section.title.upper()}  ──────────────{marker} {suffix}".rstrip()
+        )
+    st.code("\n".join(boundary_rows), language=None)
+
+    checkpoint_indexes = [
+        index
+        for index, event in enumerate(runtime.trajectory.events)
+        if event.kind.value == "checkpoint"
+        and event.metadata.get("section_id") == section.id
+    ]
+    checkpointed = bool(checkpoint_indexes) and checkpoint_indexes[-1] == (
+        len(runtime.trajectory.events) - 1
+    )
+    latest_checkpoint = (
+        runtime.trajectory.events[checkpoint_indexes[-1]] if checkpoint_indexes else None
+    )
+    if latest_checkpoint and checkpointed:
+        st.success(f"✓ Enregistré · {latest_checkpoint.timestamp}")
+    elif latest_checkpoint:
+        st.warning("● Modifications non enregistrées")
+    else:
+        st.caption("○ Jamais enregistré")
+    flash_key = f"probe_checkpoint_flash_{participation_id}_{section.id}"
+    if st.session_state.pop(flash_key, False):
+        st.toast(
+            "Étape enregistrée. Une copie YAML a été téléchargée sur votre appareil."
+        )
+    review_key = f"probe_checkpoint_review_{participation_id}_{section.id}"
+    save_column, review_column, continue_column = st.columns(3)
+    prepared = runtime.prepare_checkpoint(section.id)
+
+    def save_checkpoint() -> None:
+        runtime.commit_checkpoint(section.id, store, prepared=prepared)
+        st.session_state[trajectory_key] = runtime.trajectory
+        store.observe("draft.yaml.export", runtime.trajectory)
+        st.session_state[flash_key] = True
+
+    with save_column:
+        if config.export_yaml:
+            st.download_button(
+                "Enregistrer et télécharger",
+                data=dump_checkpoint_draft(probe, prepared, section_id=section.id),
+                file_name=f"{probe.id}-{section.id}-brouillon.yaml",
+                mime="application/yaml",
+                type="secondary" if checkpointed else "primary",
+                width="stretch",
+                on_click=save_checkpoint,
+                key=f"probe_checkpoint_save_{section.id}",
+            )
+        elif st.button(
+            "Enregistrer",
+            type="secondary" if checkpointed else "primary",
+            width="stretch",
+            key=f"probe_checkpoint_save_{section.id}",
+        ):
+            runtime.commit_checkpoint(section.id, store, prepared=prepared)
+            st.session_state[trajectory_key] = runtime.trajectory
+            st.session_state[flash_key] = True
+            st.rerun()
+    if review_column.button(
+        "Relire cette section",
+        width="stretch",
+        disabled=not config.review,
+        key=f"probe_checkpoint_review_button_{section.id}",
+    ):
+        st.session_state[review_key] = not bool(st.session_state.get(review_key))
+        st.rerun()
+    if continue_column.button(
+        "Continuer",
+        type="primary",
+        width="stretch",
+        disabled=not checkpointed,
+        key=f"probe_checkpoint_continue_{section.id}",
+    ):
+        if section.sync_point:
+            runtime.reach_sync_point(section.id, store)
+            st.session_state[trajectory_key] = runtime.trajectory
+        st.session_state.pop(pending_key, None)
+        if section.step_ids[-1] == probe.steps[-1].id:
+            st.session_state[stage_key] = "review"
+        st.rerun()
+
+    if config.review and st.session_state.get(review_key):
+        review = {item.question_id: item for item in runtime.review()}
+        step_ids = set(section.step_ids)
+        for step in probe.steps:
+            if step.id not in step_ids:
+                continue
+            st.subheader(step.title)
+            for field_id in step.field_ids:
+                item = review[field_id]
+                if item.value is None and not item.state.startswith("skipped"):
+                    continue
+                field = probe.question(field_id)
+                answer_column, edit_column = st.columns([8, 2])
+                with answer_column:
+                    st.markdown(f"**{field.prompt}**")
+                    st.text(
+                        "Question passée"
+                        if item.state.startswith("skipped")
+                        else _review_value(probe, field, item.value)
+                    )
+                with edit_column:
+                    if st.button(
+                        "Modifier",
+                        key=f"probe_checkpoint_edit_{section.id}_{field_id}",
+                    ):
+                        st.session_state[f"probe_edit_{participation_id}"] = field_id
+                        st.rerun()
+        edit_field_id = str(st.session_state.get(f"probe_edit_{participation_id}") or "")
+        if edit_field_id:
+            _render_review_editor(
+                probe=probe,
+                runtime=runtime,
+                store=store,
+                field=probe.question(edit_field_id),
+                participation_id=participation_id,
+                trajectory_key=trajectory_key,
+            )
+
+
 def render_registered_probe(
     *,
     registration: RegisteredProbe,
     probe: ProbeDefinition,
     repository: Repository,
+    draft_repository: Repository | None = None,
     test_mode: bool = False,
 ) -> None:
     participant_id = participant_uuid()
@@ -783,8 +1143,19 @@ def render_registered_probe(
         persistence_log.append(item)
         del persistence_log[:-50]
 
-    backend = repository.__class__.__name__
-    store = ProbeRepositoryStore(
+    draft_repository = draft_repository or repository
+    submission_backend = repository.__class__.__name__
+    draft_backend = draft_repository.__class__.__name__
+    backend = f"draft={draft_backend}; submission={submission_backend}"
+    draft_store = ProbeRepositoryStore(
+        draft_repository,
+        probe_id=probe.id,
+        participant_id=participant_id,
+        scope_id=registration.session_code,
+        diagnostic_sink=record_persistence,
+        target="checkpoint drafts",
+    )
+    submission_store = ProbeRepositoryStore(
         repository,
         probe_id=probe.id,
         participant_id=participant_id,
@@ -793,26 +1164,61 @@ def render_registered_probe(
         target=(
             "debug dry-run memory"
             if test_mode
-            else f"{backend}:responses"
+            else f"{submission_backend}:final submissions"
         ),
     )
-    stored = store.load(participation_id)
-    hydrated = stored is not None
-    runtime = (
-        ProbeRuntime.hydrate(
+    trajectory_key = f"probe_session_trajectory_{participation_id}"
+    hydrated_key = f"probe_hydrated_{participation_id}"
+    session_trajectory = st.session_state.get(trajectory_key)
+    if session_trajectory is None:
+        stored = draft_store.load(participation_id)
+        if (
+            stored is not None
+            and stored.participation.probe_revision != probe.revision
+        ):
+            st.error(
+                "Ce brouillon appartient à une autre révision du questionnaire. "
+                "Une migration explicite est nécessaire avant de le reprendre."
+            )
+            with st.sidebar.expander("Developer · Draft revision", expanded=False):
+                st.code(
+                    json.dumps(
+                        {
+                            "stored_revision": stored.participation.probe_revision,
+                            "current_revision": probe.revision,
+                            "migration": "required",
+                        },
+                        indent=2,
+                    ),
+                    language="json",
+                )
+            return
+        hydrated = stored is not None
+        runtime = (
+            ProbeRuntime.hydrate(
+                probe,
+                stored,
+                participant_id=participant_id,
+                scope_id=registration.session_code,
+            )
+            if stored
+            else ProbeRuntime(
+                probe,
+                participant_id=participant_id,
+                scope_id=registration.session_code,
+                participation_id=participation_id,
+            )
+        )
+        st.session_state[trajectory_key] = runtime.trajectory
+        st.session_state[hydrated_key] = hydrated
+    else:
+        runtime = ProbeRuntime.hydrate(
             probe,
-            stored,
+            session_trajectory,
             participant_id=participant_id,
             scope_id=registration.session_code,
         )
-        if stored
-        else ProbeRuntime(
-            probe,
-            participant_id=participant_id,
-            scope_id=registration.session_code,
-            participation_id=participation_id,
-        )
-    )
+        hydrated = bool(st.session_state.get(hydrated_key))
     _sidebar_debug(
         registration,
         probe,
@@ -837,6 +1243,7 @@ def render_registered_probe(
     }
     stage_key = f"probe_stage_{participation_id}"
     stage = str(st.session_state.get(stage_key) or "welcome")
+    pending_checkpoint_key = f"probe_pending_checkpoint_{participation_id}"
 
     if stage == "welcome":
         st.title(probe.title)
@@ -850,8 +1257,30 @@ def render_registered_probe(
             st.rerun()
         return
 
+    pending_checkpoint = str(st.session_state.get(pending_checkpoint_key) or "")
+    if pending_checkpoint:
+        _render_checkpoint_surface(
+            probe=probe,
+            runtime=runtime,
+            store=draft_store,
+            section=probe.section(pending_checkpoint),
+            participation_id=participation_id,
+            trajectory_key=trajectory_key,
+            pending_key=pending_checkpoint_key,
+            stage_key=stage_key,
+        )
+        return
+
     if stage == "done":
-        st.success("Merci. Vos réponses ont bien été enregistrées.")
+        if st.session_state.get(f"probe_terminal_reason_{participation_id}") == "skipped_consent":
+            st.info(
+                "Vous avez passé la question de consentement. Votre participation "
+                "n’est pas considérée comme consentie et aucune réponse ne sera soumise."
+            )
+        elif test_mode:
+            st.success("Simulation terminée. Aucune écriture de production n’a été effectuée.")
+        else:
+            st.success("Merci. Vos réponses ont bien été enregistrées.")
         return
 
     if stage == "review":
@@ -880,7 +1309,7 @@ def render_registered_probe(
                                 ),
                                 None,
                             )
-                            reason = _skip_summary(latest_skip) if latest_skip else ""
+                            reason = _skip_summary(probe, latest_skip) if latest_skip else ""
                             st.caption(
                                 "Question passée"
                                 + (f" · {reason}" if reason else "")
@@ -905,16 +1334,44 @@ def render_registered_probe(
             _render_review_editor(
                 probe=probe,
                 runtime=runtime,
-                store=store,
+                store=draft_store,
                 field=probe.question(edit_field_id),
                 participation_id=participation_id,
+                trajectory_key=trajectory_key,
+            )
+        preview_hints = probe.authoring.presentation_hints.get("submission_preview", {})
+        prepared = runtime.prepare_finalisation(idempotency_key=participation_id)
+        payload = submission_store.preview_payload(
+            prepared,
+            idempotency_key=participation_id,
+        )
+        if test_mode and preview_hints.get("enabled", True):
+            with st.expander(
+                str(preview_hints.get("title") or "Prévisualiser ce qui sera envoyé"),
+                expanded=False,
+            ):
+                st.code(
+                    json.dumps(payload, ensure_ascii=False, indent=2),
+                    language="json",
+                )
+                st.caption(
+                    "Payload exact transmis à l’adaptateur de persistance après confirmation."
+                )
+        if not test_mode and repository_mode() != "notion":
+            st.warning(
+                "L’écriture de production exige une authentification Notion configurée."
             )
         if st.button(
             "Intégrer au paysage commun",
             type="primary",
             width="stretch",
+            disabled=not test_mode and repository_mode() != "notion",
         ):
-            runtime.finalise(store, idempotency_key=participation_id)
+            runtime.finalise(
+                submission_store,
+                idempotency_key=participation_id,
+                prepared=prepared,
+            )
             st.session_state[stage_key] = "done"
             st.rerun()
         return
@@ -977,7 +1434,7 @@ def render_registered_probe(
                     for event in reversed(runtime.trajectory.events)
                     if event.question_id == field.id and event.kind.value == "skipped"
                 )
-                st.caption(f"Question passée · {_skip_summary(latest_skip)}")
+                st.caption(f"Question passée · {_skip_summary(probe, latest_skip)}")
                 if st.button("Modifier", key=f"probe_reopen_button_{field.id}"):
                     st.session_state[reopen_key] = True
                     st.rerun()
@@ -1003,7 +1460,7 @@ def render_registered_probe(
                     )
                     with st.container(border=True):
                         st.caption(
-                            f"Question passée · {_skip_summary(latest_skip)}"
+                            f"Question passée · {_skip_summary(probe, latest_skip)}"
                         )
                 else:
                     draft[field.id] = _render_field(
@@ -1015,6 +1472,7 @@ def render_registered_probe(
                     )
             with flag_column:
                 actions[field.id] = _render_question_actions(
+                    probe,
                     field,
                     key=action_key,
                     label="Signaler",
@@ -1029,9 +1487,10 @@ def render_registered_probe(
                     if reopen_clicked:
                         st.session_state[reopen_key] = True
                         st.rerun()
-                else:
+                elif field.skippable:
                     pass_clicked = st.button(
                         "Passer",
+                        type="secondary",
                         width="stretch",
                         disabled=not field.skippable,
                         key=f"probe_skip_{participation_id}_{field.id}",
@@ -1045,7 +1504,9 @@ def render_registered_probe(
                 field,
                 participation_id=participation_id,
                 runtime=runtime,
-                store=store,
+                store=draft_store,
+                trajectory_key=trajectory_key,
+                stage_key=stage_key,
             )
 
     if single_question_step and visible_fields:
@@ -1054,7 +1515,7 @@ def render_registered_probe(
         reopened = bool(
             st.session_state.get(f"probe_reopen_{participation_id}_{field.id}")
         )
-        continue_column, flag_column, skip_column = st.columns([1.6, 0.5, 0.4])
+        continue_column, skip_column, flag_column = st.columns([1.6, 0.4, 0.5])
         single_resolved = _has_resolved_value(field, draft.get(field.id)) or (
             skipped and not reopened
         )
@@ -1065,18 +1526,21 @@ def render_registered_probe(
             disabled=not single_resolved,
             key=f"probe_continue_{participation_id}_{step.id}",
         )
+        skip_button_clicked = False
+        if field.skippable:
+            skip_button_clicked = skip_column.button(
+                "Passer",
+                type="secondary",
+                width="stretch",
+                key=f"probe_skip_{participation_id}_{field.id}",
+            )
         with flag_column:
             actions[field.id] = _render_question_actions(
+                probe,
                 field,
                 key=f"probe_action_{participation_id}_{field.id}",
                 label="Signaler",
             )
-        skip_button_clicked = skip_column.button(
-            "Passer",
-            width="stretch",
-            disabled=not field.skippable,
-            key=f"probe_skip_{participation_id}_{field.id}",
-        )
         if skip_button_clicked:
             st.session_state[f"probe_skip_dialog_{participation_id}_{field.id}"] = True
             st.rerun()
@@ -1084,7 +1548,9 @@ def render_registered_probe(
             field,
             participation_id=participation_id,
             runtime=runtime,
-            store=store,
+            store=draft_store,
+            trajectory_key=trajectory_key,
+            stage_key=stage_key,
         )
     else:
         unresolved = [
@@ -1144,13 +1610,23 @@ def render_registered_probe(
         except ProbeRuntimeError as exc:
             st.error(_participant_runtime_error(exc))
             return
-        terminal = any(
-            route.action == "end"
-            and route.when.operator == "equals"
-            and draft.get(route.when.field_id) == route.when.value
+        matched_routes = [
+            route
             for field in visible_fields
             for route in field.routes
+            if _condition_matches(route.when, {**answers, **draft})
+        ]
+        return_route = next(
+            (route for route in matched_routes if route.action == "return_to_information"),
+            None,
         )
+        if return_route:
+            st.toast(str(return_route.metadata.get("toast") or "Merci de relire les informations."))
+            return
+        if any(route.action == "show_contact" for route in matched_routes):
+            st.info("Contactez l’équipe indiquée ci-dessus avant de poursuivre.")
+            return
+        terminal = any(route.action == "end" for route in matched_routes)
         section = next(
             (
                 item
@@ -1159,12 +1635,23 @@ def render_registered_probe(
             ),
             None,
         )
-        if section and (section.checkpoint or section.sync_point):
-            scratch.reach_section_boundary(section.id, store)
-        else:
-            scratch.checkpoint(store)
+        st.session_state[trajectory_key] = scratch.trajectory
+        record_persistence(
+            {
+                "operation": "session.mutation",
+                "timestamp": scratch.trajectory.events[-1].timestamp,
+                "target": "browser/session state",
+                "record_identity": participation_id,
+                "success": True,
+                "trajectory_event_count": len(scratch.trajectory.events),
+                "items_affected": 1,
+                "duration_ms": 0,
+            }
+        )
         if terminal:
             st.session_state[stage_key] = "done"
+        elif section and section.checkpoint:
+            st.session_state[pending_checkpoint_key] = section.id
         elif step_index + 1 >= len(probe.steps):
             st.session_state[stage_key] = "review"
         st.rerun()

@@ -68,6 +68,105 @@ class NotionRepository:
         self._session_page_id = str(manifest["seed_session"]["page_id"])
         self._client = Client(auth=token, notion_version=notion_version)
 
+    def save_probe_trajectory(
+        self, trajectory: dict[str, Any]
+    ) -> dict[str, Any]:
+        participation_id = str(trajectory["participation_id"])
+        probe_id = str(trajectory["probe_id"])
+        payload = json.dumps(trajectory, ensure_ascii=False, separators=(",", ":"))
+        pages = self._query_all(
+            "responses",
+            filter_={
+                "property": "item_id",
+                "rich_text": {"equals": participation_id},
+            },
+        )
+        existing = next(
+            (
+                page
+                for page in pages
+                if _rich(page.get("properties") or {}, "item_id")
+                == participation_id
+            ),
+            None,
+        )
+        events = ((trajectory.get("trajectory") or {}).get("events") or [])
+        updated_at = str(events[-1].get("timestamp") or "") if events else None
+        properties = {
+            "response_value": {"rich_text": _text(probe_id)},
+            "value_label": {
+                "rich_text": _text(f"{len(events)} trajectory events")
+            },
+            "value_json": {"rich_text": _text(payload)},
+            "revision": {"number": int(trajectory["probe_revision"])},
+        }
+        if updated_at:
+            properties["submitted_at"] = {"date": {"start": updated_at}}
+        if existing:
+            self._client.pages.update(
+                page_id=str(existing["id"]),
+                properties=properties,
+            )
+            result = dict(trajectory)
+            result["_page_id"] = str(existing["id"])
+            return result
+        created = self._client.pages.create(
+            parent={
+                "type": "data_source_id",
+                "data_source_id": self._sources["responses"],
+            },
+            properties={
+                "Name": {"title": _text(f"{probe_id} trajectory")},
+                "session": _relation(self._session_page_id),
+                "participant_uuid": {
+                    "rich_text": _text(str(trajectory["participant_id"]))
+                },
+                "question_id": {"rich_text": _text(probe_id)},
+                "item_id": {"rich_text": _text(participation_id)},
+                "question_type": {"select": {"name": "other"}},
+                "text_id": {"rich_text": _text(probe_id)},
+                "device_id": {
+                    "rich_text": _text(str(trajectory["participant_id"]))
+                },
+                "protocol_version": {
+                    "rich_text": _text(f"v{trajectory['probe_revision']}")
+                },
+                **properties,
+                **(
+                    {"created_at": {"date": {"start": updated_at}}}
+                    if updated_at
+                    else {}
+                ),
+            },
+        )
+        result = dict(trajectory)
+        result["_page_id"] = str(created["id"])
+        return result
+
+    def get_probe_trajectory(
+        self, participation_id: str
+    ) -> dict[str, Any] | None:
+        pages = self._query_all(
+            "responses",
+            filter_={
+                "property": "item_id",
+                "rich_text": {"equals": participation_id},
+            },
+        )
+        for page in pages:
+            properties = page.get("properties") or {}
+            if _rich(properties, "item_id") != participation_id:
+                continue
+            raw = _rich(properties, "value_json")
+            try:
+                value = json.loads(raw)
+            except json.JSONDecodeError:
+                continue
+            if value.get("record_type") == "probe_trajectory":
+                value["_page_id"] = str(page.get("id") or "")
+                return value
+        return None
+
     @staticmethod
     def _protocol_lab_field_note_from_page(
         page: dict[str, Any],

@@ -63,7 +63,7 @@ class ProbeRepositoryStore:
 
     def load(self, participation_id: str) -> Trajectory | None:
         record = self._communicate(
-            "load",
+            "draft.hydrate",
             participation_id,
             lambda: self.repository.get_probe_trajectory(participation_id),
         )
@@ -72,8 +72,13 @@ class ProbeRepositoryStore:
         return trajectory_from_dict(record["trajectory"])
 
     def checkpoint(self, trajectory: Trajectory) -> Trajectory:
+        operation = (
+            "sync.arrival"
+            if trajectory.events and trajectory.events[-1].kind.value == "sync_point_reached"
+            else "draft.session.save"
+        )
         self._communicate(
-            "upsert",
+            operation,
             trajectory.participation.id,
             lambda: self.repository.save_probe_trajectory(
                 self._record(trajectory, integrated=False)
@@ -82,25 +87,65 @@ class ProbeRepositoryStore:
         )
         return trajectory
 
+    def observe(self, operation: str, trajectory: Trajectory) -> None:
+        """Record a non-persistence boundary operation for developer diagnostics."""
+        self._communicate(
+            operation,
+            trajectory.participation.id,
+            lambda: None,
+            event_count=len(trajectory.events),
+        )
+
     def integrate(
         self,
         trajectory: Trajectory,
         *,
         idempotency_key: str,
     ) -> Trajectory:
+        payload = self.submission_payload(
+            trajectory,
+            integrated=True,
+            idempotency_key=idempotency_key,
+        )
         self._communicate(
-            "integrate",
+            "submission.commit",
             trajectory.participation.id,
-            lambda: self.repository.save_probe_trajectory(
-                self._record(
-                    trajectory,
-                    integrated=True,
-                    idempotency_key=idempotency_key,
-                )
-            ),
+            lambda: self.repository.save_probe_trajectory(payload),
             event_count=len(trajectory.events),
         )
         return trajectory
+
+    def preview_payload(
+        self,
+        trajectory: Trajectory,
+        *,
+        idempotency_key: str,
+    ) -> dict[str, Any]:
+        """Build and report the exact final payload without performing a write."""
+        return self._communicate(
+            "submission.preview",
+            trajectory.participation.id,
+            lambda: self.submission_payload(
+                trajectory,
+                integrated=True,
+                idempotency_key=idempotency_key,
+            ),
+            event_count=len(trajectory.events),
+        )
+
+    def submission_payload(
+        self,
+        trajectory: Trajectory,
+        *,
+        integrated: bool,
+        idempotency_key: str = "",
+    ) -> dict[str, Any]:
+        """Build the exact canonical record passed to the repository adapter."""
+        return self._record(
+            trajectory,
+            integrated=integrated,
+            idempotency_key=idempotency_key,
+        )
 
     def _record(
         self,

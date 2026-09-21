@@ -20,9 +20,26 @@ def _secret(section: str, key: str) -> str:
     return str(value or "").strip()
 
 
+def notion_token() -> str:
+    """Return the configured Notion integration credential.
+
+    ``notion.api_key`` is the established secret name in this application.
+    The Protocol Hack-specific and generic token aliases remain supported for
+    environment-specific deployments.
+    """
+
+    return (
+        os.getenv("PROTOHACK_NOTION_TOKEN", "").strip()
+        or os.getenv("NOTION_TOKEN", "").strip()
+        or _secret("notion", "protohack_token")
+        or _secret("notion", "token")
+        or _secret("notion", "api_key")
+    )
+
+
 def repository_mode() -> str:
     forced_demo = os.getenv("PROTOHACK_DEMO_MODE", "").lower() in {"1", "true", "yes"}
-    token = os.getenv("NOTION_TOKEN", "").strip() or _secret("notion", "token")
+    token = notion_token()
     return "demo" if forced_demo or not token else "notion"
 
 
@@ -42,5 +59,4 @@ def _notion_repository(token: str) -> NotionRepository:
 def get_repository() -> Repository:
     if repository_mode() == "demo":
         return _memory_repository()
-    token = os.getenv("NOTION_TOKEN", "").strip() or _secret("notion", "token")
-    return _notion_repository(token)
+    return _notion_repository(notion_token())

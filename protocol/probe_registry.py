@@ -10,7 +10,7 @@ from probe_engine import ProbeDefinition, load_yaml_probe
 
 APP_ROOT = Path(__file__).resolve().parents[1]
 QUESTION_SETS = APP_ROOT / "question_sets"
-PROBE_ENGINE_COMMIT = "5bd7d7dd04c2d294c9421d6f48923fcd3266e7fe"
+PROBE_ENGINE_COMMIT = "ee367a6d096a2e3d1a578ee5c024faa3c7024f43"
 
 
 @dataclass(frozen=True)

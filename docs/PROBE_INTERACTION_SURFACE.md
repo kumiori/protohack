@@ -14,8 +14,25 @@ Skip resolution and optional flags. Skip and Flag are separate controls. The ste
 visible question has an explicit answer or Skip event. Flags are supplementary
 events and never resolve a question.
 
-Review edits append a new canonical Answered or Skipped event and checkpoint the
-trajectory. Earlier events remain in the trajectory.
+The participation-consent question is skippable under the same resolution
+grammar, but its canonical `skip_action: end` terminates the journey without an
+affirmative-consent answer or submission.
+
+Review edits append a new canonical Answered or Skipped event to session state.
+Earlier events remain in the trajectory; an explicit checkpoint or final submit
+performs persistence.
+
+Ordinary traversal mutates only the browser/session trajectory. An authored
+section checkpoint opens a dedicated surface where the participant can review,
+edit, explicitly save a recoverable draft and export that same canonical state as
+YAML. A checkpoint is not an integrated submission. An authored sync-point
+arrival is recorded separately when continuing, and final submission remains an
+explicit operation after payload preview.
+
+The application wires draft and submission repositories separately. Until a
+durable authenticated draft adapter is selected, deployed checkpoints use the
+dedicated process-local draft repository plus explicit YAML export; they never
+write partial trajectories into the production Notion responses collection.
 
 ## Subordinate value rule
 
@@ -43,12 +60,14 @@ Its canonical value contains the display label, locality, region, country,
 country code, stable place id, latitude and longitude. The richer WG2 variant
 also preserves raw input, lookup source/status and explicit coordinate consent.
 Lookup failure keeps manual text available and shows a non-blocking warning or
-empty-result message.
+empty-result message. When the canonical field declares `lookup_trigger:
+after_text_input`, the lookup follows typed text automatically and offers results
+for explicit confirmation; it never silently replaces the typed value.
 
 The reusable implementation now lives at the Protocol Hack field-rendering
 boundary. Probe Engine `location` fields retain the canonical structured value;
-Protocol Hack supplies the explicitly triggered OpenCage lookup and durable
-manual-entry fallback.
+Protocol Hack supplies the authored automatic or explicitly triggered OpenCage
+lookup mode and durable manual-entry fallback.
 
 No IceIceBaby source contains `navigator.geolocation`, `getCurrentPosition`, or
 an equivalent browser-GPS component. A “Utiliser ma position” control therefore
@@ -57,13 +76,12 @@ canonical location value; it cannot be extracted from the reference.
 
 ## Current upstream gates
 
-- Probe Engine `0.3.0.dev2` at commit `5bd7d7dd04c2d294c9421d6f48923fcd3266e7fe` supplies canonical composed
+- Probe Engine `0.3.0.dev5` at commit `ee367a6d096a2e3d1a578ee5c024faa3c7024f43` supplies canonical composed
   Other answers and representation definitions/results.
 - Structured location is a canonical field primitive in the pinned release.
-- Probe Engine exposes `independently_answerable`, but the Montréal fixture still
-  marks its top-level optional example fields as independently answerable. The
-  renderer follows that contract and does not infer relationships from IDs or
-  layout.
+- Probe Engine exposes `independently_answerable`; optional companions remain
+  supplementary unless explicitly authored as required. The renderer follows
+  that contract and does not infer relationships from IDs or layout.
 - Probe Engine can append Flagged events but has no inverse/unflag event, so a
   prior flag cannot yet be removed truthfully.
 
