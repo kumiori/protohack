@@ -580,7 +580,7 @@ def _render_viewport_notice() -> None:
     st.markdown(
         """
         <style>
-        .probe-viewport-note { padding:.7rem .9rem; border:1px solid rgba(18,33,27,.2); border-radius:.65rem; margin:.5rem 0 1rem; font-size:.9rem; }
+        .probe-viewport-note { padding:.7rem .9rem; border:1px solid rgba(18,33,27,.2); border-radius:.65rem; margin:.5rem 0 1rem; font-size:var(--type-helper); line-height:var(--line-helper); }
         .probe-viewport-note.mobile { display:none; }
         @media (max-width: 700px) {
           .probe-viewport-note.wide { display:none; }
@@ -595,31 +595,10 @@ def _render_viewport_notice() -> None:
 
 
 def _render_probe_styles() -> None:
-    """Apply a responsive hierarchy without changing canonical Probe content."""
+    """Apply Probe layout styles without overriding shared typography tokens."""
     st.markdown(
         """
         <style>
-        [data-testid="stAppViewContainer"] h1 {
-            font-size: clamp(2.35rem, 7vw, 5.5rem);
-            line-height: .96;
-        }
-        [data-testid="stAppViewContainer"] h2 {
-            font-size: clamp(1.65rem, 3.6vw, 2.6rem);
-            line-height: 1.05;
-        }
-        [data-testid="stAppViewContainer"] h3,
-        [data-testid="stAppViewContainer"] details summary {
-            font-size: clamp(1.05rem, 2vw, 1.3rem);
-            line-height: 1.2;
-        }
-        [data-testid="stAppViewContainer"] h4 {
-            font-size: clamp(1.25rem, 2.6vw, 1.75rem);
-            line-height: 1.18;
-        }
-        [data-testid="stAppViewContainer"] [data-testid="stCaptionContainer"] {
-            font-size: clamp(.82rem, 1.2vw, .95rem);
-            line-height: 1.35;
-        }
         [data-testid="stBaseButton-secondary"] {
             background: #f8f7f2 !important;
             color: #13221d !important;
@@ -641,15 +620,11 @@ def _render_probe_styles() -> None:
             border: 1px solid rgba(19, 34, 29, .24);
             border-radius: .65rem;
             font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-            font-size: clamp(.74rem, 1.4vw, .9rem);
+            font-size: var(--type-metadata);
+            line-height: 1.35;
         }
         .probe-checkpoint-grid .rail { border-top: 1px solid currentColor; opacity: .45; }
         .probe-checkpoint-grid .state { white-space: nowrap; }
-        @media (max-width: 700px) {
-            [data-testid="stAppViewContainer"] h1 {
-                font-size: clamp(2rem, 11vw, 3.4rem);
-            }
-        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -1341,7 +1316,8 @@ def render_registered_probe(
     if stage == "welcome":
         welcome = probe.step("welcome")
         st.title(welcome.title)
-        st.write(welcome.body)
+        with st.container(key="editorial_lead"):
+            st.write(welcome.body)
         _render_viewport_notice()
         if st.button(welcome.cta or "Commencer", type="primary", width="stretch"):
             st.session_state[stage_key] = "steps"
@@ -1376,7 +1352,8 @@ def render_registered_probe(
         elif st.session_state.get(f"probe_submission_receipt_{participation_id}"):
             done = probe.step("done")
             st.title(done.title)
-            st.write(done.body)
+            with st.container(key="editorial_lead"):
+                st.write(done.body)
         else:
             st.warning(
                 "Aucun reçu de persistance n’est disponible. "
@@ -1517,7 +1494,8 @@ def render_registered_probe(
         st.caption(section.title.upper())
     st.title(step.title)
     if step.body:
-        st.write(step.body)
+        with st.container(key="editorial_lead"):
+            st.write(step.body)
     draft: dict[str, Any] = {}
     actions: dict[str, dict[str, Any]] = {}
     visible_fields: list[QuestionDefinition] = []
@@ -1562,60 +1540,62 @@ def render_registered_probe(
                     saved=answers.get(field.id),
                 )
         else:
-            st.markdown(f"#### {field.prompt}")
-            answer_column, flag_column, skip_column = st.columns(
-                [8, 2, 1.5], vertical_alignment="top"
-            )
-            with answer_column:
-                if skipped and not reopened:
-                    latest_skip = next(
-                        event
-                        for event in reversed(runtime.trajectory.events)
-                        if event.question_id == field.id
-                        and event.kind.value == "skipped"
+            with st.container(key=f"probe_question_{field.id}"):
+                st.markdown(f"#### {field.prompt}")
+                with st.container(key=f"probe_question_row_{field.id}"):
+                    answer_column, flag_column, skip_column = st.columns(
+                        [8, 2, 1.5], vertical_alignment="top"
                     )
-                    with st.container(border=True):
-                        st.caption(
-                            f"Question passée · {_skip_summary(probe, latest_skip)}"
+                    with answer_column:
+                        if skipped and not reopened:
+                            latest_skip = next(
+                                event
+                                for event in reversed(runtime.trajectory.events)
+                                if event.question_id == field.id
+                                and event.kind.value == "skipped"
+                            )
+                            with st.container(border=True):
+                                st.caption(
+                                    f"Question passée · {_skip_summary(probe, latest_skip)}"
+                                )
+                        else:
+                            draft[field.id] = _render_field(
+                                probe,
+                                field,
+                                key=f"probe_{participation_id}_{field.id}",
+                                saved=answers.get(field.id),
+                                show_prompt=False,
+                            )
+                    with flag_column:
+                        actions[field.id] = _render_question_actions(
+                            probe,
+                            field,
+                            key=action_key,
+                            label="Signaler",
                         )
-                else:
-                    draft[field.id] = _render_field(
-                        probe,
-                        field,
-                        key=f"probe_{participation_id}_{field.id}",
-                        saved=answers.get(field.id),
-                        show_prompt=False,
-                    )
-            with flag_column:
-                actions[field.id] = _render_question_actions(
-                    probe,
-                    field,
-                    key=action_key,
-                    label="Signaler",
-                )
-            with skip_column:
-                if skipped and not reopened:
-                    reopen_clicked = st.button(
-                        "Modifier",
-                        width="stretch",
-                        key=f"probe_reopen_button_{field.id}",
-                    )
-                    if reopen_clicked:
-                        st.session_state[reopen_key] = True
-                        st.rerun()
-                elif field.skippable:
-                    pass_clicked = st.button(
-                        "Passer",
-                        type="secondary",
-                        width="stretch",
-                        disabled=not field.skippable,
-                        key=f"probe_skip_{participation_id}_{field.id}",
-                    )
-                    if pass_clicked:
-                        st.session_state[
-                            f"probe_skip_dialog_{participation_id}_{field.id}"
-                        ] = True
-                        st.rerun()
+                    with skip_column:
+                        if skipped and not reopened:
+                            reopen_clicked = st.button(
+                                "Modifier",
+                                width="stretch",
+                                key=f"probe_reopen_button_{field.id}",
+                            )
+                            if reopen_clicked:
+                                st.session_state[reopen_key] = True
+                                st.rerun()
+                        elif field.skippable:
+                            pass_clicked = st.button(
+                                "Passer",
+                                type="secondary",
+                                width="stretch",
+                                disabled=not field.skippable,
+                                key=f"probe_skip_{participation_id}_{field.id}",
+                            )
+                            if pass_clicked:
+                                st.session_state[
+                                    f"probe_skip_dialog_{participation_id}_{field.id}"
+                                ] = True
+                                st.rerun()
             _render_skip_dialog(
                 field,
                 participation_id=participation_id,
@@ -1631,32 +1611,33 @@ def render_registered_probe(
         reopened = bool(
             st.session_state.get(f"probe_reopen_{participation_id}_{field.id}")
         )
-        continue_column, skip_column, flag_column = st.columns([1.6, 0.4, 0.5])
-        single_resolved = _has_resolved_value(field, draft.get(field.id)) or (
-            skipped and not reopened
-        )
-        continue_clicked = continue_column.button(
-            step.cta or "Continuer",
-            type="primary",
-            width="stretch",
-            disabled=not single_resolved,
-            key=f"probe_continue_{participation_id}_{step.id}",
-        )
-        skip_button_clicked = False
-        if field.skippable:
-            skip_button_clicked = skip_column.button(
-                "Passer",
-                type="secondary",
+        with st.container(key=f"probe_single_actions_{field.id}"):
+            continue_column, skip_column, flag_column = st.columns([1.6, 0.4, 0.5])
+            single_resolved = _has_resolved_value(field, draft.get(field.id)) or (
+                skipped and not reopened
+            )
+            continue_clicked = continue_column.button(
+                step.cta or "Continuer",
+                type="primary",
                 width="stretch",
-                key=f"probe_skip_{participation_id}_{field.id}",
+                disabled=not single_resolved,
+                key=f"probe_continue_{participation_id}_{step.id}",
             )
-        with flag_column:
-            actions[field.id] = _render_question_actions(
-                probe,
-                field,
-                key=f"probe_action_{participation_id}_{field.id}",
-                label="Signaler",
-            )
+            skip_button_clicked = False
+            if field.skippable:
+                skip_button_clicked = skip_column.button(
+                    "Passer",
+                    type="secondary",
+                    width="stretch",
+                    key=f"probe_skip_{participation_id}_{field.id}",
+                )
+            with flag_column:
+                actions[field.id] = _render_question_actions(
+                    probe,
+                    field,
+                    key=f"probe_action_{participation_id}_{field.id}",
+                    label="Signaler",
+                )
         if skip_button_clicked:
             st.session_state[f"probe_skip_dialog_{participation_id}_{field.id}"] = True
             st.rerun()

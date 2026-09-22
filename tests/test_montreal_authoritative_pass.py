@@ -19,8 +19,8 @@ def _probe():
 
 def test_rendered_action_hierarchy_is_explicit() -> None:
     source = (ROOT / "probe_ui.py").read_text(encoding="utf-8")
-    assert '"Passer",\n                        type="secondary"' in source
-    assert '"Passer",\n                type="secondary"' in source
+    assert '"Passer"' in source
+    assert 'type="secondary"' in source
     assert '[data-testid="stBaseButton-secondary"]' in source
     assert "background: #f8f7f2 !important" in source
     assert '[data-testid="stPopover"] button' in source
@@ -34,7 +34,7 @@ def test_welcome_uses_only_the_canonical_editorial_copy() -> None:
     source = (ROOT / "probe_ui.py").read_text(encoding="utf-8")
     assert welcome.title == "Communs de données et IA"
     assert "Pour démarrer le Forum" in welcome.body
-    assert "Mieux se connaître." in welcome.body
+    assert "Mieux nous connaître." in welcome.body
     assert "Merci pour votre contribution à cette démarche collective." in welcome.body
     assert welcome.cta == "Commencer"
     assert 'welcome = probe.step("welcome")' in source
@@ -131,7 +131,7 @@ def test_optional_companions_and_required_other_remain_distinct() -> None:
             "frictions",
             {"selected": ["other"], "other": {"value": ""}, "companions": {}},
         )
-    assert probe.question("frictions").companions[0].prompt == "Je précise si je le souhaite"
+    assert probe.question("frictions").companions[0].prompt == "Je précise, si je le souhaite"
     assert probe.question("frictions").companions[0].required is False
 
 

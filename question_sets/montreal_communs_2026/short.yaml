@@ -34,7 +34,7 @@ step_order:
 flow_modes:
     standard:
         title: Communs de données et IA
-        detail: ~20 minutes
+        detail: ~20-30 minutes
         steps:
             - participation_information
             - participation
@@ -119,7 +119,7 @@ step_copy:
 
             Les informations recueillies poursuivent deux objectifs :
 
-            **Mieux se connaître.** Vos réponses nous permettront de dresser et de présenter un portrait des personnes présentes : nos champs d’activité, les connaissances que nous sommes en mesure de partager, nos besoins en matière d’échange de savoirs et nos visions du futur.
+            **Mieux nous connaître.** Vos réponses nous permettront de dresser et de présenter un portrait des personnes présentes : nos champs d’activité, les connaissances que nous sommes en mesure de partager, nos besoins en matière d’échange de savoirs et nos visions du futur.
 
             **Documenter nos projets, si applicable.** Si vous participez au nom d’une organisation culturelle, patrimoniale ou éducative porteuse d’un projet en lien avec la thématique du Forum, vous pouvez l’indiquer.
 
@@ -156,7 +156,7 @@ step_copy:
         title: Ma participation
         body:
             'L’atelier réunit un nombre restreint de 40 personnes sélectionnées sur invitation pour un engagement actif et collectif.
-            Je privilégie une présence aux deux journées : une disponibilité partielle peut potentiellement priver une autre personne
+            Nous privilégions une présence aux deux journées : une disponibilité partielle peut potentiellement priver une autre personne
             d’y participer. En cas de disponibilité limitée, l’équipe pourra reprendre contact avec moi pour préciser les modalités.'
         cta: Continuer
     portrait:
@@ -211,7 +211,7 @@ step_copy:
         body: À quoi pourrait ressembler, pour nous, un résultat positif pour les communs de données ?
         cta: Continuer
     future_effects:
-        title: Ce que cela changerait
+        title: Ce que ces résultats changeraient
         body: Passons du résultat souhaité à ses effets concrets dans nos pratiques, projets, organisations ou domaines de recherche.
         cta: Continuer
     future_conditions:
@@ -413,17 +413,12 @@ questions:
             label: J’ai lu et j’accepte de participer à cette recherche selon les modalités décrites
           - value: decline
             label: Je n’accepte pas
-          - value: read_not_understood
-            label: J’ai lu mais je n’ai pas compris
           - value: not_read
             label: Je n’ai pas lu
       routing:
           end_session:
               when:
                   equals: decline
-          show_contact:
-              when:
-                  equals: read_not_understood
           return_to_information:
               when:
                   equals: not_read
@@ -439,14 +434,6 @@ questions:
       context: Une participation aux deux journées consécutives est souhaitée.
       input_type: multi
       required: false
-      shortcuts:
-          - id: both_full_days
-            label: Les deux journées
-            select:
-                - oct28_am_online
-                - oct28_pm_inrs
-                - oct29_am_inrs
-                - oct29_pm_inrs
       options:
           - value: oct28_am_online
             label: 28 octobre, matin
@@ -528,7 +515,7 @@ questions:
       field: base_location
       id: base_location
       revision: 3
-      prompt: Où est-ce que je suis principalement basé·e pour mon activité ?
+      prompt: Où suis-je principalement basé·e pour mon activité ?
       input_type: location
       required: false
       capabilities:
@@ -709,7 +696,7 @@ questions:
           prompt: Autre frein
       companion:
           field: frictions_detail
-          prompt: Je précise si je le souhaite
+          prompt: Je précise, si je le souhaite
           required: false
     - step: inspiration
       field: inspiration
@@ -799,7 +786,7 @@ questions:
           prompt: Autre résultat possible
       companion:
           field: future_outcome_detail
-          prompt: Je précise si je le souhaite
+          prompt: Je précise, si je le souhaite
           required: false
     - step: future_effects
       field: future_effects
@@ -826,6 +813,9 @@ questions:
             label: Développer une capacité
           - value: reduce_dependency
             label: Réduire une dépendance
+          - value: new_experiment
+          - value: power_relations_change
+            label: Changer des rapports de force
           - value: new_experiment
             label: Ouvrir une nouvelle expérimentation
           - value: other

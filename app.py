@@ -4,7 +4,7 @@ import streamlit as st
 
 from event_ui import page_for_event
 from protocol.probe_registry import registered_events
-from ui import apply_theme
+from ui import apply_theme, revision_badge
 
 
 st.set_page_config(
@@ -148,6 +148,12 @@ navigation = st.navigation(
                 url_path="test-landing-primitives",
             ),
             st.Page(
+                "views/test_probe_theme_lab.py",
+                title="Probe Theme Lab",
+                icon="🎨",
+                url_path="test-probe-theme-lab",
+            ),
+            st.Page(
                 "views/test_smokegun.py",
                 title="Smoke gun",
                 icon="🧪",
@@ -162,4 +168,5 @@ navigation = st.navigation(
         ],
     }
 )
+revision_badge()
 navigation.run()

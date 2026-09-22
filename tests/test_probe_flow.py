@@ -77,6 +77,8 @@ def test_event_surface_wraps_the_generic_probe_adapter() -> None:
 
     assert "page_for_event(event) for event in registered_events()" in app_source
     assert 'url_path=event.slug' in event_source
+    assert "revision_badge()" in app_source
+    assert "revision_badge()" not in event_source
     assert 'view == "results"' in event_source
     assert 'view == "host"' in event_source
     assert "variant=variant" in event_source
@@ -269,7 +271,7 @@ def test_collaborator_revision_preserves_identity_and_companion_semantics() -> N
     assert "geneva_2027_source_verification" in source
 
 
-def test_availability_keeps_stable_values_and_exposes_select_all_shortcut() -> None:
+def test_availability_keeps_stable_values_without_select_all_shortcut() -> None:
     availability = _probe().question("availability")
     assert [option.value for option in availability.options] == [
         "oct28_am_online",
@@ -283,17 +285,7 @@ def test_availability_keeps_stable_values_and_exposes_select_all_shortcut() -> N
         "29 octobre, matin",
         "29 octobre, après-midi",
     ]
-    shortcut = availability.shortcuts[0]
-    assert (shortcut.id, shortcut.label, shortcut.select) == (
-        "both_full_days",
-        "Les deux journées",
-        (
-            "oct28_am_online",
-            "oct28_pm_inrs",
-            "oct29_am_inrs",
-            "oct29_pm_inrs",
-        ),
-    )
+    assert availability.shortcuts == ()
     ui_source = (ROOT / "probe_ui.py").read_text(encoding="utf-8")
     assert "for shortcut in field.shortcuts" in ui_source
     assert "set(shortcut_values) <= set(" in ui_source
@@ -314,7 +306,8 @@ def test_information_steps_checkpoint_copy_and_truthful_done_are_rendered_generi
     )
     assert 'probe_submission_receipt_{participation_id}' in ui_source
     assert "Les réponses ne sont pas présentées comme enregistrées" in ui_source
-    assert 'font-size: clamp(2.35rem, 7vw, 5.5rem)' in ui_source
+    assert 'font-size: clamp(2.35rem, 7vw, 5.5rem)' not in ui_source
+    assert "without overriding shared typography tokens" in ui_source
 
 
 @pytest.mark.parametrize(
@@ -679,12 +672,10 @@ def test_consent_skip_ends_without_becoming_affirmative_consent() -> None:
     assert [option.value for option in consent.options] == [
         "accept",
         "decline",
-        "read_not_understood",
         "not_read",
     ]
     assert {route.action for route in consent.routes} == {
         "end",
-        "show_contact",
         "return_to_information",
     }
     runtime = ProbeRuntime(probe, participant_id="participant", scope_id="montreal")
