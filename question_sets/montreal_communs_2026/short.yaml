@@ -1,7 +1,7 @@
 schema: probe-authoring/v1
 questionnaire:
     id: montreal_communs_data_ai_short_2026
-    revision: 4
+    revision: 5
     status: review
     language: fr
     default_mode: standard
@@ -112,31 +112,24 @@ sections:
 step_copy:
     welcome:
         title: Communs de données et IA
-        body:
-            'Pour finaliser notre inscription au Forum Communs de données et IA (28–29 octobre 2026, INRS), prenons environ
-            20 minutes pour répondre à ces questions.
+        body: |
+            Pour démarrer le Forum Communs de données et IA (28–29 octobre, INRS), nous vous invitons à remplir ce court formulaire.
 
+            Prévoyez environ 20 minutes pour répondre aux différentes questions.
 
-            Cette démarche poursuit deux objectifs :
+            Les informations recueillies poursuivent deux objectifs :
 
-            1. Mieux nous connaître : situer nos champs d’activité, ce que nous pouvons partager, ce que nous recherchons et nos
-            visions du futur.
+            **Mieux se connaître.** Vos réponses nous permettront de dresser et de présenter un portrait des personnes présentes : nos champs d’activité, les connaissances que nous sommes en mesure de partager, nos besoins en matière d’échange de savoirs et nos visions du futur.
 
-            2. Documenter un projet, si applicable : lorsqu’une organisation culturelle, patrimoniale ou éducative porte un projet
-            lié à la thématique du Forum, nous pouvons l’intégrer à la base de connaissances qui accompagne l’événement, notamment
-            sous l’angle des données, ressources, pratiques, gouvernance, licences, infrastructures et modèles économiques.
+            **Documenter nos projets, si applicable.** Si vous participez au nom d’une organisation culturelle, patrimoniale ou éducative porteuse d’un projet en lien avec la thématique du Forum, vous pouvez l’indiquer.
 
+            Nous pourrons par la suite intégrer ces projets à la base de connaissances documentaire qui accompagne l’événement, en recueillant des informations sur les projets portés par les organisations : données, ressources, pratiques, gouvernance, licences, infrastructures et modèles économiques.
 
-            Plus largement, nos réponses permettront de cartographier le réseau d’acteurs en présence, les collaborations établies
-            et les initiatives collectives existantes.
+            Ces informations nous permettront, plus largement, de cartographier le réseau d’acteurs en présence, à travers les collaborations établies et les initiatives collectives existantes.
 
+            Une version courte du formulaire est proposée à l’ensemble des participants ; la version longue s’adresse uniquement aux organisations porteuses d’un projet et prend quelques minutes de plus à remplir.
 
-            Une version courte est proposée à l’ensemble des personnes participantes; une version longue pourra approfondir les
-            projets documentés.
-
-
-            Sauf indication contraire, plusieurs choix sont possibles. Nous pouvons passer ou signaler chaque question. Nous pourrons
-            relire, modifier, réaligner et faire évoluer nos réponses.'
+            Merci pour votre contribution à cette démarche collective.
         cta: Commencer
     participation_information:
         title: Informations sur ma participation
@@ -205,13 +198,13 @@ step_copy:
     future_intro:
         title: Genève 2027
         body: |
-            En 2027, Genève accueillera le prochain sommet mondial sur l’IA, dans la continuité des sommets de Bletchley Park (2023), Séoul (2024), Paris (2025) et New Delhi (2026).
+            Objectif : identifier des pistes d’action à travers un exercice de rétroplanification à partir d’un futur souhaité pour les communs de données, qui sera approfondi lors du Forum.
 
-            Ce sommet intergouvernemental réunit des représentants des gouvernements, des organisations internationales, du secteur privé, du monde académique et de la société civile, dans le but de coordonner des positions sur l’usage responsable de l’IA, sa gouvernance et sa régulation à l’échelle internationale.
+            En 2027, Genève accueillera le prochain sommet mondial sur l’IA, dans la continuité des sommets de Bletchley Park (2023), Séoul (2024), Paris (2025) et New Delhi (2026). Ce sommet intergouvernemental réunit des représentants des gouvernements, des organisations internationales, du secteur privé, du monde académique et de la société civile, dans le but de coordonner des positions sur l’usage responsable de l’IA, sa gouvernance et sa régulation à l’échelle internationale.
 
             Les éditions précédentes ont donné lieu à différents types de résultats : déclarations politiques multilatérales, rapports scientifiques indépendants, engagements volontaires du secteur privé, annonces de financement et d’infrastructure, coalitions thématiques permanentes, jalons vers une gouvernance mondiale institutionnalisée.
 
-            Projetons-nous au lendemain du sommet de Genève, dans un scénario favorable aux communs de données.
+            Nous nous projetons au lendemain du sommet de Genève, dans un scénario favorable aux communs de données.
         cta: Je me projette
     future_outcome:
         title: Ce que nous aimerions voir émerger
@@ -507,25 +500,23 @@ questions:
     - step: portrait
       field: email
       id: email
-      revision: 1
+      revision: 2
       prompt: Mon adresse courriel
       context:
           Elle pourra notamment être utilisée pour me transmettre les informations relatives au Forum et, lorsque cette fonctionnalité
           sera activée, les informations nécessaires pour retrouver mes réponses.
-      input_type: text
+      input_type: email
       required: false
     - step: portrait
       field: participation_position
       id: participation_position
-      revision: 3
+      revision: 4
       prompt: Dans quelle position est-ce que je participe ?
       input_type: single_with_other
       required: false
       options:
           - value: individual
             label: À titre individuel
-          - value: organisation
-            label: Au nom d’une organisation GLAM
           - value: data_organisation
             label: Au nom d’une organisation impliquée dans la production, la gestion ou la gouvernance de données culturelles
           - value: other
@@ -581,11 +572,8 @@ questions:
       input_type: text
       required: false
       show_if:
-          any:
-              - field: participation_position
-                equals: organisation
-              - field: participation_position
-                equals: data_organisation
+          field: participation_position
+          equals: data_organisation
     - step: organisation
       field: organisation_size
       id: organisation_size
@@ -601,11 +589,8 @@ questions:
           - value: 100_plus
             label: 100 personnes et plus
       show_if:
-          any:
-              - field: participation_position
-                equals: organisation
-              - field: participation_position
-                equals: data_organisation
+          field: participation_position
+          equals: data_organisation
     - step: organisation
       field: organisation_territory
       id: organisation_territory
@@ -630,11 +615,8 @@ questions:
           field: organisation_territory_other
           prompt: Je précise le territoire
       show_if:
-          any:
-              - field: participation_position
-                equals: organisation
-              - field: participation_position
-                equals: data_organisation
+          field: participation_position
+          equals: data_organisation
     - step: project
       field: document_project
       id: document_project
@@ -651,11 +633,8 @@ questions:
           - value: not_applicable
             label: Ne s’applique pas
       show_if:
-          any:
-              - field: participation_position
-                equals: organisation
-              - field: participation_position
-                equals: data_organisation
+          field: participation_position
+          equals: data_organisation
     - step: project
       field: project_name
       id: project_name

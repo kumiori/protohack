@@ -179,10 +179,6 @@ def render_location_lookup(
             label_visibility="collapsed",
             key=f"{key}_choice",
         )
-        if st.button("Modifier ma recherche", key=f"{key}_modify"):
-            st.session_state[state_key] = []
-            st.session_state.pop(lookup_query_key, None)
-            st.rerun()
     if isinstance(selected, LocationValue):
         return selected.as_dict()
     if token == str(current.get("display_label") or "") and current.get("place_id"):

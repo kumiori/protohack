@@ -40,7 +40,7 @@ def test_montreal_resolves_through_the_generic_probe_registry() -> None:
     assert probe.id == registration.probe_id
     assert registration.source_path == ROOT / "question_sets" / "montreal_communs_2026" / "short.yaml"
     assert len(probe.steps) == 18
-    assert probe.revision == 4
+    assert probe.revision == 5
     assert probe.step("portrait").field_ids[:3] == (
         "name",
         "email",
@@ -183,27 +183,23 @@ def test_participation_position_is_single_and_controls_organisation_fields() -> 
     assert position.input_type.value == "single_with_other"
     assert [option.value for option in position.options] == [
         "individual",
-        "organisation",
         "data_organisation",
         "other",
     ]
     condition = probe.question("organisation_name").visible_if
     assert condition is not None
-    assert condition.operator == "any"
-    assert {
-        (clause.field_id, clause.operator, clause.value)
-        for clause in condition.clauses
-    } == {
-        ("participation_position", "equals", "organisation"),
-        ("participation_position", "equals", "data_organisation"),
-    }
+    assert (condition.field_id, condition.operator, condition.value) == (
+        "participation_position",
+        "equals",
+        "data_organisation",
+    )
 
     runtime = ProbeRuntime(
         probe,
         participant_id="participant-position",
         scope_id="montreal_communs_2026",
     )
-    runtime.answer("participation_position", "organisation")
+    runtime.answer("participation_position", "data_organisation")
     runtime.answer("organisation_name", "Organisation test")
 
 
@@ -365,7 +361,7 @@ def test_canonical_values_survive_checkpoint_restart_and_hydration() -> None:
         "name": "Ada Lovelace",
         "availability": ["oct28_am_online"],
         "knowledge_offer": ["governance_models", "apis_ai"],
-        "participation_position": "organisation",
+        "participation_position": "data_organisation",
         "document_project": "yes",
         "project_name": "Communs IA",
         "future_conditions": [
@@ -754,7 +750,7 @@ def test_authored_checkpoint_capabilities_drive_the_generic_surface() -> None:
     assert "Enregistrer cette étape" in source
     assert "Enregistrer et télécharger" in source
     assert "on_click=save_checkpoint" in source
-    assert "Étape enregistrée. Une copie YAML a été téléchargée sur votre appareil." in source
+    assert "Un fichier contenant vos réponses jusqu’à cette étape a été téléchargé." in source
     assert "Modifications non enregistrées" in source
     assert "draft_repository=draft_repository" in event_source
     assert "draft_repository = repository if test_mode else _draft_repository(event.id)" in event_source

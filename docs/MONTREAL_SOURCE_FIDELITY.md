@@ -7,7 +7,7 @@ This audit follows the participant surface boundary:
 The executable authored sources are Protocol Hack's local
 `question_sets/montreal_communs_2026/short.yaml` and
 `question_sets/montreal_communs_2026/initial_conditions_v0.yaml`. Probe Engine at
-commit `ee367a6d096a2e3d1a578ee5c024faa3c7024f43` (package `0.3.0.dev5`) parses and
+commit `f5bb61a121cd498fde97886c2d226a014d5d4255` (package `0.3.0.dev6`) parses and
 validates them but is not their content store. The supplied
 `V2-DOC_QuestionnaireMapping.md` is reference prose, not executable YAML.
 
@@ -33,7 +33,8 @@ validates them but is not their content store. The supplied
 | Answer, Skip and Flag | Canonical trajectory events | Compact per-question actions menu | Preserved |
 | Checkpoints and sync points | Canonical section process and checkpoint capabilities | Private draft checkpoint surface; separate sync-arrival event | Preserved |
 | Other + associated text | Canonical composed `{selected, other: {value}}` answer | Inline text control, including grouped and nested repeatable selections | Preserved |
-| Welcome, Review and Done | Deliberately absent from canonical steps in the Probe Engine integration build | Application flow states, disclosed in sidebar | **Application chrome** |
+| Welcome and Done | Canonical `StepDefinition` nodes with authored title, body and CTA | Rendered directly from the canonical steps | Preserved |
+| Review | Canonical structured answer state | Application navigation and structured recomposition; no authored answer shape is flattened | **Application flow over canonical state** |
 | `representations` and `results` source blocks | Canonical representation and results definitions | Results surface consumes the definitions | Preserved at boundary |
 
 ## Reference-document differences

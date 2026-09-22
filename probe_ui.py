@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 import json
 import re
 import uuid
@@ -18,7 +19,7 @@ from probe_engine import (
     RuntimeError as ProbeRuntimeError,
 )
 
-from protocol.probe_registry import PROBE_ENGINE_COMMIT, RegisteredProbe, resolve_event
+from protocol.probe_registry import PROBE_ENGINE_COMMIT, RegisteredProbe
 from protocol.probe_draft import dump_checkpoint_draft
 from protocol.location_lookup import render_location_lookup
 from protocol.probe_store import ProbeRepositoryStore
@@ -194,7 +195,12 @@ def _render_field(
         st.markdown(f"#### {field.prompt}")
     if show_prompt and field.context:
         st.caption(field.context)
-    text_types = {InputType.TEXT, InputType.TEXT_WITH_SUGGESTIONS, InputType.URL}
+    text_types = {
+        InputType.TEXT,
+        InputType.TEXT_WITH_SUGGESTIONS,
+        InputType.EMAIL,
+        InputType.URL,
+    }
     single_types = {InputType.SINGLE, InputType.SINGLE_WITH_OTHER}
     multiple_types = {
         InputType.MULTIPLE,
@@ -525,6 +531,8 @@ def _participant_runtime_error(exc: Exception) -> str:
     code = str(getattr(exc, "code", ""))
     if code == "other_detail_required" or "requires other text" in message:
         return "Précisez votre réponse « Autre » avant de continuer."
+    if code == "invalid_email" or "valid email address" in message:
+        return "Saisissez une adresse courriel valide avant de continuer."
     if "other text without selecting other" in message:
         return "Le texte « Autre » ne peut être conservé que si « Autre » est sélectionné."
     if "requires a collection of options" in message:
@@ -613,9 +621,30 @@ def _render_probe_styles() -> None:
             line-height: 1.35;
         }
         [data-testid="stBaseButton-secondary"] {
-            background: transparent;
-            box-shadow: none;
+            background: #f8f7f2 !important;
+            color: #13221d !important;
+            border: 1px solid rgba(19, 34, 29, .28) !important;
+            box-shadow: none !important;
         }
+        [data-testid="stPopover"] button {
+            background: transparent !important;
+            color: #33483f !important;
+            border-color: transparent !important;
+            box-shadow: none !important;
+        }
+        .probe-checkpoint-grid {
+            display: grid;
+            grid-template-columns: minmax(9rem, 1fr) minmax(2rem, 4fr) minmax(7rem, auto);
+            gap: .35rem .8rem;
+            align-items: center;
+            padding: .9rem 1rem;
+            border: 1px solid rgba(19, 34, 29, .24);
+            border-radius: .65rem;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: clamp(.74rem, 1.4vw, .9rem);
+        }
+        .probe-checkpoint-grid .rail { border-top: 1px solid currentColor; opacity: .45; }
+        .probe-checkpoint-grid .state { white-space: nowrap; }
         @media (max-width: 700px) {
             [data-testid="stAppViewContainer"] h1 {
                 font-size: clamp(2rem, 11vw, 3.4rem);
@@ -1049,14 +1078,18 @@ def _render_checkpoint_surface(
             and event.metadata.get("section_id") == authored_section.id
             for event in runtime.trajectory.events
         )
-        marker = "●" if saved else "○"
-        suffix = "saved" if saved else ""
-        if authored_section.id == section.id:
-            suffix = "checkpoint"
+        state = "● enregistré" if saved else "○"
         boundary_rows.append(
-            f"{authored_section.title.upper()}  ──────────────{marker} {suffix}".rstrip()
+            '<div class="label">'
+            + html.escape(authored_section.title.upper())
+            + '</div><div class="rail"></div><div class="state">'
+            + state
+            + "</div>"
         )
-    st.code("\n".join(boundary_rows), language=None)
+    st.markdown(
+        '<div class="probe-checkpoint-grid">' + "".join(boundary_rows) + "</div>",
+        unsafe_allow_html=True,
+    )
 
     checkpoint_indexes = [
         index
@@ -1078,9 +1111,7 @@ def _render_checkpoint_surface(
         st.caption("○ Jamais enregistré")
     flash_key = f"probe_checkpoint_flash_{participation_id}_{section.id}"
     if st.session_state.pop(flash_key, False):
-        st.toast(
-            "Étape enregistrée. Une copie YAML a été téléchargée sur votre appareil."
-        )
+        st.toast("Un fichier contenant vos réponses jusqu’à cette étape a été téléchargé.")
     review_key = f"probe_checkpoint_review_{participation_id}_{section.id}"
     save_column, review_column, continue_column = st.columns(3)
     prepared = runtime.prepare_checkpoint(section.id)
@@ -1098,14 +1129,14 @@ def _render_checkpoint_surface(
                 data=dump_checkpoint_draft(probe, prepared, section_id=section.id),
                 file_name=f"{probe.id}-{section.id}-brouillon.yaml",
                 mime="application/yaml",
-                type="secondary" if checkpointed else "primary",
+                type="primary",
                 width="stretch",
                 on_click=save_checkpoint,
                 key=f"probe_checkpoint_save_{section.id}",
             )
         elif st.button(
             "Enregistrer",
-            type="secondary" if checkpointed else "primary",
+            type="primary",
             width="stretch",
             key=f"probe_checkpoint_save_{section.id}",
         ):
@@ -1115,6 +1146,7 @@ def _render_checkpoint_surface(
             st.rerun()
     if review_column.button(
         "Relire cette section",
+        type="secondary",
         width="stretch",
         disabled=not config.review,
         key=f"probe_checkpoint_review_button_{section.id}",
@@ -1125,7 +1157,6 @@ def _render_checkpoint_surface(
         "Continuer",
         type="primary",
         width="stretch",
-        disabled=not checkpointed,
         key=f"probe_checkpoint_continue_{section.id}",
     ):
         if section.sync_point:
@@ -1209,6 +1240,7 @@ def render_registered_probe(
     backend = f"draft={draft_backend}; submission={submission_backend}"
     draft_store = ProbeRepositoryStore(
         draft_repository,
+        probe=probe,
         probe_id=probe.id,
         participant_id=participant_id,
         scope_id=registration.session_code,
@@ -1217,6 +1249,7 @@ def render_registered_probe(
     )
     submission_store = ProbeRepositoryStore(
         repository,
+        probe=probe,
         probe_id=probe.id,
         participant_id=participant_id,
         scope_id=registration.session_code,
@@ -1306,13 +1339,11 @@ def render_registered_probe(
     pending_checkpoint_key = f"probe_pending_checkpoint_{participation_id}"
 
     if stage == "welcome":
-        st.title(probe.title)
-        st.write("Questionnaire participant · environ 20 minutes")
+        welcome = probe.step("welcome")
+        st.title(welcome.title)
+        st.write(welcome.body)
         _render_viewport_notice()
-        event = resolve_event(event_id=registration.event_id)
-        for paragraph in event.participant_intro:
-            st.write(paragraph)
-        if st.button("Commencer", type="primary", width="stretch"):
+        if st.button(welcome.cta or "Commencer", type="primary", width="stretch"):
             st.session_state[stage_key] = "steps"
             st.rerun()
         return

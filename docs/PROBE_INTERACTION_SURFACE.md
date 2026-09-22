@@ -76,7 +76,7 @@ canonical location value; it cannot be extracted from the reference.
 
 ## Current upstream gates
 
-- Probe Engine `0.3.0.dev5` at commit `ee367a6d096a2e3d1a578ee5c024faa3c7024f43` supplies canonical composed
+- Probe Engine `0.3.0.dev6` at commit `f5bb61a121cd498fde97886c2d226a014d5d4255` supplies canonical email validation, composed
   Other answers and representation definitions/results.
 - Structured location is a canonical field primitive in the pinned release.
 - Probe Engine exposes `independently_answerable`; optional companions remain

@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from time import perf_counter
 from typing import Any
 
-from probe_engine import Trajectory, trajectory_from_dict
+from probe_engine import ProbeDefinition, ProbeRuntime, Trajectory, trajectory_from_dict
 
 from storage.base import Repository
 
@@ -20,6 +20,7 @@ class ProbeRepositoryStore:
         probe_id: str,
         participant_id: str,
         scope_id: str,
+        probe: ProbeDefinition | None = None,
         diagnostic_sink: Callable[[dict[str, Any]], None] | None = None,
         target: str = "probe trajectories",
     ) -> None:
@@ -27,6 +28,7 @@ class ProbeRepositoryStore:
         self.probe_id = probe_id
         self.participant_id = participant_id
         self.scope_id = scope_id
+        self.probe = probe
         self.diagnostic_sink = diagnostic_sink
         self.target = target
 
@@ -161,7 +163,7 @@ class ProbeRepositoryStore:
             or participation.scope_id != self.scope_id
         ):
             raise ValueError("Probe trajectory identity does not match its repository store.")
-        return {
+        record = {
             "record_type": "probe_trajectory",
             "participation_id": participation.id,
             "participant_id": participation.participant_id,
@@ -172,3 +174,26 @@ class ProbeRepositoryStore:
             "idempotency_key": idempotency_key,
             "trajectory": trajectory.to_dict(),
         }
+        if self.probe is not None:
+            reviewed = ProbeRuntime.hydrate(
+                self.probe,
+                trajectory,
+                participant_id=self.participant_id,
+                scope_id=self.scope_id,
+            ).review()
+            answers = {
+                item.question_id: item.value
+                for item in reviewed
+                if item.value is not None and item.state.startswith("answered")
+            }
+            record["identity"] = {
+                field_id: answers[field_id]
+                for field_id in self.probe.authoring.profile_fields
+                if field_id in answers
+            }
+            record["responses"] = {
+                field_id: answers[field_id]
+                for field_id in self.probe.authoring.session_fields
+                if field_id in answers
+            }
+        return record

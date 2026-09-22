@@ -4,7 +4,7 @@ PyYAML==6.0.3
 requests>=2.32,<3
 -e ./packages/protocol-lab
 trajectory-engine @ git+https://github.com/kumiori/3868a1d2cf7234d3bb44ffc5455adc18.git@757c2baeb17e9864eeff0900b5ad9ea3cec23d9d
-probe-engine @ git+https://github.com/kumiori/ebabbd4ed0a438351e6ca71acb3e8ba8.git@ee367a6d096a2e3d1a578ee5c024faa3c7024f43
+probe-engine @ git+https://github.com/kumiori/ebabbd4ed0a438351e6ca71acb3e8ba8.git@f5bb61a121cd498fde97886c2d226a014d5d4255
 notion-client==3.0.0
 plotly>=6.0,<7
 pytest>=8.0,<9
