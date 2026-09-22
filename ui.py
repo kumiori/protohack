@@ -62,9 +62,6 @@ def apply_theme() -> None:
           font-size:var(--type-body);
           line-height:var(--line-body);
         }
-        [data-testid="stAppViewContainer"] [data-testid="stMarkdownContainer"] > p {
-          margin-block-end:var(--paragraph-spacing);
-        }
         .editorial-lead,
         .editorial-lead p,
         .st-key-editorial_lead [data-testid="stMarkdownContainer"] > p {
