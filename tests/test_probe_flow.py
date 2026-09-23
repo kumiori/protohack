@@ -157,6 +157,13 @@ def test_test_results_restore_ephemeral_canonical_generation() -> None:
     assert "Source des données" in source
     assert "Voir les données structurées" in source
     assert "trajectories = _synthetic_trajectories" in source
+    assert "Shared test repository unavailable" in source
+    assert "Developer · repository health" in source
+    assert "deployed Notion token" in source
+    assert "configured data-source ID" in source
+    assert "database/page shared with the integration" in source
+    assert "Le service d’enregistrement est temporairement indisponible" in source
+    assert "repository.health_check()" in source
 
     trajectories = _synthetic_trajectories(probe, "montreal-test")
     assert trajectories

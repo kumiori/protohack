@@ -1,16 +1,57 @@
 from copy import deepcopy
+import httpx
 import json
 from pathlib import Path
 
 import storage.notion as notion_module
+from notion_client.errors import APIResponseError
 from scripts.bootstrap_protohack_notion import DATABASES, RELATIONS, SCHEMA_VERSION
 from protocol.shared_goals import build_goal_trajectory
 from protocol.timeline_plan import build_plan_payload
 from protocol.trajectory_schema import build_trajectory_document
 from storage.notion import NotionRepository
+from storage.notion_debug import GenericNotionDebugRepository
 
 
 PARTICIPANT = "00000000-0000-4000-8000-000000000001"
+
+
+def test_debug_repository_health_normalises_inaccessible_data_source() -> None:
+    class Users:
+        @staticmethod
+        def me():
+            return {"name": "fuckthesystem"}
+
+    class DataSources:
+        calls = 0
+
+        @classmethod
+        def query(cls, **_arguments):
+            cls.calls += 1
+            raise APIResponseError(
+                code="object_not_found",
+                status=404,
+                message="raw Notion message must not reach participants",
+                headers=httpx.Headers(),
+                raw_body_text="{}",
+            )
+
+    repository = object.__new__(GenericNotionDebugRepository)
+    repository._sources = {"test_submissions": "5559d76a-d0b2-4c9b-8115-6c4ad1ee97f9"}
+    repository._client = type("Client", (), {"users": Users(), "data_sources": DataSources()})()
+    repository._health_result = None
+    repository._health_checked_at = 0.0
+
+    first = repository.health_check()
+    second = repository.health_check()
+
+    assert first == second
+    assert first.available is False
+    assert first.integration == "fuckthesystem"
+    assert first.data_source_id == "5559d76a-d0b2-4c9b-8115-6c4ad1ee97f9"
+    assert first.status == "inaccessible / not found"
+    assert first.error_code == "object_not_found"
+    assert DataSources.calls == 1
 
 
 def _trajectory_document() -> dict[str, object]:

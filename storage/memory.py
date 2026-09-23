@@ -6,6 +6,8 @@ from copy import deepcopy
 from threading import RLock
 from typing import Any
 
+from .base import RepositoryHealth
+
 
 class InMemoryRepository:
     def __init__(self) -> None:
@@ -20,6 +22,14 @@ class InMemoryRepository:
         self._shared_goals: dict[str, dict[str, Any]] = {}
         self._goal_trajectories: dict[str, dict[str, Any]] = {}
         self._lock = RLock()
+
+    def health_check(self) -> RepositoryHealth:
+        return RepositoryHealth(
+            available=True,
+            integration="process memory",
+            data_source_id="not applicable",
+            status="available",
+        )
 
     def save_probe_trajectory(
         self, trajectory: dict[str, Any]

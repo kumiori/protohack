@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from functools import partial
+import json
 from typing import Any
 from urllib.parse import urlencode
 
@@ -18,6 +19,7 @@ from probe_engine import (
 from probe_ui import render_registered_probe
 from protocol.probe_registry import RegisteredEvent, resolve_event, resolve_probe
 from storage import get_repository, repository_mode
+from storage.base import RepositoryHealth
 from storage.context import get_test_repository
 from storage.memory import InMemoryRepository
 
@@ -247,7 +249,52 @@ def _synthetic_trajectories(probe: Any, scope_id: str, count: int = 8) -> tuple[
     return tuple(trajectories)
 
 
-def _render_host(event: RegisteredEvent, *, test_mode: bool) -> None:
+def _repository_diagnostic(health: RepositoryHealth) -> dict[str, str]:
+    source = health.data_source_id
+    abbreviated = f"{source[:8]}…{source[-4:]}" if len(source) > 14 else source
+    return {
+        "integration": health.integration,
+        "data_source": abbreviated,
+        "status": health.status,
+        "error_code": health.error_code or "none",
+    }
+
+
+def _render_repository_failure(
+    health: RepositoryHealth,
+    *,
+    detailed: bool,
+) -> None:
+    diagnostic = _repository_diagnostic(health)
+    if detailed:
+        st.error("Shared test repository unavailable")
+        st.markdown(
+            f"**Integration:** `{diagnostic['integration']}`  \n"
+            f"**Data source:** `{diagnostic['data_source']}`  \n"
+            f"**Status:** {diagnostic['status']}"
+        )
+        st.markdown(
+            "Check:\n"
+            "- deployed Notion token\n"
+            "- configured data-source ID\n"
+            "- database/page shared with the integration"
+        )
+    else:
+        st.error(
+            "Le service d’enregistrement est temporairement indisponible. "
+            "Veuillez réessayer plus tard."
+        )
+    with st.sidebar.expander("Developer · repository health", expanded=False):
+        st.code(json.dumps(diagnostic, indent=2), language="json")
+        st.caption("No credential or token is displayed.")
+
+
+def _render_host(
+    event: RegisteredEvent,
+    *,
+    test_mode: bool,
+    repository_health: RepositoryHealth,
+) -> None:
     st.title(f"{event.title} · Host")
     st.caption("How the event is operating · operational surface")
     if not event.host_enabled:
@@ -256,6 +303,12 @@ def _render_host(event: RegisteredEvent, *, test_mode: bool) -> None:
     mode = "shared-test-database" if test_mode else repository_mode()
     st.metric("Registered probe variants", len(event.probes))
     st.metric("Persistence mode", mode)
+    st.metric(
+        "Repository health",
+        "available" if repository_health.available else repository_health.status,
+    )
+    if not repository_health.available:
+        _render_repository_failure(repository_health, detailed=True)
     for probe in event.probes:
         with st.container(border=True):
             st.markdown(f"**{probe.variant}** · `{probe.probe_id}`")
@@ -275,15 +328,34 @@ def render_event(event: RegisteredEvent) -> None:
         repository = get_test_repository() if test_mode else get_repository()
     except RuntimeError as exc:
         st.error("La base de test partagée n’est pas configurée sur cette instance.")
-        with st.sidebar.expander("Developer · test repository", expanded=True):
-            st.exception(exc)
+        with st.sidebar.expander("Developer · repository health", expanded=False):
+            st.code(
+                json.dumps(
+                    {
+                        "integration": "not configured",
+                        "data_source": "unknown",
+                        "status": "unavailable",
+                        "error_code": type(exc).__name__,
+                    },
+                    indent=2,
+                ),
+                language="json",
+            )
         return
+    repository_health = repository.health_check()
     _surface_links(event)
+    if view == "host":
+        _render_host(
+            event,
+            test_mode=test_mode,
+            repository_health=repository_health,
+        )
+        return
+    if not repository_health.available:
+        _render_repository_failure(repository_health, detailed=test_mode)
+        return
     if view == "results":
         _render_results(event, test_mode=test_mode, repository=repository)
-        return
-    if view == "host":
-        _render_host(event, test_mode=test_mode)
         return
     if view != "probe":
         st.error(f"Unknown event view: {view}")

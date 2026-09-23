@@ -22,6 +22,7 @@ def _payload_text(content: str) -> list[dict[str, Any]]:
 
 class GenericNotionDebugRepository(NotionRepository):
     SOURCE = "test_submissions"
+    HEALTH_SOURCE = SOURCE
 
     def _pages(self, *, property_name: str = "", equals: str = "") -> list[dict[str, Any]]:
         filter_ = (

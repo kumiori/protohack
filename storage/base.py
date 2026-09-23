@@ -2,10 +2,22 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, Protocol
 
 
+@dataclass(frozen=True)
+class RepositoryHealth:
+    available: bool
+    integration: str
+    data_source_id: str
+    status: str
+    error_code: str = ""
+
+
 class Repository(Protocol):
+    def health_check(self) -> RepositoryHealth: ...
+
     def save_probe_trajectory(
         self, trajectory: dict[str, Any]
     ) -> dict[str, Any]: ...

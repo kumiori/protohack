@@ -4,9 +4,13 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from time import monotonic
 from typing import Any, Iterable
 
 from notion_client import Client
+from notion_client.errors import APIResponseError
+
+from .base import RepositoryHealth
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -53,6 +57,8 @@ def _relation(page_id: str) -> dict[str, Any]:
 
 
 class NotionRepository:
+    HEALTH_SOURCE = "responses"
+
     def __init__(
         self,
         *,
@@ -67,6 +73,56 @@ class NotionRepository:
         }
         self._session_page_id = str(manifest["seed_session"]["page_id"])
         self._client = Client(auth=token, notion_version=notion_version)
+        self._health_result: RepositoryHealth | None = None
+        self._health_checked_at = 0.0
+
+    def health_check(self) -> RepositoryHealth:
+        """Verify the configured integration can query its required data source."""
+
+        if self._health_result is not None and monotonic() - self._health_checked_at < 60:
+            return self._health_result
+
+        def remember(result: RepositoryHealth) -> RepositoryHealth:
+            self._health_result = result
+            self._health_checked_at = monotonic()
+            return result
+
+        integration = "unknown"
+        source_id = str(self._sources.get(self.HEALTH_SOURCE) or "")
+        try:
+            integration = str(self._client.users.me().get("name") or "unknown")
+            self._client.data_sources.query(
+                data_source_id=source_id,
+                page_size=1,
+            )
+        except APIResponseError as exc:
+            code = str(getattr(exc, "code", "") or "")
+            status = (
+                "inaccessible / not found"
+                if code == "object_not_found" or getattr(exc, "status", 0) == 404
+                else "unavailable"
+            )
+            return remember(RepositoryHealth(
+                available=False,
+                integration=integration,
+                data_source_id=source_id,
+                status=status,
+                error_code=code or type(exc).__name__,
+            ))
+        except Exception as exc:
+            return remember(RepositoryHealth(
+                available=False,
+                integration=integration,
+                data_source_id=source_id,
+                status="unavailable",
+                error_code=type(exc).__name__,
+            ))
+        return remember(RepositoryHealth(
+            available=True,
+            integration=integration,
+            data_source_id=source_id,
+            status="available",
+        ))
 
     def save_probe_trajectory(
         self, trajectory: dict[str, Any]
