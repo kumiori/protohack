@@ -11,6 +11,7 @@ from probe_engine import (
 )
 
 from event_ui import _synthetic_trajectories
+from probe_ui import _persistence_error_diagnostic
 from protocol.probe_registry import registered_events, resolve_event, resolve_probe
 from protocol.probe_draft import dump_checkpoint_draft, load_checkpoint_draft
 from protocol.probe_store import ProbeRepositoryStore
@@ -18,6 +19,23 @@ from storage.memory import InMemoryRepository
 
 
 ROOT = Path(__file__).parent.parent
+
+
+def test_persistence_failure_diagnostic_excludes_message_and_credentials() -> None:
+    class TransportError(Exception):
+        code = "validation_error"
+        status = 400
+
+    diagnostic = _persistence_error_diagnostic(
+        TransportError("body includes secret_token_that_must_not_render")
+    )
+
+    assert diagnostic == {
+        "error_type": "TransportError",
+        "error_code": "validation_error",
+        "status": 400,
+    }
+    assert "secret_token" not in str(diagnostic)
 
 
 def _source_text() -> str:

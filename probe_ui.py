@@ -672,6 +672,16 @@ def _participant_runtime_error(exc: Exception) -> str:
     return message
 
 
+def _persistence_error_diagnostic(exc: Exception) -> dict[str, Any]:
+    """Return safe transport metadata without response bodies or credentials."""
+
+    return {
+        "error_type": type(exc).__name__,
+        "error_code": str(getattr(exc, "code", "") or "unknown"),
+        "status": int(getattr(exc, "status", 0) or 0),
+    }
+
+
 def _skip_summary(probe: ProbeDefinition, event: Any) -> str:
     labels = {item.value: item.label for item in probe.resolution.skip_reasons.options}
     reasons = [labels.get(code, code) for code in event.reason_codes]
@@ -1651,11 +1661,34 @@ def render_registered_probe(
                     selector=code.selector,
                     verifier=code.verifier,
                 )
-                runtime.finalise(
-                    submission_store,
-                    idempotency_key=participation_id,
-                    prepared=prepared,
-                )
+                try:
+                    runtime.finalise(
+                        submission_store,
+                        idempotency_key=participation_id,
+                        prepared=prepared,
+                    )
+                except Exception as exc:
+                    diagnostic = _persistence_error_diagnostic(exc)
+                    if test_mode:
+                        st.error(
+                            "Shared test repository rejected the submission. "
+                            f"Status: {diagnostic['status'] or 'unknown'} · "
+                            f"Code: {diagnostic['error_code']}"
+                        )
+                    else:
+                        st.error(
+                            "Le service d’enregistrement est temporairement "
+                            "indisponible. Veuillez réessayer plus tard."
+                        )
+                    with st.sidebar.expander(
+                        "Developer · persistence failure", expanded=False
+                    ):
+                        st.code(
+                            json.dumps(diagnostic, indent=2),
+                            language="json",
+                        )
+                        st.caption("No credential, token or response body is displayed.")
+                    return
                 receipt = submission_store.last_receipt
                 if not receipt or receipt.get("success") is not True:
                     st.error("La base distante n’a pas retourné de reçu de persistance.")

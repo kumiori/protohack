@@ -20,10 +20,22 @@ DEFAULT_NOTION_VERSION = "2025-09-03"
 
 def _text(content: str) -> list[dict[str, Any]]:
     value = str(content)
-    chunks = [value[index : index + 2000] for index in range(0, len(value), 2000)]
+    chunks: list[str] = []
+    current: list[str] = []
+    current_units = 0
+    for character in value:
+        units = len(character.encode("utf-16-le")) // 2
+        if current and current_units + units > 2000:
+            chunks.append("".join(current))
+            current = []
+            current_units = 0
+        current.append(character)
+        current_units += units
+    if current or not chunks:
+        chunks.append("".join(current))
     return [
         {"type": "text", "text": {"content": chunk}}
-        for chunk in (chunks or [""])
+        for chunk in chunks
     ]
 
 

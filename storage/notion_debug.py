@@ -9,17 +9,6 @@ from typing import Any
 from .notion import NotionRepository, _date, _rich, _text
 
 
-def _payload_text(content: str) -> list[dict[str, Any]]:
-    """Stay below Notion's 2,000 UTF-16-unit rich-text segment limit."""
-
-    value = str(content)
-    chunks = [value[index : index + 1800] for index in range(0, len(value), 1800)]
-    return [
-        {"type": "text", "text": {"content": chunk}}
-        for chunk in (chunks or [""])
-    ]
-
-
 class GenericNotionDebugRepository(NotionRepository):
     SOURCE = "test_submissions"
     HEALTH_SOURCE = SOURCE
@@ -79,7 +68,7 @@ class GenericNotionDebugRepository(NotionRepository):
                 "rich_text": _text(str(envelope.get("access_code_verifier") or ""))
             },
             "updated_at": {"date": {"start": str(envelope["updated_at"])}},
-            "payload": {"rich_text": _payload_text(serialized)},
+            "payload": {"rich_text": _text(serialized)},
             "receipt_metadata": {"rich_text": _text("{}")},
         }
         if existing:

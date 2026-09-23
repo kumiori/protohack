@@ -16,6 +16,18 @@ from storage.notion_debug import GenericNotionDebugRepository
 PARTICIPANT = "00000000-0000-4000-8000-000000000001"
 
 
+def test_notion_rich_text_chunks_respect_utf16_unit_limit() -> None:
+    content = "a" * 1998 + "🌊🦊" + "b" * 12
+
+    chunks = notion_module._text(content)
+
+    assert "".join(item["text"]["content"] for item in chunks) == content
+    assert all(
+        len(item["text"]["content"].encode("utf-16-le")) // 2 <= 2000
+        for item in chunks
+    )
+
+
 def test_debug_repository_health_normalises_inaccessible_data_source() -> None:
     class Users:
         @staticmethod
