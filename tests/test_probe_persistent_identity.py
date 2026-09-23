@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from probe_engine import ProbeRuntime, trajectory_from_dict
+from streamlit.testing.v1 import AppTest
 
 from protocol.probe_access import (
     access_code_from_key,
@@ -14,6 +17,19 @@ from storage.memory import InMemoryRepository
 
 
 ACCESS_KEY = "00000000-0000-4000-8000-000000000001"
+NEW_PARTICIPANT_APP = Path(__file__).parent / "fixtures" / "probe_new_participant_app.py"
+
+
+def test_new_participant_does_not_query_remote_storage_before_first_answer() -> None:
+    app = AppTest.from_file(str(NEW_PARTICIPANT_APP), default_timeout=10).run()
+    assert not app.exception
+
+    next(button for button in app.button if button.label == "Oui, je commence").click().run()
+
+    assert not app.exception
+    assert any(
+        title.value == "Informations sur ma participation" for title in app.title
+    )
 
 
 def test_four_emoji_selector_is_copy_safe_and_has_a_verifier() -> None:

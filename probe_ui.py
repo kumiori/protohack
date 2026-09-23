@@ -69,6 +69,7 @@ def _render_probe_entry_gate(
             uuid.NAMESPACE_URL,
             f"{registration.session_code}:{probe.id}:{participant_id}",
         ).hex
+        st.session_state[f"probe_new_participant_{participation_id}"] = True
         st.session_state[f"probe_stage_{participation_id}"] = "steps"
         st.rerun()
     if returning.button(
@@ -1388,7 +1389,9 @@ def render_registered_probe(
     hydrated_key = f"probe_hydrated_{participation_id}"
     session_trajectory = st.session_state.get(trajectory_key)
     if session_trajectory is None:
-        stored = draft_store.load(participation_id)
+        new_participant_key = f"probe_new_participant_{participation_id}"
+        is_new_participant = bool(st.session_state.pop(new_participant_key, False))
+        stored = None if is_new_participant else draft_store.load(participation_id)
         if (
             stored is not None
             and stored.participation.probe_revision != probe.revision
