@@ -93,7 +93,7 @@ def _manifest(tmp_path: Path) -> Path:
 
 
 def test_bootstrap_v2_has_no_strategy_to_contact_relation() -> None:
-    assert SCHEMA_VERSION == "protohack-notion-v3-shared-trajectories"
+    assert SCHEMA_VERSION == "protohack-notion-v4-probe-test-submissions"
     assert "player" not in RELATIONS["responses"]
     assert "participant_uuid" in DATABASES["responses"]["properties"]
     assert "rationale" in DATABASES["responses"]["properties"]
@@ -103,6 +103,9 @@ def test_bootstrap_v2_has_no_strategy_to_contact_relation() -> None:
     assert "goal_trajectories" in DATABASES
     assert RELATIONS["goal_trajectories"]["goal"] == ("goals", "contributions")
     assert "trajectory_payload" in DATABASES["goal_trajectories"]["properties"]
+    assert DATABASES["test_submissions"]["title"] == "protohack_ProbeTestSubmissions"
+    assert "payload" in DATABASES["test_submissions"]["properties"]
+    assert "access_code_verifier" in DATABASES["test_submissions"]["properties"]
 
 
 def test_shared_trajectory_write_keeps_canonical_payload_in_one_field(

@@ -89,7 +89,14 @@ def test_event_surface_wraps_the_generic_probe_adapter() -> None:
     assert 'st.sidebar.expander("Developer · Identity"' in ui_source
     assert 'st.sidebar.expander("Developer · Persistence"' in ui_source
     assert 'st.sidebar.expander("Developer · Canonical event log"' in ui_source
-    assert "TEST MODE · DRY RUN" in ui_source
+    assert "TEST MODE · writes go to the shared test database only" in ui_source
+    assert "Est-ce votre première participation ?" in ui_source
+    assert "Oui, je commence" in ui_source
+    assert "Non, j’ai déjà un code d’accès" in ui_source
+    assert "J’ai conservé mon code" in ui_source
+    assert "Copier le code complet" in ui_source
+    assert "_render_confetti()" in ui_source
+    assert "st.balloons()" not in ui_source
     assert "with st.popover(label" in ui_source
     assert 'label="Signaler"' in ui_source
     assert '"Enregistrer la révision"' in ui_source
@@ -97,7 +104,7 @@ def test_event_surface_wraps_the_generic_probe_adapter() -> None:
     assert "runtime.skip(" in ui_source
     assert 'label="Signaler"' in ui_source
     assert '"Passer"' in ui_source
-    assert '"Intégrer au paysage commun"' in ui_source
+    assert '"Intégrer mes réponses"' in ui_source
     assert "runtime.flag(" in ui_source
     assert 'st.query_params["participation"] =' not in ui_source
     assert "_normalise_rich_questionnaire" not in loader_source
@@ -146,6 +153,10 @@ def test_test_results_restore_ephemeral_canonical_generation() -> None:
     assert "Aucune représentation n’est définie pour cette Probe." in source
     assert "Les représentations sont définies, mais aucune donnée n’est encore disponible." in source
     assert "Representation placeholder" not in source
+    assert "Canonical representations" not in source
+    assert "Source des données" in source
+    assert "Voir les données structurées" in source
+    assert "trajectories = _synthetic_trajectories" in source
 
     trajectories = _synthetic_trajectories(probe, "montreal-test")
     assert trajectories

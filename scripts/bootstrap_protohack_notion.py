@@ -35,7 +35,7 @@ from notion_client.errors import APIResponseError
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MANIFEST = ROOT / "config" / "protohack_notion.json"
 DEFAULT_NOTION_VERSION = "2025-09-03"
-SCHEMA_VERSION = "protohack-notion-v3-shared-trajectories"
+SCHEMA_VERSION = "protohack-notion-v4-probe-test-submissions"
 PREFIX = "protohack"
 
 
@@ -193,6 +193,27 @@ DATABASES: dict[str, dict[str, Any]] = {
             "integrated_at": date(),
             "protocol_version": rich_text(),
             "revision": number(),
+        },
+    },
+    "test_submissions": {
+        "title": f"{PREFIX}_ProbeTestSubmissions",
+        "properties": {
+            "Name": {"title": {}},
+            "event_id": rich_text(),
+            "probe_id": rich_text(),
+            "probe_revision": number(),
+            "participant_id": rich_text(),
+            "participation_id": rich_text(),
+            "submission_id": rich_text(),
+            "environment": select(("test", "yellow")),
+            "state": select(("draft", "gray"), ("submitted", "green")),
+            "batch_id": rich_text(),
+            "access_code_selector": rich_text(),
+            "access_code_verifier": rich_text(),
+            "created_at": date(),
+            "updated_at": date(),
+            "payload": rich_text(),
+            "receipt_metadata": rich_text(),
         },
     },
     "questions": {
@@ -384,7 +405,9 @@ def write_manifest(path: Path, payload: dict[str, Any]) -> None:
 
 
 def token_or_fail() -> str:
-    token = os.getenv("NOTION_TOKEN", "").strip()
+    from storage.context import notion_token
+
+    token = notion_token()
     if not token:
         raise RuntimeError("NOTION_TOKEN is required for this command.")
     return token
@@ -567,6 +590,7 @@ def emit_secrets(manifest: dict[str, Any]) -> str:
         "protohack_statements_db_id": "statements",
         "protohack_players_db_id": "players",
         "protohack_responses_db_id": "responses",
+        "protohack_test_submissions_db_id": "test_submissions",
         "protohack_questions_db_id": "questions",
         "protohack_moderation_votes_db_id": "moderation_votes",
         "protohack_decisions_db_id": "decisions",

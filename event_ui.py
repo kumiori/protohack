@@ -7,11 +7,18 @@ from typing import Any
 from urllib.parse import urlencode
 
 import streamlit as st
-from probe_engine import InputType, ProbeRuntime, evaluate_representation, evaluate_results
+from probe_engine import (
+    InputType,
+    ProbeRuntime,
+    evaluate_representation,
+    evaluate_results,
+    trajectory_from_dict,
+)
 
 from probe_ui import render_registered_probe
 from protocol.probe_registry import RegisteredEvent, resolve_event, resolve_probe
 from storage import get_repository, repository_mode
+from storage.context import get_test_repository
 from storage.memory import InMemoryRepository
 
 
@@ -26,11 +33,6 @@ def page_for_event(event: RegisteredEvent) -> Any:
         icon="🧭",
         url_path=event.slug,
     )
-
-
-@st.cache_resource
-def _debug_repository(event_id: str) -> InMemoryRepository:
-    return InMemoryRepository()
 
 
 @st.cache_resource
@@ -71,7 +73,9 @@ def _surface_links(event: RegisteredEvent) -> None:
         st.link_button("Host", url("host"), width="stretch")
 
 
-def _render_results(event: RegisteredEvent, *, test_mode: bool) -> None:
+def _render_results(
+    event: RegisteredEvent, *, test_mode: bool, repository: Any
+) -> None:
     st.title(f"{event.title} · Results")
     st.caption("What the Probe represents · public participant-facing surface")
     if not event.results_enabled:
@@ -85,7 +89,14 @@ def _render_results(event: RegisteredEvent, *, test_mode: bool) -> None:
         with st.expander("Developer · canonical source failure"):
             st.exception(exc)
         return
-    trajectories = ()
+    records = repository.list_probe_trajectories(
+        registration.session_code, probe.id
+    )
+    trajectories = tuple(
+        trajectory_from_dict(record["trajectory"])
+        for record in records
+        if record.get("integrated") and record.get("trajectory")
+    )
     if test_mode:
         generate = st.toggle(
             "Generate ephemeral synthetic test data",
@@ -95,7 +106,44 @@ def _render_results(event: RegisteredEvent, *, test_mode: bool) -> None:
         if generate:
             trajectories = _synthetic_trajectories(probe, registration.session_code)
             st.warning("SYNTHETIC TEST DATA · generated on this render · not persisted")
-    st.subheader("Canonical representations")
+        with st.sidebar:
+            st.caption(f"{len(records)} generic test envelope(s)")
+            current_only = st.checkbox(
+                "Current run only",
+                value=True,
+                help="Limits cleanup to the current run/participant batch.",
+            )
+            if st.button("Discard test records", type="secondary"):
+                removed = repository.discard_probe_trajectories(
+                    registration.session_code,
+                    probe.id,
+                    batch_id=(
+                        str(st.query_params.get("run") or "")
+                        if current_only
+                        else None
+                    ),
+                )
+                st.toast(f"{removed} test record(s) discarded.")
+                st.rerun()
+    if test_mode and generate:
+        source_label = "données synthétiques éphémères"
+        source_detail = f"{len(trajectories)} trajectoires générées · non enregistrées"
+        synthetic_label = "oui · remplace les données persistées"
+    elif test_mode:
+        source_label = "base de test partagée"
+        source_detail = f"{len(trajectories)} trajectoire(s) intégrée(s)"
+        synthetic_label = "non"
+    else:
+        source_label = "réponses intégrées au Forum"
+        source_detail = f"{len(trajectories)} trajectoire(s) intégrée(s)"
+        synthetic_label = "non"
+    with st.container(border=True):
+        st.markdown("**Source des données**")
+        st.write(source_detail)
+        st.caption(
+            f"Source : {source_label} · Probe : {probe.id}@{probe.revision} · "
+            f"Données synthétiques : {synthetic_label}"
+        )
     if not probe.representations:
         st.info("Aucune représentation n’est définie pour cette Probe.")
         return
@@ -116,7 +164,8 @@ def _render_results(event: RegisteredEvent, *, test_mode: bool) -> None:
                     st.markdown(
                         f"**{block.representation_id.replace('_', ' ').title()}**"
                     )
-                    st.json(block.result.to_dict())
+                    with st.expander("Voir les données structurées"):
+                        st.json(block.result.to_dict())
         return
     for representation in probe.representations:
         with st.container(border=True):
@@ -133,7 +182,9 @@ def _render_results(event: RegisteredEvent, *, test_mode: bool) -> None:
                     ):
                         st.exception(exc)
                 else:
-                    st.json(result.to_dict())
+                    st.write(f"{len(population)} contribution(s) intégrée(s)")
+                    with st.expander("Voir les données structurées"):
+                        st.json(result.to_dict())
 
 
 def _synthetic_value(probe: Any, field: Any, index: int) -> Any:
@@ -202,7 +253,7 @@ def _render_host(event: RegisteredEvent, *, test_mode: bool) -> None:
     if not event.host_enabled:
         st.warning("Host is disabled for this event.")
         return
-    mode = "dry-run" if test_mode else repository_mode()
+    mode = "shared-test-database" if test_mode else repository_mode()
     st.metric("Registered probe variants", len(event.probes))
     st.metric("Persistence mode", mode)
     for probe in event.probes:
@@ -219,10 +270,17 @@ def render_event(event: RegisteredEvent) -> None:
     test_mode = _test_mode()
     view = str(st.query_params.get("view") or event.default_view).lower()
     if test_mode:
-        st.error("TEST MODE · DRY RUN · no production database writes")
+        st.error("TEST MODE · writes go to the shared test database only")
+    try:
+        repository = get_test_repository() if test_mode else get_repository()
+    except RuntimeError as exc:
+        st.error("La base de test partagée n’est pas configurée sur cette instance.")
+        with st.sidebar.expander("Developer · test repository", expanded=True):
+            st.exception(exc)
+        return
     _surface_links(event)
     if view == "results":
-        _render_results(event, test_mode=test_mode)
+        _render_results(event, test_mode=test_mode, repository=repository)
         return
     if view == "host":
         _render_host(event, test_mode=test_mode)
@@ -244,7 +302,6 @@ def render_event(event: RegisteredEvent) -> None:
         with st.sidebar.expander("Developer · routing", expanded=True):
             st.exception(exc)
         return
-    repository = _debug_repository(event.id) if test_mode else get_repository()
     draft_repository = repository if test_mode else _draft_repository(event.id)
     render_registered_probe(
         registration=registration,

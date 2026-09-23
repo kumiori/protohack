@@ -23,6 +23,8 @@ class ProbeRepositoryStore:
         probe: ProbeDefinition | None = None,
         diagnostic_sink: Callable[[dict[str, Any]], None] | None = None,
         target: str = "probe trajectories",
+        environment: str = "production",
+        batch_id: str = "",
     ) -> None:
         self.repository = repository
         self.probe_id = probe_id
@@ -31,6 +33,15 @@ class ProbeRepositoryStore:
         self.probe = probe
         self.diagnostic_sink = diagnostic_sink
         self.target = target
+        self.environment = environment
+        self.batch_id = batch_id
+        self.access_code_selector = ""
+        self.access_code_verifier = ""
+        self.last_receipt: dict[str, Any] | None = None
+
+    def set_access_code(self, *, selector: str, verifier: str) -> None:
+        self.access_code_selector = selector
+        self.access_code_verifier = verifier
 
     def _communicate(
         self,
@@ -109,12 +120,17 @@ class ProbeRepositoryStore:
             integrated=True,
             idempotency_key=idempotency_key,
         )
-        self._communicate(
+        receipt = self._communicate(
             "submission.commit",
             trajectory.participation.id,
             lambda: self.repository.save_probe_trajectory(payload),
             event_count=len(trajectory.events),
         )
+        self.last_receipt = {
+            "success": receipt is not None,
+            "record_identity": trajectory.participation.id,
+            "repository_result": dict(receipt or {}),
+        }
         return trajectory
 
     def preview_payload(
@@ -163,37 +179,82 @@ class ProbeRepositoryStore:
             or participation.scope_id != self.scope_id
         ):
             raise ValueError("Probe trajectory identity does not match its repository store.")
-        record = {
-            "record_type": "probe_trajectory",
-            "participation_id": participation.id,
-            "participant_id": participation.participant_id,
-            "probe_id": participation.probe_id,
-            "probe_revision": participation.probe_revision,
-            "scope_id": participation.scope_id,
-            "integrated": integrated,
-            "idempotency_key": idempotency_key,
-            "trajectory": trajectory.to_dict(),
-        }
-        if self.probe is not None:
-            reviewed = ProbeRuntime.hydrate(
+        events = list(trajectory.to_dict().get("events") or [])
+        reviewed = (
+            ProbeRuntime.hydrate(
                 self.probe,
                 trajectory,
                 participant_id=self.participant_id,
                 scope_id=self.scope_id,
             ).review()
-            answers = {
-                item.question_id: item.value
-                for item in reviewed
-                if item.value is not None and item.state.startswith("answered")
+            if self.probe is not None
+            else ()
+        )
+        answers = {
+            item.question_id: item.value
+            for item in reviewed
+            if item.value is not None and item.state.startswith("answered")
+        }
+        skips = {
+            str(event.get("question_id") or ""): {
+                "reasons": list(event.get("reason_codes") or []),
+                "note": str(event.get("reason_note") or ""),
             }
-            record["identity"] = {
-                field_id: answers[field_id]
-                for field_id in self.probe.authoring.profile_fields
-                if field_id in answers
-            }
-            record["responses"] = {
-                field_id: answers[field_id]
-                for field_id in self.probe.authoring.session_fields
-                if field_id in answers
-            }
+            for event in events
+            if event.get("kind") == "skipped" and event.get("question_id")
+        }
+        flags = {
+            item.question_id: list(item.flags)
+            for item in reviewed
+            if item.flags
+        }
+        identity = {
+            field_id: answers[field_id]
+            for field_id in (self.probe.authoring.profile_fields if self.probe else ())
+            if field_id in answers
+        }
+        responses = {
+            field_id: answers[field_id]
+            for field_id in (self.probe.authoring.session_fields if self.probe else ())
+            if field_id in answers
+        }
+        submitted_at = str(events[-1].get("timestamp") or "") if events else ""
+        canonical_payload = {
+            "schema": "probe-submission/v1",
+            "event_id": self.scope_id,
+            "probe": {"id": participation.probe_id, "revision": participation.probe_revision},
+            "participant_id": participation.participant_id,
+            "participation_id": participation.id,
+            "answers": responses,
+            "skips": skips,
+            "flags": flags,
+            "identity": identity,
+            "trajectory": trajectory.to_dict(),
+            "submitted_at": submitted_at if integrated else None,
+        }
+        record = {
+            "record_type": "probe_submission",
+            "schema": "probe-submission-envelope/v1",
+            "created_at": str(events[0].get("timestamp") or submitted_at) if events else submitted_at,
+            "updated_at": submitted_at,
+            "environment": self.environment,
+            "event_id": self.scope_id,
+            "participation_id": participation.id,
+            "participant_id": participation.participant_id,
+            "probe_id": participation.probe_id,
+            "probe_revision": participation.probe_revision,
+            "scope_id": participation.scope_id,
+            "submission_id": idempotency_key,
+            "access_code_selector": self.access_code_selector,
+            "access_code_verifier": self.access_code_verifier,
+            "state": "submitted" if integrated else "draft",
+            "batch_id": self.batch_id,
+            "integrated": integrated,
+            "idempotency_key": idempotency_key,
+            "trajectory": trajectory.to_dict(),
+            "payload": canonical_payload,
+            "receipt_metadata": {},
+            "identity": identity,
+            "responses": responses,
+        }
         return record

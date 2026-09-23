@@ -162,10 +162,65 @@ class NotionRepository:
                 value = json.loads(raw)
             except json.JSONDecodeError:
                 continue
-            if value.get("record_type") == "probe_trajectory":
+            if value.get("record_type") in {"probe_trajectory", "probe_submission"}:
                 value["_page_id"] = str(page.get("id") or "")
                 return value
         return None
+
+    @staticmethod
+    def _probe_envelope_from_page(page: dict[str, Any]) -> dict[str, Any] | None:
+        properties = page.get("properties") or {}
+        raw = _rich(properties, "value_json")
+        try:
+            value = json.loads(raw)
+        except json.JSONDecodeError:
+            return None
+        if value.get("record_type") not in {"probe_trajectory", "probe_submission"}:
+            return None
+        value["_page_id"] = str(page.get("id") or "")
+        return value
+
+    def list_probe_trajectories(
+        self, event_id: str, probe_id: str
+    ) -> list[dict[str, Any]]:
+        rows = []
+        for page in self._query_all(
+            "responses",
+            filter_={"property": "question_id", "rich_text": {"equals": probe_id}},
+        ):
+            value = self._probe_envelope_from_page(page)
+            if value is None:
+                continue
+            if str(value.get("event_id") or value.get("scope_id") or "") == event_id:
+                rows.append(value)
+        return rows
+
+    def find_probe_trajectories_by_access_selector(
+        self, access_code_selector: str
+    ) -> list[dict[str, Any]]:
+        # The selector lives inside the canonical envelope so the existing
+        # generic response table remains schema-neutral.
+        matches = []
+        for page in self._query_all("responses"):
+            value = self._probe_envelope_from_page(page)
+            if value and str(value.get("access_code_selector") or "") == access_code_selector:
+                matches.append(value)
+        return matches
+
+    def discard_probe_trajectories(
+        self, event_id: str, probe_id: str, *, batch_id: str | None = None
+    ) -> int:
+        count = 0
+        for row in self.list_probe_trajectories(event_id, probe_id):
+            if str(row.get("environment") or "") != "test":
+                continue
+            if batch_id is not None and str(row.get("batch_id") or "") != batch_id:
+                continue
+            page_id = str(row.get("_page_id") or "")
+            if page_id:
+                self._client.pages.update(page_id=page_id, archived=True)
+                count += 1
+        return count
 
     @staticmethod
     def _protocol_lab_field_note_from_page(

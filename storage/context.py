@@ -10,6 +10,7 @@ import streamlit as st
 from .base import Repository
 from .memory import InMemoryRepository
 from .notion import NotionRepository
+from .notion_debug import GenericNotionDebugRepository
 
 
 def _secret(section: str, key: str) -> str:
@@ -56,7 +57,26 @@ def _notion_repository(token: str) -> NotionRepository:
     )
 
 
+@st.cache_resource
+def _notion_debug_repository(token: str) -> GenericNotionDebugRepository:
+    return GenericNotionDebugRepository(
+        token=token,
+        notion_version=os.getenv("NOTION_VERSION", "2025-09-03"),
+    )
+
+
 def get_repository() -> Repository:
     if repository_mode() == "demo":
         return _memory_repository()
     return _notion_repository(notion_token())
+
+
+def get_test_repository() -> Repository:
+    """Return the physical generic TEST sink used by interactive test mode."""
+
+    if repository_mode() == "demo":
+        raise RuntimeError(
+            "Interactive TEST MODE requires a configured Notion credential; "
+            "the process-local repository is reserved for automated tests."
+        )
+    return _notion_debug_repository(notion_token())

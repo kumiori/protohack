@@ -10,6 +10,7 @@ from importlib.metadata import version as package_version
 from typing import Any, Mapping
 
 import streamlit as st
+import streamlit.components.v1 as components
 from probe_engine import (
     FieldDefinition,
     InputType,
@@ -17,15 +18,117 @@ from probe_engine import (
     ProbeRuntime,
     QuestionDefinition,
     RuntimeError as ProbeRuntimeError,
+    trajectory_from_dict,
 )
 
 from protocol.probe_registry import PROBE_ENGINE_COMMIT, RegisteredProbe
 from protocol.probe_draft import dump_checkpoint_draft
+from protocol.probe_access import (
+    access_code_from_key,
+    mint_probe_access_code,
+    resolve_probe_access_input,
+)
 from protocol.location_lookup import render_location_lookup
 from protocol.probe_store import ProbeRepositoryStore
 from storage.base import Repository
 from storage.context import repository_mode
-from track_ui import participant_uuid
+
+
+def _render_probe_entry_gate(
+    *,
+    registration: RegisteredProbe,
+    probe: ProbeDefinition,
+    repository: Repository,
+    test_mode: bool,
+) -> str | None:
+    """Resolve a new or returning participant before creating Probe state."""
+
+    gate_key = f"probe_entry_gate_{registration.session_code}_{probe.id}"
+    accepted = str(st.session_state.get(gate_key) or "")
+    if accepted:
+        st.session_state["participant_uuid"] = accepted
+        return accepted
+
+    welcome = probe.step("welcome")
+    st.title(welcome.title)
+    with st.container(key="editorial_lead"):
+        st.write(welcome.body)
+    st.markdown("### Est-ce votre première participation ?")
+    fresh, returning = st.columns(2)
+    if fresh.button(
+        "Oui, je commence",
+        type="primary",
+        width="stretch",
+        key=f"probe_entry_new_{probe.id}",
+    ):
+        participant_id = str(uuid.uuid4())
+        st.session_state[gate_key] = participant_id
+        st.session_state["participant_uuid"] = participant_id
+        st.query_params["run"] = participant_id
+        participation_id = uuid.uuid5(
+            uuid.NAMESPACE_URL,
+            f"{registration.session_code}:{probe.id}:{participant_id}",
+        ).hex
+        st.session_state[f"probe_stage_{participation_id}"] = "steps"
+        st.rerun()
+    if returning.button(
+        "Non, j’ai déjà un code d’accès",
+        type="secondary",
+        width="stretch",
+        key=f"probe_entry_returning_{probe.id}",
+    ):
+        st.session_state[f"{gate_key}_returning"] = True
+        st.rerun()
+    if st.session_state.get(f"{gate_key}_returning"):
+        with st.form(f"probe_entry_code_form_{probe.id}"):
+            raw_code = st.text_input(
+                "Mon code d’accès",
+                placeholder="🌊 🦊 🌿 🔭 ou code complet",
+            )
+            recover = st.form_submit_button("Retrouver mes réponses", type="primary")
+        if recover:
+            try:
+                selector, supplied_verifier = resolve_probe_access_input(raw_code)
+            except ValueError as exc:
+                st.warning(str(exc))
+                return None
+            matches = [
+                row
+                for row in repository.find_probe_trajectories_by_access_selector(selector)
+                if str(row.get("event_id") or row.get("scope_id") or "")
+                == registration.session_code
+                and str(row.get("probe_id") or "") == probe.id
+                and str(row.get("environment") or "production")
+                == ("test" if test_mode else "production")
+                and (
+                    supplied_verifier is None
+                    or str(row.get("access_code_verifier") or "")
+                    == supplied_verifier
+                )
+            ]
+            if len(matches) != 1:
+                st.warning(
+                    "Ce code ne correspond pas à une participation unique dans cet environnement."
+                )
+            else:
+                record = matches[0]
+                participant_id = str(record["participant_id"])
+                participation_id = str(record["participation_id"])
+                st.session_state[gate_key] = participant_id
+                st.session_state["participant_uuid"] = participant_id
+                st.session_state[
+                    f"probe_participation_{registration.session_code}"
+                ] = participation_id
+                st.session_state[
+                    f"probe_session_trajectory_{participation_id}"
+                ] = trajectory_from_dict(record["trajectory"])
+                st.session_state[f"probe_hydrated_{participation_id}"] = True
+                st.session_state[f"probe_stage_{participation_id}"] = (
+                    "review" if record.get("integrated") else "steps"
+                )
+                st.query_params["run"] = participant_id
+                st.rerun()
+    return None
 
 
 def _answers(runtime: ProbeRuntime) -> dict[str, Any]:
@@ -631,6 +734,35 @@ def _render_probe_styles() -> None:
     )
 
 
+def _render_confetti() -> None:
+    """Celebrate a confirmed persistence receipt without using balloons."""
+
+    components.html(
+        """
+        <style>
+        body{margin:0;overflow:hidden;background:transparent}
+        .c{position:fixed;top:-12px;width:9px;height:16px;opacity:.95;
+           animation:fall 2.8s cubic-bezier(.2,.7,.4,1) forwards}
+        @keyframes fall{to{transform:translate3d(var(--drift),110vh,0) rotate(760deg);opacity:.25}}
+        </style>
+        <div id="confetti"></div>
+        <script>
+        const colors=['#d7ff48','#a993ff','#ff7b61','#b9ead7','#12211b'];
+        const root=document.getElementById('confetti');
+        for(let i=0;i<48;i++){
+          const bit=document.createElement('i'); bit.className='c';
+          bit.style.left=((i*37)%100)+'vw';
+          bit.style.background=colors[i%colors.length];
+          bit.style.animationDelay=((i%12)*.06)+'s';
+          bit.style.setProperty('--drift',(((i%9)-4)*16)+'px');
+          root.appendChild(bit);
+        }
+        </script>
+        """,
+        height=220,
+    )
+
+
 def _render_review_editor(
     *,
     probe: ProbeDefinition,
@@ -875,21 +1007,26 @@ def _sidebar_debug(
             "submission.preview": "submission.previewed",
             "submission.commit": "committed.submission",
         }.get(latest_operation["operation"], state)
-    submission_commits = sum(
-        1
+    notion_request_count = sum(
+        {
+            "draft.hydrate": 1,
+            "draft.session.save": 2,
+            "sync.arrival": 2,
+            "submission.commit": 2,
+        }.get(str(item.get("operation") or ""), 0)
         for item in persistence_log
-        if item.get("operation") == "submission.commit" and item.get("success")
+        if item.get("success")
     )
-    notion_request_count = submission_commits * 2
+    physical_notion = "NotionRepository" in backend or "NotionDebugRepository" in backend
     notion_request_mode = (
         "estimated real"
-        if "submission=NotionRepository" in backend and not test_mode
+        if physical_notion
         else "supposed production-equivalent"
     )
     persistence_debug = {
         "backend": backend,
         "target": (
-            "debug dry-run memory"
+            "shared test database"
             if test_mode
             else "separate draft checkpoint and final submission stores"
         ),
@@ -903,7 +1040,8 @@ def _sidebar_debug(
         "notion_api_requests_so_far": notion_request_count,
         "notion_api_request_count_mode": notion_request_mode,
         "notion_api_request_basis": (
-            "2 requests per final commit: lookup plus create/update; pagination retries excluded"
+            "hydrate=1; checkpoint/commit=2 (lookup plus create/update); "
+            "access-code collision queries and pagination retries excluded"
         ),
     }
     with st.sidebar.expander("Developer · Identity", expanded=False):
@@ -1002,7 +1140,7 @@ def _sidebar_debug(
         st.markdown("Protocol Hack ↔ persistence: instrumented adapter operations")
         st.markdown("Runtime ↔ process: checkpoint and sync-point events")
         if test_mode:
-            st.warning("Upserts are simulated in process memory; no database query executes.")
+            st.info("Upserts target the shared physical Notion test data source.")
     with st.sidebar.expander("Developer · Capability gaps", expanded=False):
         engine_version = package_version("probe-engine")
         st.caption(
@@ -1190,7 +1328,14 @@ def render_registered_probe(
     test_mode: bool = False,
 ) -> None:
     _render_probe_styles()
-    participant_id = participant_uuid()
+    participant_id = _render_probe_entry_gate(
+        registration=registration,
+        probe=probe,
+        repository=repository,
+        test_mode=test_mode,
+    )
+    if participant_id is None:
+        return
     participation_key = f"probe_participation_{registration.session_code}"
     derived_participation_id = uuid.uuid5(
         uuid.NAMESPACE_URL,
@@ -1221,6 +1366,8 @@ def render_registered_probe(
         scope_id=registration.session_code,
         diagnostic_sink=record_persistence,
         target="checkpoint drafts",
+        environment="test" if test_mode else "production",
+        batch_id=str(st.query_params.get("run") or ""),
     )
     submission_store = ProbeRepositoryStore(
         repository,
@@ -1230,10 +1377,12 @@ def render_registered_probe(
         scope_id=registration.session_code,
         diagnostic_sink=record_persistence,
         target=(
-            "debug dry-run memory"
+            "shared test database"
             if test_mode
             else f"{submission_backend}:final submissions"
         ),
+        environment="test" if test_mode else "production",
+        batch_id=str(st.query_params.get("run") or ""),
     )
     trajectory_key = f"probe_session_trajectory_{participation_id}"
     hydrated_key = f"probe_hydrated_{participation_id}"
@@ -1297,7 +1446,7 @@ def render_registered_probe(
         backend=backend,
     )
     if test_mode:
-        st.error("TEST MODE · DRY RUN · no production database writes")
+        st.error("TEST MODE · writes go to the shared test database only")
     elif repository_mode() == "demo":
         st.error(
             "TEST MODE · stockage temporaire en mémoire · les réponses disparaîtront "
@@ -1347,13 +1496,15 @@ def render_registered_probe(
                 "Vous n’avez pas accepté les modalités de participation. Votre participation "
                 "n’est pas considérée comme consentie et aucune réponse ne sera soumise."
             )
-        elif test_mode:
-            st.success("Simulation terminée. Aucune écriture de production n’a été effectuée.")
         elif st.session_state.get(f"probe_submission_receipt_{participation_id}"):
             done = probe.step("done")
             st.title(done.title)
             with st.container(key="editorial_lead"):
                 st.write(done.body)
+            celebration_key = f"probe_submission_celebrated_{participation_id}"
+            if not st.session_state.get(celebration_key):
+                _render_confetti()
+                st.session_state[celebration_key] = True
         else:
             st.warning(
                 "Aucun reçu de persistance n’est disponible. "
@@ -1418,6 +1569,19 @@ def render_registered_probe(
                 trajectory_key=trajectory_key,
             )
         preview_hints = probe.authoring.presentation_hints.get("submission_preview", {})
+        access_key_state = f"probe_access_key_{participation_id}"
+        if access_key_state not in st.session_state:
+            minted = mint_probe_access_code(
+                repository.find_probe_trajectories_by_access_selector
+            )
+            st.session_state[access_key_state] = minted.full_key
+        prepared_access = access_code_from_key(
+            str(st.session_state[access_key_state])
+        )
+        submission_store.set_access_code(
+            selector=prepared_access.selector,
+            verifier=prepared_access.verifier,
+        )
         prepared = runtime.prepare_finalisation(idempotency_key=participation_id)
         payload = submission_store.preview_payload(
             prepared,
@@ -1439,21 +1603,69 @@ def render_registered_probe(
             st.warning(
                 "L’écriture de production exige une authentification Notion configurée."
             )
+        integrate_dialog_key = f"probe_integrate_dialog_{participation_id}"
         if st.button(
-            "Intégrer au paysage commun",
+            "Intégrer mes réponses",
             type="primary",
             width="stretch",
             disabled=not test_mode and repository_mode() != "notion",
         ):
-            runtime.finalise(
-                submission_store,
-                idempotency_key=participation_id,
-                prepared=prepared,
-            )
-            if not test_mode:
-                st.session_state[f"probe_submission_receipt_{participation_id}"] = True
-            st.session_state[stage_key] = "done"
+            st.session_state[integrate_dialog_key] = True
             st.rerun()
+
+        @st.dialog("Votre code d’accès")
+        def confirm_integration() -> None:
+            code = access_code_from_key(str(st.session_state[access_key_state]))
+            full_display = code.full_key.upper()
+            st.write(
+                "Conservez l’un de ces codes. Il vous permettra de retrouver vos réponses."
+            )
+            st.markdown("**Code court**")
+            st.markdown(
+                f'<div style="font-size:3.4rem;line-height:1.2;text-align:center;'
+                f'letter-spacing:.16em;margin:1rem 0">{html.escape(code.selector)}</div>',
+                unsafe_allow_html=True,
+            )
+            st.markdown("**Code complet**")
+            st.code(full_display, language=None)
+            components.html(
+                "<button id='copy-full' style='border:1px solid #12211b;"
+                "border-radius:999px;background:#fffdf6;padding:.7rem 1rem;"
+                "font:600 16px Manrope,sans-serif;cursor:pointer'>"
+                "Copier le code complet</button><span id='copy-status' "
+                "style='margin-left:.7rem;font:14px Manrope,sans-serif'></span>"
+                f"<script>document.getElementById('copy-full').onclick=async()=>{{"
+                f"await navigator.clipboard.writeText({json.dumps(full_display)});"
+                "document.getElementById('copy-status').textContent='Copié';}}</script>",
+                height=58,
+            )
+            st.write(
+                "Prenez une capture d’écran, notez votre code court ou copiez le code "
+                "complet dans un endroit sûr."
+            )
+            if st.button("J’ai conservé mon code", type="primary", width="stretch"):
+                submission_store.set_access_code(
+                    selector=code.selector,
+                    verifier=code.verifier,
+                )
+                runtime.finalise(
+                    submission_store,
+                    idempotency_key=participation_id,
+                    prepared=prepared,
+                )
+                receipt = submission_store.last_receipt
+                if not receipt or receipt.get("success") is not True:
+                    st.error("La base distante n’a pas retourné de reçu de persistance.")
+                    return
+                st.session_state[
+                    f"probe_submission_receipt_{participation_id}"
+                ] = receipt
+                st.session_state[integrate_dialog_key] = False
+                st.session_state[stage_key] = "done"
+                st.rerun()
+
+        if st.session_state.get(integrate_dialog_key):
+            confirm_integration()
         return
 
     informational_key = f"probe_information_steps_{participation_id}"

@@ -29,7 +29,18 @@ package APIs directly.
 
 Protocol Hack is a one-scenario strategic mapping experiment. The pilot asks a participant to make one first move, explain it in one sentence, review it, save a return key, and explicitly integrate the resulting anonymous trajectory into a Commons Map.
 
-Every normal question systematically provides `Continue`, `Flag`, and `Skip`. Flagging uses the feedback vocabulary and an optional note. Skipping opens a dialog and requires a reason. A successful integration always triggers balloons; opening the confirmation dialog alone never writes anything.
+Every normal question systematically provides `Continue`, `Flag`, and `Skip`. Flagging uses the feedback vocabulary and an optional note. Skipping opens a dialog and requires a reason. A successful Probe integration triggers confetti only after a repository receipt; opening the confirmation dialog alone never writes anything. Legacy question-set experiences retain their authored completion animation.
+
+Registered Probe events share a Prediction-style persistent identity flow. A
+new participant receives no return code at entry. Review produces one canonical
+`probe-submission/v1` payload; immediately before integration the participant
+is shown a collision-checked four-emoji shorthand and its full credential and must acknowledge saving one of them.
+Only a repository receipt unlocks the success screen and celebration. Returning
+participants use either credential to hydrate the stored canonical trajectory.
+In interactive test mode the same envelope is written to the shared physical,
+schema-neutral `protohack_ProbeTestSubmissions` Notion data source, while
+production routes the identical envelope to the configured production
+repository. The process-local implementation remains available for unit tests.
 
 After integration, a separate coordination step asks only:
 

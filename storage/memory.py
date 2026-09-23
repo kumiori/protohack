@@ -36,6 +36,43 @@ class InMemoryRepository:
             value = self._probe_trajectories.get(participation_id)
             return deepcopy(value) if value else None
 
+    def list_probe_trajectories(
+        self, event_id: str, probe_id: str
+    ) -> list[dict[str, Any]]:
+        with self._lock:
+            return [
+                deepcopy(row)
+                for row in self._probe_trajectories.values()
+                if str(row.get("event_id") or row.get("scope_id") or "") == event_id
+                and str(row.get("probe_id") or "") == probe_id
+            ]
+
+    def find_probe_trajectories_by_access_selector(
+        self, access_code_selector: str
+    ) -> list[dict[str, Any]]:
+        with self._lock:
+            return [
+                deepcopy(row)
+                for row in self._probe_trajectories.values()
+                if str(row.get("access_code_selector") or "") == access_code_selector
+            ]
+
+    def discard_probe_trajectories(
+        self, event_id: str, probe_id: str, *, batch_id: str | None = None
+    ) -> int:
+        with self._lock:
+            keys = [
+                key
+                for key, row in self._probe_trajectories.items()
+                if str(row.get("environment") or "") == "test"
+                and str(row.get("event_id") or row.get("scope_id") or "") == event_id
+                and str(row.get("probe_id") or "") == probe_id
+                and (batch_id is None or str(row.get("batch_id") or "") == batch_id)
+            ]
+            for key in keys:
+                del self._probe_trajectories[key]
+            return len(keys)
+
     def create_shared_goal(self, goal: dict[str, Any]) -> dict[str, Any]:
         goal_id = str(goal["goal_id"])
         with self._lock:
