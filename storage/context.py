@@ -25,16 +25,17 @@ def notion_token() -> str:
     """Return the configured Notion integration credential.
 
     ``notion.api_key`` is the established secret name in this application.
-    The Protocol Hack-specific and generic token aliases remain supported for
-    environment-specific deployments.
+    Protocol Hack-specific overrides remain supported.  The generic
+    ``NOTION_TOKEN`` alias is intentionally last so a stale root-level
+    Streamlit secret cannot shadow the app's configured integration.
     """
 
     return (
         os.getenv("PROTOHACK_NOTION_TOKEN", "").strip()
-        or os.getenv("NOTION_TOKEN", "").strip()
         or _secret("notion", "protohack_token")
-        or _secret("notion", "token")
         or _secret("notion", "api_key")
+        or _secret("notion", "token")
+        or os.getenv("NOTION_TOKEN", "").strip()
     )
 
 
