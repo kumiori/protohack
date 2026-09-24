@@ -154,6 +154,13 @@ navigation = st.navigation(
                 url_path="test-probe-theme-lab",
             ),
             st.Page(
+                "views/test_probe_smoking_gun.py",
+                title="Notion Smoking Gun",
+                icon="🔫",
+                url_path="test_probe-smoking-gun",
+                visibility="hidden",
+            ),
+            st.Page(
                 "views/test_smokegun.py",
                 title="Smoke gun",
                 icon="🧪",
