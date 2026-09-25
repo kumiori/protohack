@@ -11,7 +11,7 @@ from probe_engine import (
 )
 
 from event_ui import _synthetic_trajectories
-from probe_ui import _persistence_error_diagnostic
+from probe_ui import _commit_skip_attempt, _persistence_error_diagnostic
 from protocol.probe_registry import registered_events, resolve_event, resolve_probe
 from protocol.probe_draft import dump_checkpoint_draft, load_checkpoint_draft
 from protocol.probe_store import ProbeRepositoryStore
@@ -144,7 +144,8 @@ def test_event_surface_wraps_the_generic_probe_adapter() -> None:
     assert "Oui, je commence" in ui_source
     assert "Non, j’ai déjà un code d’accès" in ui_source
     assert "J’ai conservé mon code" in ui_source
-    assert "Copier le code complet" in ui_source
+    assert "Copier le code complet" not in ui_source
+    assert "st.code(full_display" in ui_source
     assert "_render_confetti()" in ui_source
     assert "st.balloons()" not in ui_source
     assert "with st.popover(label" in ui_source
@@ -184,6 +185,19 @@ def test_event_registration_drives_canonical_surface_family() -> None:
     assert initial.results_enabled is True
     assert initial.host_enabled is True
     assert initial.probes[0].probe_id == "montreal_initial_conditions_2026"
+
+
+def test_review_modifier_uses_shared_wider_action_column() -> None:
+    from streamlit.testing.v1 import AppTest
+
+    app = AppTest.from_file(
+        str(ROOT / "tests" / "fixtures" / "probe_review_export_app.py"),
+        default_timeout=10,
+    ).run()
+    columns = app.get("column")
+
+    assert columns
+    assert [column.weight for column in columns] == [0.7, 0.3] * (len(columns) // 2)
 
 
 def test_probe_entry_remains_available_when_submission_repository_is_unhealthy() -> None:
@@ -324,9 +338,25 @@ def test_functions_are_flat_families_while_topics_remain_grouped_expanders() -> 
         "other",
     ]
     assert probe.taxonomy("commons_ai_topics").presentation["groups"] == "expanders"
+    assert probe.taxonomy("commons_ai_topics").presentation["default_state"] == "expanded"
     assert 'taxonomy_presentation.get("groups") == "expanders"' in source
     assert "st.expander(" in source
     assert "group_title" in source
+
+    from streamlit.testing.v1 import AppTest
+
+    app = AppTest.from_file(
+        str(ROOT / "tests" / "fixtures" / "probe_expanders_app.py"),
+        default_timeout=10,
+    ).run()
+    assert not app.exception
+    taxonomy_expanders = [
+        item
+        for item in app.expander
+        if "sélectionné" in item.label or "sélectionnés" in item.label
+    ]
+    assert len(taxonomy_expanders) == 4
+    assert all(item.proto.expanded for item in taxonomy_expanders)
 
 
 def test_collaborator_revision_preserves_identity_and_companion_semantics() -> None:
@@ -445,7 +475,8 @@ def test_canonical_values_survive_checkpoint_restart_and_hydration() -> None:
         "future_conditions": [
             {
                 "id": "condition-1",
-                "action": "Former une coalition",
+                "category": "Formation ou élargissement d’une coalition",
+                "details": "Former une coalition",
                 "actors": ["cultural_institution", "commons_movement"],
             }
         ],
@@ -612,7 +643,7 @@ def test_answer_skip_flag_and_review_revision_remain_distinct_events() -> None:
     ]
 
 
-def test_repeatable_accepts_selected_suggestion_as_the_action_value() -> None:
+def test_repeatable_preserves_selected_category_and_action_details() -> None:
     probe = _probe()
     runtime = ProbeRuntime(
         probe,
@@ -623,7 +654,8 @@ def test_repeatable_accepts_selected_suggestion_as_the_action_value() -> None:
     value = [
         {
             "id": "step-1",
-            "action": "Concertation / consultation",
+            "category": "Concertation / consultation",
+            "details": "Réunir les partenaires autour du protocole.",
             "actors": ["commons_movement"],
         }
     ]
@@ -680,7 +712,8 @@ def test_nested_composed_other_survives_repeatable_answer() -> None:
     value = [
         {
             "id": "step-1",
-            "action": "Concertation / consultation",
+            "category": "Concertation / consultation",
+            "details": "Réunir les partenaires autour du protocole.",
             "actors": {
                 "selected": ["civil_society", "other"],
                 "other": {"value": "Habitant·es du quartier"},
@@ -749,11 +782,112 @@ def test_every_authored_skip_reason_uses_the_canonical_registry() -> None:
     assert "no_option_fits" not in ui_source
 
 
-def test_consent_skip_ends_without_becoming_affirmative_consent() -> None:
+def test_skip_commit_is_safe_for_a_stale_question_reference() -> None:
+    probe = _probe()
+    runtime = ProbeRuntime(probe, participant_id="participant", scope_id="montreal")
+
+    success, diagnostic = _commit_skip_attempt(
+        runtime=runtime,
+        probe=probe,
+        field_id="stale-question-from-prior-rerun",
+        reason_code="prefer_not",
+        note="",
+        current_step_id="participation",
+        rerun_sequence=7,
+    )
+
+    assert success is False
+    assert diagnostic["question_exists"] is False
+    assert diagnostic["success"] is False
+    assert diagnostic["event_count_before"] == diagnostic["event_count_after"] == 0
+
+
+def test_skip_commit_survives_rehydration_for_every_question_and_reason() -> None:
+    probe = _probe()
+    reasons = [option.value for option in probe.resolution.skip_reasons.options]
+    skippable = [
+        question
+        for question in probe.questions
+        if question.skippable and question.visible_if is None
+    ]
+
+    for iteration in range(3):
+        for question in skippable:
+            for reason in reasons:
+                runtime = ProbeRuntime(
+                    probe,
+                    participant_id=f"participant-{iteration}-{question.id}-{reason}",
+                    scope_id="montreal",
+                )
+                runtime = ProbeRuntime.hydrate(
+                    probe,
+                    runtime.trajectory,
+                    participant_id=runtime.trajectory.participation.participant_id,
+                    scope_id="montreal",
+                )
+                success, diagnostic = _commit_skip_attempt(
+                    runtime=runtime,
+                    probe=probe,
+                    field_id=question.id,
+                    reason_code=reason,
+                    note="Motif" if reason == "other" else "",
+                    current_step_id=next(
+                        step.id for step in probe.steps if question.id in step.field_ids
+                    ),
+                    rerun_sequence=iteration + 1,
+                )
+
+                assert success is True
+                assert diagnostic["question_exists"] is True
+                assert diagnostic["event_count_after"] == 1
+                assert len(runtime.trajectory.events) == 1
+
+
+@pytest.mark.parametrize(
+    "reason",
+    ("not_applicable", "dont_know", "prefer_not", "cannot_answer", "other"),
+)
+def test_rendered_skip_dialog_commits_once_across_reruns(reason: str) -> None:
+    from streamlit.testing.v1 import AppTest
+
+    app = AppTest.from_file(
+        str(ROOT / "tests" / "fixtures" / "probe_skip_dialog_app.py"),
+        default_timeout=10,
+    ).run()
+    next(button for button in app.button if button.label == "Passer").click().run()
+    next(
+        radio
+        for radio in app.radio
+        if radio.label == "Pourquoi souhaitez-vous passer ?"
+    ).set_value(reason)
+    app.run()
+    if reason == "other":
+        next(
+            item for item in app.text_input if item.label == "Précisons pourquoi"
+        ).set_value("Motif")
+        app.run()
+    next(
+        button for button in app.button if button.label == "Passer et continuer"
+    ).click().run()
+
+    assert not app.exception
+    state = app.session_state.filtered_state
+    log_key = next(key for key in state if key.startswith("probe_interaction_log_"))
+    attempts = [
+        item
+        for item in state[log_key]
+        if item.get("operation") == "question.skip.commit"
+    ]
+    assert len(attempts) == 1
+    assert attempts[0]["skip_reason"] == reason
+    assert attempts[0]["success"] is True
+    assert attempts[0]["event_count_after"] == attempts[0]["event_count_before"] + 1
+
+
+def test_consent_gate_does_not_offer_generic_skip() -> None:
     probe = _probe()
     consent = probe.question("participation_acknowledgement")
-    assert consent.skippable is True
-    assert consent.skip_action == "end"
+    assert consent.skippable is False
     assert [option.value for option in consent.options] == [
         "accept",
         "decline",
@@ -764,11 +898,18 @@ def test_consent_skip_ends_without_becoming_affirmative_consent() -> None:
         "return_to_information",
     }
     runtime = ProbeRuntime(probe, participant_id="participant", scope_id="montreal")
-    runtime.skip("participation_acknowledgement", reason_codes=["prefer_not"])
-    resolution = runtime.resolution("participation_acknowledgement")
-    assert resolution.state == ResolutionState.SKIPPED
-    assert resolution.event is not None
-    assert resolution.event.value is None
+    with pytest.raises(ProbeRuntimeError):
+        runtime.skip("participation_acknowledgement", reason_codes=["prefer_not"])
+
+    from streamlit.testing.v1 import AppTest
+
+    app = AppTest.from_file(
+        str(ROOT / "tests" / "fixtures" / "probe_new_participant_app.py"),
+        default_timeout=10,
+    ).run()
+    next(button for button in app.button if button.label == "Oui, je commence").click().run()
+    assert not app.exception
+    assert "Passer" not in [button.label for button in app.button]
 
 
 def test_preview_is_side_effect_free_and_equals_the_committed_payload() -> None:

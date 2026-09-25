@@ -95,7 +95,8 @@ trajectory:
       question_revision: 3
       value:
         - id: step-1
-          action: Documenter un protocole
+          category: Cartographie / documentation
+          details: Documenter un protocole
           actors:
             selected: [civil_society]
       reason: ''

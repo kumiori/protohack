@@ -25,3 +25,18 @@ def is_local_runtime() -> bool:
     except Exception:
         hostname = ""
     return hostname in {"", "localhost", "127.0.0.1", "::1"}
+
+
+def developer_sidebar_enabled(query_params: object | None = None) -> bool:
+    """Expose developer diagnostics locally or through an explicit URL opt-in."""
+
+    if is_local_runtime():
+        return True
+    params = st.query_params if query_params is None else query_params
+    try:
+        raw = params.get("developer", "")  # type: ignore[union-attr]
+    except (AttributeError, TypeError):
+        raw = ""
+    if isinstance(raw, (list, tuple)):
+        raw = raw[-1] if raw else ""
+    return str(raw or "").strip().lower() in {"1", "true", "yes", "on"}

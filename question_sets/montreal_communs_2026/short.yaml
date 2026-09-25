@@ -343,7 +343,7 @@ taxonomies:
               label: Autre
         presentation:
             groups: expanders
-            default_state: collapsed
+            default_state: expanded
             show_selected_count: true
             keep_multiple_open: true
     friction_types:
@@ -424,8 +424,7 @@ questions:
                   equals: not_read
               toast: Merci de lire les informations de participation avant de poursuivre.
               scroll_to: participation_information
-      allow_skip: true
-      skip_action: end
+      allow_skip: false
     - step: participation
       field: availability
       id: availability
@@ -838,8 +837,8 @@ questions:
       required: false
       min_items: 0
       fields:
-          - field: action
-            prompt: Étape ou action nécessaire
+          - field: category
+            prompt: Catégorie d’action
             input_type: text_with_suggestions
             required: false
             suggestions:
@@ -860,6 +859,10 @@ questions:
                 - Communication publique
                 - Autre
             suggestion_label: Je peux partir d’une suggestion
+          - field: details
+            prompt: Étape ou action nécessaire
+            input_type: text
+            required: false
             detail_prompt: J’ajoute 1 à 3 détails pour préciser cette étape
             detail_placeholder: Qui ? quoi ? dans quelles conditions ?
             voice_note:

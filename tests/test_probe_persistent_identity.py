@@ -46,6 +46,7 @@ def test_four_emoji_selector_is_copy_safe_and_has_a_verifier() -> None:
 
 def test_full_and_short_credentials_resolve_to_the_same_selector() -> None:
     code = access_code_from_key(ACCESS_KEY)
+    assert len({code.selector, code.emoji, code.full_key}) == 3
     assert resolve_probe_access_input(code.selector) == (code.selector, None)
     assert resolve_probe_access_input(ACCESS_KEY) == (code.selector, code.verifier)
 
@@ -225,6 +226,10 @@ def test_returning_player_keeps_one_credential_across_response_revisions() -> No
     assert len({row["submission_id"] for row in revisions}) == 2
     assert generated == 1
     latest = latest_returning_record(revisions, supplied_verifier=code.verifier)
+    assert latest["player"]["credential"]["emoji"] == code.emoji
+    assert credential_for_player(
+        existing=latest["player"]["credential"], mint=mint
+    ).full_key == code.full_key
     assert latest["submission_id"] != first["submission_id"]
 
     unchanged = ProbeRuntime.hydrate(

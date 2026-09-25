@@ -4,19 +4,19 @@ import streamlit as st
 
 from event_ui import page_for_event
 from protocol.probe_registry import registered_events
-from runtime_environment import is_local_runtime
+from runtime_environment import developer_sidebar_enabled
 from ui import apply_theme, revision_badge
 
 
-LOCAL_RUNTIME = is_local_runtime()
+DEVELOPER_SIDEBAR = developer_sidebar_enabled()
 st.set_page_config(
     page_title="Protocol Laboratory · Commons",
     page_icon="🧬",
     layout="wide",
-    initial_sidebar_state="expanded" if LOCAL_RUNTIME else "collapsed",
+    initial_sidebar_state="expanded" if DEVELOPER_SIDEBAR else "collapsed",
 )
 apply_theme()
-if not LOCAL_RUNTIME:
+if not DEVELOPER_SIDEBAR:
     st.html(
         """
         <style>

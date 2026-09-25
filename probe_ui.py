@@ -10,7 +10,6 @@ from importlib.metadata import version as package_version
 from typing import Any, Mapping
 
 import streamlit as st
-import streamlit.components.v1 as components
 
 from confetti_burst import render_confetti_burst
 from probe_engine import (
@@ -38,9 +37,12 @@ from protocol.probe_access import (
 )
 from protocol.location_lookup import render_location_lookup
 from protocol.probe_store import ProbeRepositoryStore
-from runtime_environment import is_local_runtime
+from runtime_environment import developer_sidebar_enabled
 from storage.base import Repository
 from storage.context import repository_mode
+
+
+REVIEW_COLUMN_WEIGHTS = (7, 3)
 
 
 def _render_probe_entry_gate(
@@ -515,8 +517,12 @@ def _render_repeatable(
         st.markdown(f"**ÉTAPE {index + 1}**")
         updated = {"id": str(row.get("id") or uuid.uuid4().hex)}
         columns = st.columns(2, gap="large")
-        for nested_index, nested in enumerate(field.item_fields):
-            target = columns[nested_index] if nested_index < 2 else st.container()
+        for nested in field.item_fields:
+            target = (
+                columns[1]
+                if nested.input_type == InputType.GROUPED_MULTIPLE
+                else columns[0]
+            )
             with target:
                 updated[nested.id] = _render_field(
                     probe,
@@ -559,6 +565,9 @@ def _render_skip_dialog(
     store: ProbeRepositoryStore,
     trajectory_key: str,
     stage_key: str,
+    current_step_id: str,
+    rerun_sequence: int,
+    interaction_log: list[dict[str, Any]],
 ) -> None:
     open_key = f"probe_skip_dialog_{participation_id}_{field.id}"
     if not st.session_state.get(open_key):
@@ -592,7 +601,23 @@ def _render_skip_dialog(
             disabled=selected is None or (selected == "other" and not note.strip()),
             key=f"probe_skip_confirm_{participation_id}_{field.id}",
         ):
-            runtime.skip(field.id, reason_codes=[str(selected)], note=note)
+            success, diagnostic = _commit_skip_attempt(
+                runtime=runtime,
+                probe=runtime.probe,
+                field_id=field.id,
+                reason_code=str(selected),
+                note=note,
+                current_step_id=current_step_id,
+                rerun_sequence=rerun_sequence,
+            )
+            interaction_log.append(diagnostic)
+            del interaction_log[:-100]
+            if not success:
+                st.error(
+                    "Cette question n’a pas pu être passée. "
+                    "Vos réponses sont intactes; fermez cette fenêtre puis réessayez."
+                )
+                return
             st.session_state[trajectory_key] = runtime.trajectory
             if field.skip_action == "end":
                 st.session_state[stage_key] = "done"
@@ -608,6 +633,60 @@ def _render_skip_dialog(
             st.rerun()
 
     dialog()
+
+
+def _commit_skip_attempt(
+    *,
+    runtime: ProbeRuntime,
+    probe: ProbeDefinition,
+    field_id: str,
+    reason_code: str,
+    note: str,
+    current_step_id: str,
+    rerun_sequence: int,
+) -> tuple[bool, dict[str, Any]]:
+    """Commit one skip without allowing stale UI state to crash the Probe."""
+
+    question_ids = tuple(question.id for question in runtime.probe.questions)
+    event_count_before = len(runtime.trajectory.events)
+    diagnostic: dict[str, Any] = {
+        "operation": "question.skip.commit",
+        "probe_id": probe.id,
+        "probe_revision": probe.revision,
+        "current_step_id": current_step_id,
+        "field_id": field_id,
+        "question_id": field_id,
+        "skip_reason": reason_code,
+        "trajectory_revision": runtime.trajectory.participation.probe_revision,
+        "event_count_before": event_count_before,
+        "question_exists": field_id in question_ids,
+        "runtime_question_ids": list(question_ids),
+        "session_rerun_sequence": rerun_sequence,
+    }
+    if not diagnostic["question_exists"]:
+        diagnostic.update(
+            success=False,
+            event_count_after=event_count_before,
+            error_type="StaleQuestionReference",
+        )
+        return False, diagnostic
+    try:
+        runtime.skip(field_id, reason_codes=[reason_code], note=note)
+    except Exception as exc:
+        diagnostic.update(
+            success=False,
+            event_count_after=len(runtime.trajectory.events),
+            error_type=type(exc).__name__,
+        )
+        return False, diagnostic
+    event_count_after = len(runtime.trajectory.events)
+    success = event_count_after == event_count_before + 1
+    diagnostic.update(
+        success=success,
+        event_count_after=event_count_after,
+        error_type="" if success else "UnexpectedSkipEventCount",
+    )
+    return success, diagnostic
 
 
 def _is_subordinate(field: QuestionDefinition) -> bool:
@@ -910,17 +989,20 @@ def _review_value(probe: ProbeDefinition, field: QuestionDefinition, value: Any)
                 if isinstance(actor_value, Mapping)
                 else actor_value
             )
-            actors = " → ".join(
-                actor_labels.get(actor, actor) for actor in actor_selected
-            )
+            actors = [actor_labels.get(actor, actor) for actor in actor_selected]
             if isinstance(actor_value, Mapping):
                 other_text = str(
                     ((actor_value.get("other") or {}).get("value") or "")
                 ).strip()
                 if other_text:
-                    actors = " → ".join(part for part in (actors, other_text) if part)
-            lines.append(f"{item.get('action', '')} → {actors}")
-        return "\n".join(lines)
+                    actors.append(other_text)
+            row_lines = [
+                str(item.get("category") or "").strip(),
+                str(item.get("details") or "").strip(),
+                *(f"→ {actor}" for actor in actors if actor),
+            ]
+            lines.append("\n".join(part for part in row_lines if part))
+        return "\n\n".join(lines)
     if field.input_type == InputType.LOCATION and isinstance(value, Mapping):
         return str(value.get("display_label") or "—")
     if isinstance(value, Mapping) and "selected" in value:
@@ -954,6 +1036,7 @@ def _sidebar_debug(
     test_mode: bool,
     hydrated: bool,
     persistence_log: list[dict[str, Any]],
+    interaction_log: list[dict[str, Any]],
     backend: str,
 ) -> None:
     answers = _answers(runtime)
@@ -1167,6 +1250,18 @@ def _sidebar_debug(
             label = f"{event.timestamp} · {event.kind.value} · {event.question_id or 'process'}"
             with st.expander(label):
                 st.json(payload)
+    with st.sidebar.expander("Developer · Interaction event log", expanded=False):
+        st.caption("No personal answer content is recorded.")
+        if not interaction_log:
+            st.caption("No interaction diagnostics yet.")
+        for item in reversed(interaction_log):
+            status = "OK" if item.get("success") else "FAILED"
+            label = (
+                f"rerun {item.get('session_rerun_sequence')} · "
+                f"{item.get('operation')} · {item.get('question_id')} · {status}"
+            )
+            with st.expander(label):
+                st.json(item)
     with st.sidebar.expander("Developer · Boundaries", expanded=False):
         st.markdown("Protocol Hack ↔ Probe Engine: canonical trajectory events")
         st.markdown("Protocol Hack ↔ persistence: instrumented adapter operations")
@@ -1403,7 +1498,7 @@ def _render_checkpoint_surface(
                 if item.value is None and not item.state.startswith("skipped"):
                     continue
                 field = probe.question(field_id)
-                answer_column, edit_column = st.columns([8, 2])
+                answer_column, edit_column = st.columns(REVIEW_COLUMN_WEIGHTS)
                 with answer_column:
                     st.markdown(f"**{field.prompt}**")
                     st.text(
@@ -1460,6 +1555,11 @@ def render_registered_probe(
     st.session_state[participation_key] = participation_id
     persistence_key = f"probe_persistence_log_{participation_id}"
     persistence_log = st.session_state.setdefault(persistence_key, [])
+    interaction_key = f"probe_interaction_log_{participation_id}"
+    interaction_log = st.session_state.setdefault(interaction_key, [])
+    rerun_key = f"probe_rerun_sequence_{participation_id}"
+    rerun_sequence = int(st.session_state.get(rerun_key, 0)) + 1
+    st.session_state[rerun_key] = rerun_sequence
 
     def record_persistence(item: dict[str, Any]) -> None:
         persistence_log.append(item)
@@ -1557,9 +1657,10 @@ def render_registered_probe(
         test_mode=test_mode,
         hydrated=hydrated,
         persistence_log=persistence_log,
+        interaction_log=interaction_log,
         backend=backend,
     )
-    if test_mode or is_local_runtime():
+    if test_mode or developer_sidebar_enabled():
         _sidebar_probe_state_transfer(
             probe=probe,
             runtime=runtime,
@@ -1648,7 +1749,7 @@ def render_registered_probe(
                     continue
                 with st.container(border=True):
                     answer_column, edit_column = st.columns(
-                        [8, 2], gap="small", vertical_alignment="center"
+                        REVIEW_COLUMN_WEIGHTS, gap="small", vertical_alignment="center"
                     )
                     with answer_column:
                         st.markdown(f"**{field.prompt}**")
@@ -1702,6 +1803,7 @@ def render_registered_probe(
             ),
         )
         st.session_state[credential_state_key] = {
+            "full_key": prepared_access.full_key,
             "emoji": prepared_access.emoji,
             "selector": prepared_access.selector,
             "selector_6": prepared_access.selector_6,
@@ -1804,7 +1906,7 @@ def render_registered_probe(
         @st.dialog("Votre code d’accès")
         def confirm_integration() -> None:
             code = prepared_access
-            full_display = code.emoji
+            full_display = code.full_key
             st.write(
                 "Conservez l’un de ces codes. Il vous permettra de retrouver vos réponses."
             )
@@ -1816,17 +1918,6 @@ def render_registered_probe(
             )
             st.markdown("**Code complet**")
             st.code(full_display, language=None)
-            components.html(
-                "<button id='copy-full' style='border:1px solid #12211b;"
-                "border-radius:999px;background:#fffdf6;padding:.7rem 1rem;"
-                "font:600 16px Manrope,sans-serif;cursor:pointer'>"
-                "Copier le code complet</button><span id='copy-status' "
-                "style='margin-left:.7rem;font:14px Manrope,sans-serif'></span>"
-                f"<script>document.getElementById('copy-full').onclick=async()=>{{"
-                f"await navigator.clipboard.writeText({json.dumps(full_display)});"
-                "document.getElementById('copy-status').textContent='Copié';}}</script>",
-                height=58,
-            )
             st.write(
                 "Prenez une capture d’écran, notez votre code court ou copiez le code "
                 "complet dans un endroit sûr."
@@ -2001,6 +2092,9 @@ def render_registered_probe(
                 store=draft_store,
                 trajectory_key=trajectory_key,
                 stage_key=stage_key,
+                current_step_id=step.id,
+                rerun_sequence=rerun_sequence,
+                interaction_log=interaction_log,
             )
 
     if single_question_step and visible_fields:
@@ -2046,6 +2140,9 @@ def render_registered_probe(
             store=draft_store,
             trajectory_key=trajectory_key,
             stage_key=stage_key,
+            current_step_id=step.id,
+            rerun_sequence=rerun_sequence,
+            interaction_log=interaction_log,
         )
     else:
         unresolved = [

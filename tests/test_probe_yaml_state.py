@@ -7,6 +7,8 @@ from streamlit.runtime.uploaded_file_manager import UploadedFile, UploadedFileRe
 
 from protocol.probe_draft import dump_probe_state, inspect_probe_state, load_probe_state
 from protocol.probe_registry import resolve_probe
+from protocol.probe_store import ProbeRepositoryStore
+from storage.memory import InMemoryRepository
 from pathlib import Path
 
 
@@ -61,7 +63,8 @@ def test_complete_yaml_state_round_trip_is_semantically_lossless() -> None:
         [
             {
                 "id": "step-1",
-                "action": "Documenter un protocole",
+                "category": "Cartographie / documentation",
+                "details": "Documenter un protocole",
                 "actors": {"selected": ["civil_society"]},
             }
         ],
@@ -187,6 +190,133 @@ def test_partial_yaml_upload_hydrates_canonical_session_without_persistence() ->
     ]
 
 
+def test_repeatable_action_category_details_and_actors_survive_yaml_round_trip() -> None:
+    registration, probe, runtime = _runtime()
+    value = [
+        {
+            "id": "step-semantic-1",
+            "category": "Définition d’un standard ou protocole",
+            "details": "Contacter les partenaires et documenter l’accord.",
+            "actors": ["government", "commons_movement"],
+        }
+    ]
+
+    runtime.answer("future_conditions", value)
+    exported = dump_probe_state(probe, runtime.trajectory)
+    restored = load_probe_state(
+        exported,
+        probe=probe,
+        participant_id="participant",
+        participation_id="participation",
+        expected_scope_id=registration.session_code,
+    )
+    hydrated = ProbeRuntime.hydrate(
+        probe,
+        restored,
+        participant_id="participant",
+        scope_id=registration.session_code,
+    )
+
+    restored_value = {
+        item.question_id: item.value for item in hydrated.review()
+    }["future_conditions"]
+    assert restored_value == value
+    assert yaml.safe_load(exported)["trajectory"]["events"][-1]["value"] == value
+
+    store = ProbeRepositoryStore(
+        InMemoryRepository(),
+        probe=probe,
+        probe_id=probe.id,
+        participant_id="participant",
+        scope_id=registration.session_code,
+    )
+    persistence_envelope = store.submission_payload(
+        runtime.trajectory,
+        integrated=True,
+    )
+    assert persistence_envelope["payload"]["answers"]["future_conditions"] == value
+
+
+def test_repeatable_action_structure_renders_and_hydrates_in_review_editor() -> None:
+    app = AppTest.from_file(str(REVIEW_EXPORT_APP), default_timeout=10).run()
+
+    review_text = next(item.value for item in app.text if "Documenter un protocole" in item.value)
+    assert review_text.splitlines() == [
+        "Cartographie / documentation",
+        "Documenter un protocole",
+        "→ Société civile / communauté / collectif",
+    ]
+
+    next(
+        button
+        for button in app.button
+        if button.key == "probe_review_edit_button_future_conditions"
+    ).click().run()
+
+    assert not app.exception
+    category = next(
+        item
+        for item in app.selectbox
+        if str(item.key).endswith("future_conditions_step-1_category_suggestion")
+    )
+    details = next(
+        item
+        for item in app.text_input
+        if str(item.key).endswith("future_conditions_step-1_details")
+    )
+    actors = next(
+        item
+        for item in app.button_group
+        if str(item.key).endswith("future_conditions_step-1_actors")
+    )
+    assert category.value == "Cartographie / documentation"
+    assert details.value == "Documenter un protocole"
+    assert actors.value == ["civil_society"]
+
+
+def test_repeatable_action_category_survives_actual_montreal_entry() -> None:
+    app = AppTest.from_file(
+        str(ROOT / "tests" / "fixtures" / "probe_repeatable_entry_app.py"),
+        default_timeout=10,
+    ).run()
+    next(button for button in app.button if button.label == "＋ Ajouter une étape").click().run()
+
+    category = next(
+        item
+        for item in app.selectbox
+        if str(item.key).endswith("_category_suggestion")
+    )
+    details = next(
+        item for item in app.text_input if str(item.key).endswith("_details")
+    )
+    actors = next(
+        item for item in app.button_group if str(item.key).endswith("_actors")
+    )
+    category.set_value("Définition d’un standard ou protocole")
+    details.set_value("Contacter les partenaires.")
+    actors.set_value(["government", "commons_movement"])
+    app.run()
+    next(button for button in app.button if button.label == "Continuer").click().run()
+
+    assert not app.exception
+    trajectory = app.session_state[
+        "probe_session_trajectory_repeatable-entry-participation"
+    ]
+    answer = next(
+        event.value
+        for event in reversed(trajectory.events)
+        if event.question_id == "future_conditions" and event.kind.value == "answered"
+    )
+    assert answer == [
+        {
+            "id": answer[0]["id"],
+            "category": "Définition d’un standard ou protocole",
+            "details": "Contacter les partenaires.",
+            "actors": ["government", "commons_movement"],
+        }
+    ]
+
+
 def test_review_surface_renders_full_yaml_download() -> None:
     app = AppTest.from_file(str(REVIEW_EXPORT_APP), default_timeout=10).run()
 
@@ -211,6 +341,13 @@ def test_yaml_review_integration_reveals_credential_only_after_receipt() -> None
     assert receipt["success"] is True
     assert "J’ai conservé mon code" in [item.label for item in app.button]
     assert app.session_state["probe_stage_review-export-participation"] == "review"
+    credential = app.session_state["probe_player_credential_review-export-player"]
+    assert credential["full_key"] in [item.value for item in app.code]
+    assert credential["emoji"] not in [item.value for item in app.code]
+    assert "Copier le code complet" not in [item.label for item in app.button]
+    source = (ROOT / "probe_ui.py").read_text(encoding="utf-8")
+    assert "st.code(full_display" in source
+    assert "components.html" not in source
 
     next(
         button for button in app.button if button.label == "J’ai conservé mon code"

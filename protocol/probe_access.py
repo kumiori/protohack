@@ -45,7 +45,7 @@ def access_code_from_key(full_key: str) -> ProbeAccessCode:
     emoji = access_key_full_emoji(canonical)
     symbols = split_full_emoji(emoji)
     return ProbeAccessCode(
-        full_key=canonical,
+        full_key=canonical.upper(),
         emoji=emoji,
         selector="".join(symbols[-4:]),
         selector_6="".join(symbols[-6:]),
