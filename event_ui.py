@@ -478,10 +478,10 @@ def render_event(event: RegisteredEvent) -> None:
             repository=repository,
         )
         return
-    if not repository_health.available:
-        _render_repository_failure(repository_health, detailed=test_mode)
-        return
     if view == "results":
+        if not repository_health.available:
+            _render_repository_failure(repository_health, detailed=test_mode)
+            return
         _render_results(event, test_mode=test_mode, repository=repository)
         return
     if view != "probe":
@@ -501,6 +501,8 @@ def render_event(event: RegisteredEvent) -> None:
         with st.sidebar.expander("Developer · routing", expanded=True):
             st.exception(exc)
         return
+    if not repository_health.available:
+        _render_repository_failure(repository_health, detailed=test_mode)
     draft_repository = repository if test_mode else _draft_repository(event.id)
     render_registered_probe(
         registration=registration,

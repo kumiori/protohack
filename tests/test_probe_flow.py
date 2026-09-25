@@ -186,6 +186,23 @@ def test_event_registration_drives_canonical_surface_family() -> None:
     assert initial.probes[0].probe_id == "montreal_initial_conditions_2026"
 
 
+def test_probe_entry_remains_available_when_submission_repository_is_unhealthy() -> None:
+    from streamlit.testing.v1 import AppTest
+
+    app_path = ROOT / "tests" / "fixtures" / "probe_unavailable_repository_app.py"
+    app = AppTest.from_file(str(app_path), default_timeout=10).run()
+
+    assert not app.exception
+    assert "Communs de données et IA" in [title.value for title in app.title]
+    assert "Oui, je commence" in [button.label for button in app.button]
+    assert "Non, j’ai déjà un code d’accès" in [button.label for button in app.button]
+
+    next(button for button in app.button if button.label == "Oui, je commence").click().run()
+
+    assert not app.exception
+    assert "Informations sur ma participation" in [title.value for title in app.title]
+
+
 def test_test_results_restore_ephemeral_canonical_generation() -> None:
     source = (ROOT / "event_ui.py").read_text(encoding="utf-8")
     probe = _probe()
