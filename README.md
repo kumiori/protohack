@@ -116,6 +116,8 @@ See [`docs/privacy_contract.md`](docs/privacy_contract.md) for the exact pilot c
 
 ```shell
 .venv/bin/python -m pytest
+NOTION_TOKEN=... .venv/bin/python scripts/bootstrap_protohack_notion.py discover \
+  --parent-page-id 3a58547ffe9a8104b382e2755d13f7c4
 NOTION_TOKEN=... .venv/bin/python scripts/bootstrap_protohack_notion.py verify
 ```
 

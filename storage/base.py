@@ -22,6 +22,10 @@ class Repository(Protocol):
         self, trajectory: dict[str, Any]
     ) -> dict[str, Any]: ...
 
+    def commit_probe_submission(
+        self, envelope: dict[str, Any]
+    ) -> dict[str, Any]: ...
+
     def get_probe_trajectory(
         self, participation_id: str
     ) -> dict[str, Any] | None: ...
@@ -30,8 +34,20 @@ class Repository(Protocol):
         self, event_id: str, probe_id: str
     ) -> list[dict[str, Any]]: ...
 
+    def list_probe_response_audit_rows(self) -> list[dict[str, Any]]: ...
+
+    def export_probe_players(self, page_ids: list[str]) -> list[dict[str, Any]]: ...
+
+    def archive_probe_cleanup(
+        self, response_page_ids: list[str], player_page_ids: list[str]
+    ) -> dict[str, int]: ...
+
     def find_probe_trajectories_by_access_selector(
         self, access_code_selector: str
+    ) -> list[dict[str, Any]]: ...
+
+    def find_probe_trajectories_by_access_verifier(
+        self, access_code_verifier: str
     ) -> list[dict[str, Any]]: ...
 
     def discard_probe_trajectories(

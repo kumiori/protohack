@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from functools import partial
+from datetime import datetime, timezone
 import json
 from typing import Any
 from urllib.parse import urlencode
@@ -18,6 +19,8 @@ from probe_engine import (
 
 from probe_ui import render_registered_probe
 from protocol.probe_registry import RegisteredEvent, resolve_event, resolve_probe
+from protocol.probe_results import audit_probe_submissions
+from protocol.probe_cleanup import plan_probe_cleanup
 from storage import get_repository, repository_mode
 from storage.base import RepositoryHealth
 from storage.context import get_test_repository
@@ -91,14 +94,48 @@ def _render_results(
         with st.expander("Developer · canonical source failure"):
             st.exception(exc)
         return
-    records = repository.list_probe_trajectories(
-        registration.session_code, probe.id
+    physical_rows = repository.list_probe_response_audit_rows()
+    audit = audit_probe_submissions(
+        physical_rows,
+        event_id=registration.session_code,
+        probe_id=probe.id,
     )
+    records = list(audit.included)
     trajectories = tuple(
         trajectory_from_dict(record["trajectory"])
         for record in records
-        if record.get("integrated") and record.get("trajectory")
+        if record.get("trajectory")
     )
+    if test_mode:
+        with st.expander("RESULTS DATA AUDIT", expanded=False):
+            st.json(audit.counts)
+            st.markdown("**Included in representations**")
+            st.dataframe(
+                [
+                    {
+                        "submission_id": row.get("submission_id"),
+                        "player": row.get("player_page_id") or row.get("participant_id"),
+                        "integrated_at": row.get("integrated_at"),
+                        "trajectory_events": len((row.get("trajectory") or {}).get("events") or []),
+                    }
+                    for row in audit.included
+                ],
+                width="stretch",
+                hide_index=True,
+            )
+            st.markdown("**Excluded physical rows**")
+            st.dataframe(
+                [
+                    {
+                        "page_id": row.get("_page_id"),
+                        "name": row.get("name"),
+                        "reason": "; ".join(row.get("exclusion_reasons") or ()),
+                    }
+                    for row in audit.excluded
+                ],
+                width="stretch",
+                hide_index=True,
+            )
     if test_mode:
         generate = st.toggle(
             "Generate ephemeral synthetic test data",
@@ -294,6 +331,7 @@ def _render_host(
     *,
     test_mode: bool,
     repository_health: RepositoryHealth,
+    repository: Any,
 ) -> None:
     st.title(f"{event.title} · Host")
     st.caption("How the event is operating · operational surface")
@@ -313,6 +351,94 @@ def _render_host(
         with st.container(border=True):
             st.markdown(f"**{probe.variant}** · `{probe.probe_id}`")
             st.caption(f"Session namespace: {probe.session_code}")
+    if test_mode and repository_health.available:
+        st.divider()
+        st.subheader("Nettoyer les données de test")
+        st.caption(
+            "Developer-only · preview and export are required before an exact archive. "
+            "No production row or unrelated database is in scope."
+        )
+        registration = resolve_probe(event_slug=event.slug, variant=_variant(event))
+        cutoff = st.text_input(
+            "Archive test/prelaunch records created before",
+            value=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            key=f"cleanup_cutoff_{event.id}_{registration.probe_id}",
+        )
+        plan_key = f"probe_cleanup_plan_{event.id}_{registration.probe_id}"
+        if st.button("Dry-run cleanup scope", type="secondary"):
+            st.session_state[plan_key] = plan_probe_cleanup(
+                repository.list_probe_response_audit_rows(),
+                event_id=registration.session_code,
+                probe_id=registration.probe_id,
+                cutoff=cutoff,
+            )
+        plan = st.session_state.get(plan_key)
+        if plan is not None:
+            counts = st.columns(3)
+            counts[0].metric("Responses", len(plan.responses))
+            counts[1].metric("Players", len(plan.player_page_ids))
+            counts[2].metric("Other databases", 0)
+            st.dataframe(
+                [
+                    {
+                        "response_page_id": row.get("_page_id"),
+                        "submission_id": row.get("submission_id"),
+                        "player_page_id": row.get("player_page_id"),
+                        "created_at": row.get("created_at"),
+                        "environment": row.get("environment"),
+                    }
+                    for row in plan.responses
+                ],
+                hide_index=True,
+                width="stretch",
+            )
+            st.download_button(
+                "Exporter Responses JSON",
+                json.dumps(plan.responses_export(), ensure_ascii=False, indent=2),
+                file_name="probe-responses-before-cleanup.json",
+                mime="application/json",
+            )
+            players = repository.export_probe_players(list(plan.player_page_ids))
+            st.download_button(
+                "Exporter Players JSON",
+                json.dumps(
+                    {"schema": "probe-cleanup-export/v1", "kind": "Players", "records": players},
+                    ensure_ascii=False,
+                    indent=2,
+                ),
+                file_name="probe-players-before-cleanup.json",
+                mime="application/json",
+            )
+            if plan.legacy_candidates:
+                st.warning(
+                    f"{len(plan.legacy_candidates)} legacy candidate(s) lack explicit metadata. "
+                    "They are shown for one-off migration review and are not included in archive."
+                )
+                st.dataframe(
+                    [
+                        {"page_id": row.get("_page_id"), "name": row.get("name"), "created_at": row.get("created_at")}
+                        for row in plan.legacy_candidates
+                    ],
+                    hide_index=True,
+                    width="stretch",
+                )
+            confirmation = st.text_input(
+                "Type ARCHIVE TEST DATA after downloading both exports",
+                key=f"cleanup_confirm_{event.id}_{registration.probe_id}",
+            )
+            if st.button(
+                "Archive exact previewed records",
+                disabled=confirmation != "ARCHIVE TEST DATA" or not plan.responses,
+                type="secondary",
+            ):
+                result = repository.archive_probe_cleanup(
+                    [str(row["_page_id"]) for row in plan.responses],
+                    list(plan.player_page_ids),
+                )
+                st.success(
+                    f"Archived {result['responses']} Responses and {result['players']} Players; other databases: 0."
+                )
+                st.session_state.pop(plan_key, None)
     st.info(
         "Participation totals and coordination controls will appear when the shared "
         "repository exposes event-scoped operational queries."
@@ -349,6 +475,7 @@ def render_event(event: RegisteredEvent) -> None:
             event,
             test_mode=test_mode,
             repository_health=repository_health,
+            repository=repository,
         )
         return
     if not repository_health.available:

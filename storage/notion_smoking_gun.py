@@ -21,9 +21,12 @@ from .notion import DEFAULT_MANIFEST, DEFAULT_NOTION_VERSION, _text, _title_valu
 class SmokingGunTarget:
     environment: str
     source_key: str
+    database: str
+    database_id: str
     data_source_id: str
+    source: str
     repository: str = "Notion"
-    operation: str = "CREATE + READ BACK"
+    operation: str = "CREATE + READ BACK + VALUE MATCH + REVERT"
 
 
 class NotionSmokingGun:
@@ -38,13 +41,18 @@ class NotionSmokingGun:
         notion_version: str = DEFAULT_NOTION_VERSION,
         client: Any | None = None,
     ) -> None:
-        manifest = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
+        resolved_manifest = Path(manifest_path).resolve()
+        manifest = json.loads(resolved_manifest.read_text(encoding="utf-8"))
         normalized = environment.upper()
         source_key = "test_submissions" if normalized == "TEST" else "responses"
+        target = manifest["databases"][source_key]
         self.target = SmokingGunTarget(
             environment=normalized,
             source_key=source_key,
-            data_source_id=str(manifest["databases"][source_key]["data_source_id"]),
+            database=str(target["title"]),
+            database_id=str(target["database_id"]),
+            data_source_id=str(target["data_source_id"]),
+            source=str(resolved_manifest.relative_to(resolved_manifest.parents[1])),
         )
         self.token_configured = bool(token)
         self.token_fingerprint = (
@@ -130,6 +138,9 @@ class NotionSmokingGun:
                 "token_configured": self.token_configured,
                 "token_fingerprint": self.token_fingerprint,
                 "data_source_id": self.target.data_source_id,
+                "database_id": self.target.database_id,
+                "database": self.target.database,
+                "source": self.target.source,
                 "success": True,
             }
         ]
@@ -228,45 +239,80 @@ class NotionSmokingGun:
         )
         return matches
 
-    def archive(self, page_id: str) -> None:
+    def archive(self, page_id: str) -> bool:
         self._operation(
-            "07 DELETE",
-            "archive current smoke page",
+            "08 REVERT",
+            "archive exact smoke page",
             lambda: self.client.pages.update(page_id=page_id, in_trash=True),
             request_fields=["in_trash"],
             request={"in_trash": True},
         )
-        self.last_page_id = ""
+        page = self._operation(
+            "09 VERIFY REVERT",
+            "retrieve exact page and verify archived state",
+            lambda: self.client.pages.retrieve(page_id=page_id),
+        )
+        archived = bool(page.get("in_trash") or page.get("archived"))
+        self.trace[-1].update({"page_id": page_id, "archived": archived})
+        if archived:
+            self.last_page_id = ""
+        return archived
 
     def run_all(self, message: str, *, run_id: str | None = None) -> bool:
         identifier = run_id or uuid.uuid4().hex[:8]
         self.begin_run(identifier)
         self.instantiate_client()
+        value_matches = False
+        reverted = False
+        failure_step = ""
         try:
             self.test_access()
             self.read_schema()
-            prefix = (
-                "SMOKE TEST"
-                if self.target.environment == "TEST"
-                else "SMOKE TEST — SAFE TO DELETE"
-            )
-            name = f"{prefix} {identifier} · {message.strip()}"
+            name = f"SMOKE TEST — {identifier} · {message.strip()}"
             page_id = self.create_record(name)
-            passed = self.read_back(page_id)
+            value_matches = self.read_back(page_id)
+            self.trace.append(
+                {
+                    "step": "07 VALUE MATCH",
+                    "operation": "compare exact written and retrieved title",
+                    "success": value_matches,
+                    "page_id": page_id,
+                }
+            )
         except Exception:
+            failure_step = str(self.trace[-1]["step"])
+
+        if self.last_page_id:
+            try:
+                reverted = self.archive(self.last_page_id)
+            except Exception:
+                failure_step = failure_step or str(self.trace[-1]["step"])
+
+        passed = value_matches and reverted and not failure_step
+        if passed:
             self.trace.append(
                 {
                     "step": "RESULT",
-                    "result": f"FAIL AT {self.trace[-1]['step']}",
-                    "success": False,
+                    "result": f"{self.target.environment} SMOKE TEST: PASS",
+                    "success": True,
+                    "active_record_remains": False,
                 }
             )
-            return False
+            return True
+
+        record_remains = bool(self.last_page_id)
         self.trace.append(
             {
                 "step": "RESULT",
-                "result": "PASS" if passed else "VALUE MISMATCH",
-                "success": passed,
+                "result": (
+                    f"{self.target.environment} SMOKE TEST: PARTIAL FAILURE"
+                    if record_remains
+                    else f"{self.target.environment} SMOKE TEST: FAIL"
+                ),
+                "failure_step": failure_step or "07 VALUE MATCH",
+                "success": False,
+                "active_record_remains": record_remains,
+                "created_record_id": self.last_page_id if record_remains else "",
             }
         )
-        return passed
+        return False

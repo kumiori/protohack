@@ -11,6 +11,8 @@ from typing import Any, Mapping
 
 import streamlit as st
 import streamlit.components.v1 as components
+
+from confetti_burst import render_confetti_burst
 from probe_engine import (
     FieldDefinition,
     InputType,
@@ -22,14 +24,21 @@ from probe_engine import (
 )
 
 from protocol.probe_registry import PROBE_ENGINE_COMMIT, RegisteredProbe
-from protocol.probe_draft import dump_checkpoint_draft
+from protocol.probe_draft import (
+    dump_checkpoint_draft,
+    dump_probe_state,
+    inspect_probe_state,
+    load_probe_state,
+)
 from protocol.probe_access import (
-    access_code_from_key,
+    credential_for_player,
+    latest_returning_record,
     mint_probe_access_code,
     resolve_probe_access_input,
 )
 from protocol.location_lookup import render_location_lookup
 from protocol.probe_store import ProbeRepositoryStore
+from runtime_environment import is_local_runtime
 from storage.base import Repository
 from storage.context import repository_mode
 
@@ -70,6 +79,7 @@ def _render_probe_entry_gate(
             f"{registration.session_code}:{probe.id}:{participant_id}",
         ).hex
         st.session_state[f"probe_new_participant_{participation_id}"] = True
+        st.session_state[f"probe_returning_player_{participant_id}"] = False
         st.session_state[f"probe_stage_{participation_id}"] = "steps"
         st.rerun()
     if returning.button(
@@ -93,30 +103,36 @@ def _render_probe_entry_gate(
             except ValueError as exc:
                 st.warning(str(exc))
                 return None
+            candidates = repository.find_probe_trajectories_by_access_selector(selector)
+            if not candidates and supplied_verifier:
+                candidates = repository.find_probe_trajectories_by_access_verifier(
+                    supplied_verifier
+                )
             matches = [
                 row
-                for row in repository.find_probe_trajectories_by_access_selector(selector)
+                for row in candidates
                 if str(row.get("event_id") or row.get("scope_id") or "")
                 == registration.session_code
                 and str(row.get("probe_id") or "") == probe.id
                 and str(row.get("environment") or "production")
                 == ("test" if test_mode else "production")
-                and (
-                    supplied_verifier is None
-                    or str(row.get("access_code_verifier") or "")
-                    == supplied_verifier
-                )
             ]
-            if len(matches) != 1:
-                st.warning(
-                    "Ce code ne correspond pas à une participation unique dans cet environnement."
+            try:
+                record = latest_returning_record(
+                    matches, supplied_verifier=supplied_verifier
                 )
+            except ValueError as exc:
+                st.warning(str(exc))
             else:
-                record = matches[0]
                 participant_id = str(record["participant_id"])
                 participation_id = str(record["participation_id"])
+                credential = dict(
+                    ((record.get("player") or {}).get("credential") or {})
+                )
                 st.session_state[gate_key] = participant_id
                 st.session_state["participant_uuid"] = participant_id
+                st.session_state[f"probe_returning_player_{participant_id}"] = True
+                st.session_state[f"probe_player_credential_{participant_id}"] = credential
                 st.session_state[
                     f"probe_participation_{registration.session_code}"
                 ] = participation_id
@@ -675,11 +691,38 @@ def _participant_runtime_error(exc: Exception) -> str:
 def _persistence_error_diagnostic(exc: Exception) -> dict[str, Any]:
     """Return safe transport metadata without response bodies or credentials."""
 
-    return {
+    diagnostic = {
         "error_type": type(exc).__name__,
         "error_code": str(getattr(exc, "code", "") or "unknown"),
         "status": int(getattr(exc, "status", 0) or 0),
     }
+    receipt = getattr(exc, "receipt", None)
+    if isinstance(receipt, Mapping):
+        diagnostic.update(
+            {
+                key: receipt.get(key)
+                for key in (
+                    "operation",
+                    "repository",
+                    "target_data_source",
+                    "player_id",
+                    "participation_id",
+                    "submission_id",
+                    "revision",
+                    "phase",
+                    "exception_class",
+                    "notion_status",
+                    "notion_code",
+                    "sanitized_message",
+                    "rollback",
+                    "stages",
+                    "readback_checks",
+                    "readback_detail",
+                )
+                if key in receipt
+            }
+        )
+    return diagnostic
 
 
 def _skip_summary(probe: ProbeDefinition, event: Any) -> str:
@@ -746,32 +789,9 @@ def _render_probe_styles() -> None:
 
 
 def _render_confetti() -> None:
-    """Celebrate a confirmed persistence receipt without using balloons."""
+    """Celebrate a confirmed persistence receipt with a bottom-up burst."""
 
-    components.html(
-        """
-        <style>
-        body{margin:0;overflow:hidden;background:transparent}
-        .c{position:fixed;top:-12px;width:9px;height:16px;opacity:.95;
-           animation:fall 2.8s cubic-bezier(.2,.7,.4,1) forwards}
-        @keyframes fall{to{transform:translate3d(var(--drift),110vh,0) rotate(760deg);opacity:.25}}
-        </style>
-        <div id="confetti"></div>
-        <script>
-        const colors=['#d7ff48','#a993ff','#ff7b61','#b9ead7','#12211b'];
-        const root=document.getElementById('confetti');
-        for(let i=0;i<48;i++){
-          const bit=document.createElement('i'); bit.className='c';
-          bit.style.left=((i*37)%100)+'vw';
-          bit.style.background=colors[i%colors.length];
-          bit.style.animationDelay=((i%12)*.06)+'s';
-          bit.style.setProperty('--drift',(((i%9)-4)*16)+'px');
-          root.appendChild(bit);
-        }
-        </script>
-        """,
-        height=220,
-    )
+    render_confetti_burst("garden", height=520, seed="persistence-receipt")
 
 
 def _render_review_editor(
@@ -1023,7 +1043,7 @@ def _sidebar_debug(
             "draft.hydrate": 1,
             "draft.session.save": 2,
             "sync.arrival": 2,
-            "submission.commit": 2,
+            "submission.commit": 7,
         }.get(str(item.get("operation") or ""), 0)
         for item in persistence_log
         if item.get("success")
@@ -1051,7 +1071,8 @@ def _sidebar_debug(
         "notion_api_requests_so_far": notion_request_count,
         "notion_api_request_count_mode": notion_request_mode,
         "notion_api_request_basis": (
-            "hydrate=1; checkpoint/commit=2 (lookup plus create/update); "
+            "hydrate=1; checkpoint=2; production commit≈7 "
+            "(Player resolve/upsert, Response lookup/write, two read-backs); "
             "access-code collision queries and pagination retries excluded"
         ),
     }
@@ -1173,6 +1194,85 @@ def _sidebar_debug(
         st.warning(
             "Aucun composant GPS navigateur n'existe dans la référence IceIceBaby; "
             "son aide de localisation est une recherche textuelle OpenCage."
+        )
+
+
+def _sidebar_probe_state_transfer(
+    *,
+    probe: ProbeDefinition,
+    runtime: ProbeRuntime,
+    participant_id: str,
+    participation_id: str,
+    scope_id: str,
+    trajectory_key: str,
+    hydrated_key: str,
+    stage_key: str,
+) -> None:
+    """Developer-only YAML interchange over the canonical Trajectory."""
+
+    pending_key = f"probe_state_pending_{participation_id}"
+    with st.sidebar.expander("Developer · Response state", expanded=False):
+        uploaded = st.file_uploader(
+            "Charger des réponses",
+            type=("yaml", "yml"),
+            key=f"probe_state_upload_{participation_id}",
+        )
+        if uploaded is not None:
+            try:
+                raw = uploaded.getvalue().decode("utf-8")
+                diagnostic = inspect_probe_state(raw, probe=probe)
+                restored = load_probe_state(
+                    raw,
+                    probe=probe,
+                    participant_id=participant_id,
+                    participation_id=participation_id,
+                    expected_scope_id=scope_id,
+                )
+            except (UnicodeDecodeError, ValueError, ProbeRuntimeError) as exc:
+                st.session_state.pop(pending_key, None)
+                st.error(str(exc))
+            else:
+                st.session_state[pending_key] = {
+                    "trajectory": restored,
+                    "diagnostic": diagnostic,
+                }
+                st.success("Fichier reconnu")
+                st.code(
+                    "\n".join(
+                        (
+                            f"Probe       {diagnostic['probe_id']}",
+                            f"Revision    {diagnostic['revision']}",
+                            f"Réponses    {diagnostic['answers']}",
+                            f"Passées     {diagnostic['skips']}",
+                            f"Signalées   {diagnostic['flags']}",
+                            "Sections    " + ", ".join(diagnostic["sections"]),
+                        )
+                    ),
+                    language="text",
+                )
+                if diagnostic["revision"] != diagnostic["current_revision"]:
+                    st.warning(
+                        f"Révision source {diagnostic['revision']} → révision courante "
+                        f"{diagnostic['current_revision']} · structure compatible validée."
+                    )
+        pending = st.session_state.get(pending_key)
+        if pending and st.button(
+            "Charger dans la session",
+            type="secondary",
+            key=f"probe_state_apply_{participation_id}",
+        ):
+            st.session_state[trajectory_key] = pending["trajectory"]
+            st.session_state[hydrated_key] = True
+            st.session_state[stage_key] = "steps"
+            st.session_state.pop(pending_key, None)
+            st.rerun()
+        st.markdown("**Télécharger l’état courant**")
+        st.download_button(
+            "Télécharger YAML",
+            data=dump_probe_state(probe, runtime.trajectory),
+            file_name=f"{probe.id}-etat-courant.yaml",
+            mime="application/yaml",
+            key=f"probe_state_download_{participation_id}",
         )
 
 
@@ -1397,6 +1497,7 @@ def render_registered_probe(
     )
     trajectory_key = f"probe_session_trajectory_{participation_id}"
     hydrated_key = f"probe_hydrated_{participation_id}"
+    stage_key = f"probe_stage_{participation_id}"
     session_trajectory = st.session_state.get(trajectory_key)
     if session_trajectory is None:
         new_participant_key = f"probe_new_participant_{participation_id}"
@@ -1458,6 +1559,17 @@ def render_registered_probe(
         persistence_log=persistence_log,
         backend=backend,
     )
+    if test_mode or is_local_runtime():
+        _sidebar_probe_state_transfer(
+            probe=probe,
+            runtime=runtime,
+            participant_id=participant_id,
+            participation_id=participation_id,
+            scope_id=registration.session_code,
+            trajectory_key=trajectory_key,
+            hydrated_key=hydrated_key,
+            stage_key=stage_key,
+        )
     if test_mode:
         st.error("TEST MODE · writes go to the shared test database only")
     elif repository_mode() == "demo":
@@ -1471,7 +1583,6 @@ def render_registered_probe(
         for item in runtime.review()
         if item.state.startswith("answered") or item.state.startswith("skipped")
     }
-    stage_key = f"probe_stage_{participation_id}"
     stage = str(st.session_state.get(stage_key) or "welcome")
     pending_checkpoint_key = f"probe_pending_checkpoint_{participation_id}"
 
@@ -1582,20 +1693,39 @@ def render_registered_probe(
                 trajectory_key=trajectory_key,
             )
         preview_hints = probe.authoring.presentation_hints.get("submission_preview", {})
-        access_key_state = f"probe_access_key_{participation_id}"
-        if access_key_state not in st.session_state:
-            minted = mint_probe_access_code(
+        credential_state_key = f"probe_player_credential_{participant_id}"
+        existing_credential = st.session_state.get(credential_state_key)
+        prepared_access = credential_for_player(
+            existing=existing_credential,
+            mint=lambda: mint_probe_access_code(
                 repository.find_probe_trajectories_by_access_selector
-            )
-            st.session_state[access_key_state] = minted.full_key
-        prepared_access = access_code_from_key(
-            str(st.session_state[access_key_state])
+            ),
         )
+        st.session_state[credential_state_key] = {
+            "emoji": prepared_access.emoji,
+            "selector": prepared_access.selector,
+            "selector_6": prepared_access.selector_6,
+            "verifier": prepared_access.verifier,
+        }
         submission_store.set_access_code(
+            emoji=prepared_access.emoji,
             selector=prepared_access.selector,
+            selector_6=prepared_access.selector_6,
             verifier=prepared_access.verifier,
         )
         prepared = runtime.prepare_finalisation(idempotency_key=participation_id)
+        st.markdown("### Télécharger mes réponses")
+        st.write(
+            "Téléchargez si vous le souhaitez une copie de l’ensemble de vos réponses "
+            "avant de les intégrer."
+        )
+        st.download_button(
+            "Télécharger mes réponses",
+            data=dump_probe_state(probe, prepared),
+            file_name=f"{probe.id}-reponses.yaml",
+            mime="application/yaml",
+            type="secondary",
+        )
         payload = submission_store.preview_payload(
             prepared,
             idempotency_key=participation_id,
@@ -1616,20 +1746,65 @@ def render_registered_probe(
             st.warning(
                 "L’écriture de production exige une authentification Notion configurée."
             )
+        returning_player = bool(
+            st.session_state.get(f"probe_returning_player_{participant_id}")
+        )
+        if returning_player:
+            st.caption("Vous êtes connecté·e avec votre code d’accès existant.")
         integrate_dialog_key = f"probe_integrate_dialog_{participation_id}"
+
+        def commit_integration() -> None:
+            try:
+                runtime.finalise(
+                    submission_store,
+                    idempotency_key=participation_id,
+                    prepared=prepared,
+                )
+            except Exception as exc:
+                diagnostic = _persistence_error_diagnostic(exc)
+                if test_mode:
+                    st.error(
+                        "Shared test repository rejected the submission. "
+                        f"Status: {diagnostic['status'] or 'unknown'} · "
+                        f"Code: {diagnostic['error_code']}"
+                    )
+                else:
+                    st.error(
+                        "Le service d’enregistrement est temporairement "
+                        "indisponible. Veuillez réessayer plus tard."
+                    )
+                with st.sidebar.expander(
+                    "Developer · persistence failure", expanded=False
+                ):
+                    st.code(json.dumps(diagnostic, indent=2), language="json")
+                    st.caption("No credential, token or response body is displayed.")
+                return
+            receipt = submission_store.last_receipt
+            if not receipt or receipt.get("success") is not True:
+                st.error("La base distante n’a pas retourné de reçu de persistance.")
+                return
+            st.session_state[f"probe_submission_receipt_{participation_id}"] = receipt
+            if returning_player:
+                st.session_state[integrate_dialog_key] = False
+                st.session_state[stage_key] = "done"
+            else:
+                # The credential is revealed only after Player + Response have
+                # both passed durable Notion read-back verification.
+                st.session_state[integrate_dialog_key] = True
+            st.rerun()
+
         if st.button(
             "Intégrer mes réponses",
             type="primary",
             width="stretch",
             disabled=not test_mode and repository_mode() != "notion",
         ):
-            st.session_state[integrate_dialog_key] = True
-            st.rerun()
+            commit_integration()
 
         @st.dialog("Votre code d’accès")
         def confirm_integration() -> None:
-            code = access_code_from_key(str(st.session_state[access_key_state]))
-            full_display = code.full_key.upper()
+            code = prepared_access
+            full_display = code.emoji
             st.write(
                 "Conservez l’un de ces codes. Il vous permettra de retrouver vos réponses."
             )
@@ -1657,50 +1832,25 @@ def render_registered_probe(
                 "complet dans un endroit sûr."
             )
             if st.button("J’ai conservé mon code", type="primary", width="stretch"):
-                submission_store.set_access_code(
-                    selector=code.selector,
-                    verifier=code.verifier,
-                )
-                try:
-                    runtime.finalise(
-                        submission_store,
-                        idempotency_key=participation_id,
-                        prepared=prepared,
-                    )
-                except Exception as exc:
-                    diagnostic = _persistence_error_diagnostic(exc)
-                    if test_mode:
-                        st.error(
-                            "Shared test repository rejected the submission. "
-                            f"Status: {diagnostic['status'] or 'unknown'} · "
-                            f"Code: {diagnostic['error_code']}"
-                        )
-                    else:
-                        st.error(
-                            "Le service d’enregistrement est temporairement "
-                            "indisponible. Veuillez réessayer plus tard."
-                        )
-                    with st.sidebar.expander(
-                        "Developer · persistence failure", expanded=False
-                    ):
-                        st.code(
-                            json.dumps(diagnostic, indent=2),
-                            language="json",
-                        )
-                        st.caption("No credential, token or response body is displayed.")
-                    return
-                receipt = submission_store.last_receipt
-                if not receipt or receipt.get("success") is not True:
-                    st.error("La base distante n’a pas retourné de reçu de persistance.")
-                    return
-                st.session_state[
+                receipt = st.session_state.get(
                     f"probe_submission_receipt_{participation_id}"
-                ] = receipt
+                )
+                if not receipt or receipt.get("success") is not True:
+                    st.error(
+                        "Le code ne peut être révélé avant confirmation de la persistance."
+                    )
+                    return
                 st.session_state[integrate_dialog_key] = False
                 st.session_state[stage_key] = "done"
                 st.rerun()
 
-        if st.session_state.get(integrate_dialog_key):
+        if (
+            st.session_state.get(integrate_dialog_key)
+            and st.session_state.get(f"probe_submission_receipt_{participation_id}", {}).get(
+                "success"
+            )
+            is True
+        ):
             confirm_integration()
         return
 

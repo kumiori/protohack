@@ -17,10 +17,12 @@ def test_application_root_renders_home_without_redirecting_to_commons() -> None:
     assert 'class="landing-shell"' in home_source
 
 
-def test_deployed_sidebar_starts_closed_without_a_public_open_control() -> None:
+def test_sidebar_is_local_and_hidden_in_production() -> None:
     app_source = APP_ENTRY.read_text(encoding="utf-8")
 
-    assert 'initial_sidebar_state="collapsed"' in app_source
+    assert 'initial_sidebar_state="expanded" if LOCAL_RUNTIME else "collapsed"' in app_source
+    assert "if not LOCAL_RUNTIME:" in app_source
+    assert 'data-testid="stSidebar"' in app_source
     assert 'data-testid="stSidebarCollapsedControl"' in app_source
 
 

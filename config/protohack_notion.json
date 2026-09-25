@@ -1,69 +1,382 @@
 {
-  "schema_version": "protohack-notion-v4-probe-test-submissions",
+  "schema_version": "protohack-notion-v7-player-credential",
   "prefix": "protohack",
-  "parent_page_id": "3a554516-e9e1-8023-b1f4-ef9fc0cad03c",
-  "parent_page_url": "https://app.notion.com/p/ProtocolHack-3a554516e9e18023b1f4ef9fc0cad03c",
-  "status": "ready",
-  "updated_at": "2026-09-23T09:49:27+00:00",
-  "seed_session": {
-    "session_code": "commons_pilot_2026",
-    "page_id": "3a554516-e9e1-813b-8b18-ef1ea51ea96c"
+  "parent_page_id": "3a58547f-fe9a-8104-b382-e2755d13f7c4",
+  "parent_page_url": "https://app.notion.com/p/Protocol-Hack-3a58547ffe9a8104b382e2755d13f7c4",
+  "parent_title": "Protocol Hack",
+  "status": "discovered",
+  "updated_at": "2026-09-25T13:07:17+00:00",
+  "discovery": {
+    "integration_id": "3c08547f-fe9a-81f2-92c0-0027dcd4c648",
+    "integration_name": "fuckthesystem",
+    "direct_child_database_count": 14
   },
   "databases": {
-    "sessions": {
-      "title": "protohack_Sessions",
-      "database_id": "a3e22243-75ce-4345-b594-53c6587f0baf",
-      "data_source_id": "03542e73-9efd-4c88-abcc-a9c1c48227d0"
-    },
     "statements": {
       "title": "protohack_Statements",
-      "database_id": "19f0138d-c89c-45dc-bee6-341063569200",
-      "data_source_id": "b4bae7e3-5752-417c-b3f7-bc69bf3f0cdd"
+      "database_id": "b1638f8a-d2d6-4597-91a0-dd5d34342d9f",
+      "data_source_id": "6053826c-edee-43b0-9b9e-f52b3c33b75a",
+      "schema": {
+        "property_count": 8,
+        "properties": {
+          "Name": "title",
+          "active": "checkbox",
+          "created_at": "date",
+          "notes": "rich_text",
+          "order": "number",
+          "responses": "relation",
+          "session": "relation",
+          "theme": "select"
+        }
+      }
     },
-    "players": {
-      "title": "protohack_Players",
-      "database_id": "b7c60677-8bdd-45dd-8885-1e14ac139f04",
-      "data_source_id": "365c5005-65e2-4c9b-bfe6-8af338080a10"
+    "sessions": {
+      "title": "protohack_Sessions",
+      "database_id": "f4609909-dd1e-4c51-bc74-7b7bc61be2f6",
+      "data_source_id": "86533166-515e-4a8e-9dc6-76a9e487196c",
+      "schema": {
+        "property_count": 21,
+        "properties": {
+          "active": "checkbox",
+          "created_at": "date",
+          "decisions": "relation",
+          "end": "date",
+          "events": "relation",
+          "mode": "select",
+          "moderation_votes": "relation",
+          "notes": "rich_text",
+          "players": "relation",
+          "questions": "relation",
+          "responses": "relation",
+          "round_index": "number",
+          "session_code": "title",
+          "session_description": "rich_text",
+          "session_name": "rich_text",
+          "session_order": "number",
+          "session_title": "rich_text",
+          "session_visualisation": "rich_text",
+          "start": "date",
+          "statements": "relation",
+          "status": "select"
+        }
+      }
     },
     "responses": {
       "title": "protohack_Responses",
-      "database_id": "172b80f9-73cf-4a7e-94d1-d57ed1015600",
-      "data_source_id": "706687de-eab4-4914-90a0-e05eed29fa7c"
+      "database_id": "67ffe200-2692-448a-845c-0622a0f32381",
+      "data_source_id": "9eee785d-3b00-4dba-a6ce-2b2279dd02ac",
+      "schema": {
+        "property_count": 43,
+        "properties": {
+          "Name": "title",
+          "access_key": "rich_text",
+          "action_id": "rich_text",
+          "created_at": "date",
+          "decision_id": "rich_text",
+          "depth": "number",
+          "device_id": "rich_text",
+          "environment": "select",
+          "event_id": "rich_text",
+          "integrated_at": "date",
+          "integration_status": "select",
+          "item_id": "rich_text",
+          "note": "rich_text",
+          "optional_text": "rich_text",
+          "page_index": "number",
+          "participant_uuid": "rich_text",
+          "participation_id": "rich_text",
+          "player": "relation",
+          "probe_id": "rich_text",
+          "probe_revision": "number",
+          "protocol_version": "rich_text",
+          "question": "relation",
+          "question_id": "rich_text",
+          "question_type": "select",
+          "rationale": "rich_text",
+          "record_type": "select",
+          "response_value": "rich_text",
+          "revision": "number",
+          "scenario_id": "rich_text",
+          "score": "number",
+          "semantic_tags_json": "rich_text",
+          "session": "relation",
+          "statement": "relation",
+          "strategic_profile_json": "rich_text",
+          "submission_id": "rich_text",
+          "submission_state": "select",
+          "submitted_at": "date",
+          "tagger_version": "rich_text",
+          "text_id": "rich_text",
+          "timestamp": "date",
+          "value": "rich_text",
+          "value_json": "rich_text",
+          "value_label": "rich_text"
+        }
+      }
     },
     "questions": {
       "title": "protohack_Questions",
-      "database_id": "ad994a43-a24c-4161-b84a-274a77d60fea",
-      "data_source_id": "aec0bf6b-e300-44ec-bc93-a9bab3f7f6d6"
+      "database_id": "f736145d-6b00-481e-a388-0ac237b08051",
+      "data_source_id": "49ed4739-fa68-4452-8938-54985ed7f477",
+      "schema": {
+        "property_count": 15,
+        "properties": {
+          "Name": "title",
+          "approve_count": "number",
+          "created_at": "date",
+          "domain": "select",
+          "item_id": "rich_text",
+          "last_updated": "date",
+          "metadata_json": "rich_text",
+          "moderation_votes": "relation",
+          "park_count": "number",
+          "question_text": "rich_text",
+          "responses": "relation",
+          "rewrite_count": "number",
+          "session": "relation",
+          "status": "select",
+          "submitted_by": "relation"
+        }
+      }
     },
-    "moderation_votes": {
-      "title": "protohack_ModerationVotes",
-      "database_id": "200a5bc7-3ce0-4153-935b-1426daf9ccc6",
-      "data_source_id": "6f56d474-0c97-4abb-932d-84b3935d26c2"
+    "players": {
+      "title": "protohack_Players",
+      "database_id": "f2b49db9-d1cc-41bc-93b2-2b473ff5be4f",
+      "data_source_id": "d3932ca7-289a-40f1-b30e-1ed839c40f8b",
+      "schema": {
+        "property_count": 41,
+        "properties": {
+          "Name": "title",
+          "access_code_emoji": "rich_text",
+          "access_code_selector": "rich_text",
+          "access_code_selector_6": "rich_text",
+          "access_code_verifier": "rich_text",
+          "access_key": "rich_text",
+          "base_location": "rich_text",
+          "base_location_label": "rich_text",
+          "base_location_lat": "number",
+          "base_location_lon": "number",
+          "base_location_place_id": "rich_text",
+          "consent_research": "checkbox",
+          "consented": "checkbox",
+          "coordination_consent_version": "rich_text",
+          "coordination_consented_at": "date",
+          "coordination_opt_in": "checkbox",
+          "coordination_status": "select",
+          "decisions": "relation",
+          "email": "email",
+          "emoji": "rich_text",
+          "emoji_suffix_4": "rich_text",
+          "emoji_suffix_6": "rich_text",
+          "events": "relation",
+          "institution": "rich_text",
+          "intent": "rich_text",
+          "joined_at": "date",
+          "last_joined_on": "date",
+          "last_seen": "date",
+          "moderation_votes": "relation",
+          "motivation": "rich_text",
+          "nickname": "rich_text",
+          "participant_id": "rich_text",
+          "participant_uuid": "rich_text",
+          "phrase": "rich_text",
+          "preferred_mode": "select",
+          "profile_json": "rich_text",
+          "questions_submitted": "relation",
+          "responses": "relation",
+          "role": "select",
+          "session": "relation",
+          "status": "select"
+        }
+      }
     },
     "decisions": {
       "title": "protohack_Decisions",
-      "database_id": "f687a5a3-fe8e-41e2-b947-933ec874d1e1",
-      "data_source_id": "0beb4991-944a-40ec-b38c-00bb5bfee6a1"
+      "database_id": "90a6c7de-f175-4e2f-90ee-c11a46d50432",
+      "data_source_id": "88da7da1-9efb-48e2-abf6-870cf672adc6",
+      "schema": {
+        "property_count": 6,
+        "properties": {
+          "Name": "title",
+          "created_at": "date",
+          "payload": "rich_text",
+          "player": "relation",
+          "session": "relation",
+          "type": "select"
+        }
+      }
+    },
+    "moderation_votes": {
+      "title": "protohack_ModerationVotes",
+      "database_id": "ff622fc5-3e0e-44a6-805d-f805eaf01357",
+      "data_source_id": "785a1f95-b5d2-4d3b-9fd2-ceec2c7591f6",
+      "schema": {
+        "property_count": 7,
+        "properties": {
+          "Name": "title",
+          "created_at": "date",
+          "note": "rich_text",
+          "question": "relation",
+          "session": "relation",
+          "vote": "select",
+          "voter": "relation"
+        }
+      }
     },
     "events": {
       "title": "protohack_Events",
-      "database_id": "0af0774e-15fa-4250-aaa3-3f9cd491f170",
-      "data_source_id": "db45d224-5e69-4ca3-a11d-5030ea85f50f"
+      "database_id": "5a004304-6c46-47d0-af6c-7ead49c02d27",
+      "data_source_id": "1adb3fd9-81c2-4ccd-a65c-5c983979e3f7",
+      "schema": {
+        "property_count": 11,
+        "properties": {
+          "Name": "title",
+          "device_id": "rich_text",
+          "event_type": "select",
+          "item_id": "rich_text",
+          "metadata_json": "rich_text",
+          "page": "rich_text",
+          "player": "relation",
+          "session": "relation",
+          "status": "select",
+          "timestamp": "date",
+          "value_label": "rich_text"
+        }
+      }
     },
     "goals": {
       "title": "protohack_Goals",
-      "database_id": "627ba3f8-b25c-4950-ae65-3cc73b6e4959",
-      "data_source_id": "a47d75c2-780f-40ad-84ec-ab7e3cdec5ab"
+      "database_id": "7e1cb3f7-a892-457b-af88-aec6cd0811c3",
+      "data_source_id": "c96ebfb9-667f-477d-9776-6b062366e19a",
+      "schema": {
+        "property_count": 9,
+        "properties": {
+          "Name": "title",
+          "contributions": "relation",
+          "created_at": "date",
+          "created_by_agent_id": "rich_text",
+          "goal_id": "rich_text",
+          "objective": "rich_text",
+          "status": "select",
+          "timeline_rooms": "relation",
+          "visibility": "select"
+        }
+      }
     },
     "goal_trajectories": {
       "title": "protohack_GoalTrajectories",
-      "database_id": "fadc56e7-d0c0-4109-b82a-5f0dc10c6c8e",
-      "data_source_id": "e7a7ef37-a601-4a00-898f-891cb24f2ebd"
+      "database_id": "2f961cdb-000c-4229-8343-d1f2c925c933",
+      "data_source_id": "9da6b83b-d8b3-4c5d-9348-1175d872b19e",
+      "schema": {
+        "property_count": 14,
+        "properties": {
+          "Name": "title",
+          "agent_display_name": "rich_text",
+          "agent_id": "rich_text",
+          "agent_type": "select",
+          "created_at": "date",
+          "goal": "relation",
+          "revision": "number",
+          "schema_version": "rich_text",
+          "source": "select",
+          "status": "select",
+          "title": "rich_text",
+          "trajectory_id": "rich_text",
+          "trajectory_payload": "rich_text",
+          "updated_at": "date"
+        }
+      }
+    },
+    "timeline_rooms": {
+      "title": "protohack_TimelineRooms",
+      "database_id": "e78ef08b-d18b-44e9-a0af-d0e1b0c7effb",
+      "data_source_id": "a821cdac-3e89-4037-8216-a6c74e531c46",
+      "schema": {
+        "property_count": 10,
+        "properties": {
+          "Name": "title",
+          "created_at": "date",
+          "created_by_agent_id": "rich_text",
+          "events": "relation",
+          "goal": "relation",
+          "members": "relation",
+          "revision": "number",
+          "room_id": "rich_text",
+          "status": "select",
+          "updated_at": "date"
+        }
+      }
+    },
+    "timeline_members": {
+      "title": "protohack_TimelineMembers",
+      "database_id": "a22e9821-04a8-4380-a0b3-3b2934229f2a",
+      "data_source_id": "b65a15bc-61c9-4c74-8b08-5d4e4c7a3de2",
+      "schema": {
+        "property_count": 9,
+        "properties": {
+          "Name": "title",
+          "display_name": "rich_text",
+          "joined_at": "date",
+          "last_acknowledged_revision": "number",
+          "last_seen_at": "date",
+          "member_id": "rich_text",
+          "role": "select",
+          "room": "relation",
+          "status": "select"
+        }
+      }
+    },
+    "timeline_events": {
+      "title": "protohack_TimelineEvents",
+      "database_id": "2e1db302-6747-4b94-8eb8-0205180aefc6",
+      "data_source_id": "32fef91a-7b8b-44b7-bb79-5dffea969a33",
+      "schema": {
+        "property_count": 11,
+        "properties": {
+          "Name": "title",
+          "actor_id": "rich_text",
+          "base_revision": "number",
+          "created_at": "date",
+          "event_id": "rich_text",
+          "event_type": "select",
+          "payload_json": "rich_text",
+          "resulting_revision": "number",
+          "room": "relation",
+          "sequence": "number",
+          "status": "select"
+        }
+      }
     },
     "test_submissions": {
       "title": "protohack_ProbeTestSubmissions",
       "database_id": "08c9605c-a8f8-4362-bf66-37beed133042",
-      "data_source_id": "5559d76a-d0b2-4c9b-8115-6c4ad1ee97f9"
+      "data_source_id": "5559d76a-d0b2-4c9b-8115-6c4ad1ee97f9",
+      "schema": {
+        "property_count": 16,
+        "properties": {
+          "Name": "title",
+          "access_code_selector": "rich_text",
+          "access_code_verifier": "rich_text",
+          "batch_id": "rich_text",
+          "created_at": "date",
+          "environment": "select",
+          "event_id": "rich_text",
+          "participant_id": "rich_text",
+          "participation_id": "rich_text",
+          "payload": "rich_text",
+          "probe_id": "rich_text",
+          "probe_revision": "number",
+          "receipt_metadata": "rich_text",
+          "state": "select",
+          "submission_id": "rich_text",
+          "updated_at": "date"
+        }
+      }
     }
+  },
+  "seed_session": {
+    "session_code": "commons_pilot_2026",
+    "page_id": "3a58547f-fe9a-81d4-ba53-cc8c5b0ed925",
+    "page_url": "https://app.notion.com/p/commons_pilot_2026-3a58547ffe9a81d4ba53cc8c5b0ed925"
   }
 }

@@ -19,8 +19,16 @@ def _manifest(tmp_path: Path) -> Path:
         json.dumps(
             {
                 "databases": {
-                    "test_submissions": {"data_source_id": "source-test"},
-                    "responses": {"data_source_id": "source-production"},
+                    "test_submissions": {
+                        "title": "protohack_ProbeTestSubmissions",
+                        "database_id": "database-test",
+                        "data_source_id": "source-test",
+                    },
+                    "responses": {
+                        "title": "protohack_Responses",
+                        "database_id": "database-production",
+                        "data_source_id": "source-production",
+                    },
                 }
             }
         ),
@@ -76,6 +84,7 @@ class FakePages:
 
     def update(self, *, page_id: str, **changes):
         self.updated.append({"page_id": page_id, **changes})
+        self.pages[page_id].update(changes)
         return self.pages[page_id]
 
 
@@ -103,9 +112,13 @@ def test_smoking_gun_uses_only_title_then_reads_exact_value(tmp_path: Path) -> N
         "data_source_id": "source-test",
     }
     assert set(created["properties"]) == {"Name"}
-    assert gun.last_page_id == "smoke-page"
-    assert gun.trace[-2]["value_matches"] is True
-    assert gun.trace[-1] == {"step": "RESULT", "result": "PASS", "success": True}
+    assert gun.last_page_id == ""
+    assert next(entry for entry in gun.trace if entry["step"] == "06 READ BACK")[
+        "value_matches"
+    ] is True
+    assert gun.trace[-1]["result"] == "TEST SMOKE TEST: PASS"
+    assert gun.trace[-1]["active_record_remains"] is False
+    assert client.pages.updated == [{"page_id": "smoke-page", "in_trash": True}]
     assert "secret-token" not in json.dumps(gun.trace)
 
 
@@ -117,17 +130,31 @@ def test_delete_archives_only_current_smoke_page(tmp_path: Path) -> None:
         manifest_path=_manifest(tmp_path),
         client=client,
     )
-    gun.run_all("message", run_id="8f13")
-
-    gun.archive(gun.last_page_id)
+    gun.begin_run("8f13")
+    gun.read_schema()
+    page_id = gun.create_record("SMOKE TEST — 8f13")
+    assert gun.archive(page_id) is True
 
     assert client.pages.updated == [{"page_id": "smoke-page", "in_trash": True}]
 
 
-def test_smoking_gun_page_is_hidden_and_defaults_to_test() -> None:
+def test_target_metadata_comes_from_the_shared_manifest(tmp_path: Path) -> None:
+    gun = NotionSmokingGun(
+        token="secret-token",
+        environment="PRODUCTION",
+        manifest_path=_manifest(tmp_path),
+        client=FakeClient(),
+    )
+
+    assert gun.target.database == "protohack_Responses"
+    assert gun.target.database_id == "database-production"
+    assert gun.target.data_source_id == "source-production"
+
+
+def test_smoking_gun_page_is_visible_and_defaults_to_test() -> None:
     source = APP.read_text(encoding="utf-8")
     assert 'url_path="test_probe-smoking-gun"' in source
-    assert 'visibility="hidden"' in source
+    assert 'visibility="hidden"' not in source
 
     app = AppTest.from_file(str(VIEW), default_timeout=10).run()
 

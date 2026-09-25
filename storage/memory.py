@@ -35,15 +35,60 @@ class InMemoryRepository:
         self, trajectory: dict[str, Any]
     ) -> dict[str, Any]:
         participation_id = str(trajectory["participation_id"])
+        storage_key = (
+            f"submission:{trajectory['submission_id']}"
+            if trajectory.get("integrated") and trajectory.get("submission_id")
+            else f"draft:{participation_id}"
+        )
         with self._lock:
-            self._probe_trajectories[participation_id] = deepcopy(trajectory)
-            return deepcopy(self._probe_trajectories[participation_id])
+            self._probe_trajectories[storage_key] = deepcopy(trajectory)
+            return deepcopy(self._probe_trajectories[storage_key])
+
+    def commit_probe_submission(self, envelope: dict[str, Any]) -> dict[str, Any]:
+        submission_id = str(envelope.get("submission_id") or "")
+        key = f"submission:{submission_id}"
+        with self._lock:
+            existing = self._probe_trajectories.get(key)
+            if existing is not None:
+                stored = deepcopy(existing)
+            else:
+                revisions = [
+                    int(row.get("revision") or 0)
+                    for row in self._probe_trajectories.values()
+                    if str(row.get("participant_id") or "")
+                    == str(envelope.get("participant_id") or "")
+                    and str(row.get("probe_id") or "")
+                    == str(envelope.get("probe_id") or "")
+                    and row.get("integrated")
+                ]
+                stored = {**deepcopy(envelope), "revision": max(revisions or [0]) + 1}
+                self._probe_trajectories[key] = deepcopy(stored)
+        return {
+            **stored,
+            "committed": True,
+            "stages": {
+                "player_resolve_upsert": True,
+                "player_identity_persisted": True,
+                "response_persisted": True,
+                "response_player_relation": True,
+                "read_back_verified": True,
+            },
+        }
 
     def get_probe_trajectory(
         self, participation_id: str
     ) -> dict[str, Any] | None:
         with self._lock:
-            value = self._probe_trajectories.get(participation_id)
+            candidates = [
+                value
+                for value in self._probe_trajectories.values()
+                if str(value.get("participation_id") or "") == participation_id
+            ]
+            value = max(
+                candidates,
+                key=lambda item: str(item.get("integrated_at") or item.get("updated_at") or ""),
+                default=None,
+            )
             return deepcopy(value) if value else None
 
     def list_probe_trajectories(
@@ -64,8 +109,51 @@ class InMemoryRepository:
             return [
                 deepcopy(row)
                 for row in self._probe_trajectories.values()
-                if str(row.get("access_code_selector") or "") == access_code_selector
+                if str(
+                    ((row.get("player") or {}).get("credential") or {}).get("selector")
+                    or row.get("access_code_selector")
+                    or ""
+                ) == access_code_selector
             ]
+
+    def find_probe_trajectories_by_access_verifier(
+        self, access_code_verifier: str
+    ) -> list[dict[str, Any]]:
+        with self._lock:
+            return [
+                deepcopy(row)
+                for row in self._probe_trajectories.values()
+                if str(
+                    ((row.get("player") or {}).get("credential") or {}).get("verifier")
+                    or row.get("access_code_verifier")
+                    or ""
+                ) == access_code_verifier
+            ]
+
+    def list_probe_response_audit_rows(self) -> list[dict[str, Any]]:
+        with self._lock:
+            rows = []
+            for value in self._probe_trajectories.values():
+                row = deepcopy(value)
+                row["player_page_id"] = str(row.get("participant_id") or "")
+                rows.append(row)
+            return rows
+
+    def export_probe_players(self, page_ids: list[str]) -> list[dict[str, Any]]:
+        return []
+
+    def archive_probe_cleanup(
+        self, response_page_ids: list[str], player_page_ids: list[str]
+    ) -> dict[str, int]:
+        targets = set(response_page_ids)
+        with self._lock:
+            keys = [
+                key for key, row in self._probe_trajectories.items()
+                if str(row.get("_page_id") or key) in targets
+            ]
+            for key in keys:
+                del self._probe_trajectories[key]
+        return {"responses": len(keys), "players": 0, "other": 0}
 
     def discard_probe_trajectories(
         self, event_id: str, probe_id: str, *, batch_id: str | None = None

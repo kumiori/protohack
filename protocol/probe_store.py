@@ -4,12 +4,103 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import datetime, timezone
+import hashlib
+import json
 from time import perf_counter
 from typing import Any
 
 from probe_engine import ProbeDefinition, ProbeRuntime, Trajectory, trajectory_from_dict
 
 from storage.base import Repository
+from .probe_results import assert_integrated_submission
+
+
+PARTICIPATION_SPECIFIC_PROFILE_FIELDS = {"participation_position"}
+
+
+def split_persistence_payload(
+    *,
+    participant_id: str,
+    identity_answers: dict[str, Any],
+    substantive_answers: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Separate stable person/profile data from event-specific responses."""
+
+    identity = dict(identity_answers)
+    responses = dict(substantive_answers)
+    for field_id in PARTICIPATION_SPECIFIC_PROFILE_FIELDS:
+        if field_id in identity:
+            responses[field_id] = identity.pop(field_id)
+    player = {
+        "participant_id": participant_id,
+        "name": identity.pop("name", None),
+        "email": identity.pop("email", None),
+        "institution": identity.pop("organisation_name", None),
+        "base_location": identity.pop("base_location", None),
+        "profile_answers": identity,
+    }
+    return player, responses
+
+
+def migrate_legacy_submission_envelope(
+    envelope: dict[str, Any],
+) -> dict[str, Any]:
+    """Convert one pre-Player Probe envelope without changing its identity."""
+
+    legacy = dict(envelope)
+    identity = dict(legacy.pop("identity", None) or {})
+    existing_player = dict(legacy.get("player") or {})
+    if identity:
+        player, migrated_responses = split_persistence_payload(
+            participant_id=str(legacy["participant_id"]),
+            identity_answers=identity,
+            substantive_answers=dict(legacy.get("responses") or {}),
+        )
+        stable_identity_fields = set(identity) - PARTICIPATION_SPECIFIC_PROFILE_FIELDS
+    else:
+        player = existing_player
+        migrated_responses = dict(legacy.get("responses") or {})
+        stable_identity_fields = {
+            str(field_id) for field_id in (player.get("answer_field_ids") or [])
+        }
+        if not stable_identity_fields:
+            stable_identity_fields = {
+                "name",
+                "email",
+                "base_location",
+                "sectors",
+                "functions",
+                "organisation_name",
+                "organisation_size",
+                "organisation_territory",
+            }
+    trajectory_events = list((legacy.get("trajectory") or {}).get("events") or [])
+    present_identity_fields = {
+        str(event.get("question_id") or "")
+        for event in trajectory_events
+        if str(event.get("question_id") or "") in stable_identity_fields
+    }
+    player["answer_field_ids"] = sorted(present_identity_fields)
+    player["trajectory_events"] = [
+        event
+        for event in trajectory_events
+        if str(event.get("question_id") or "") in present_identity_fields
+    ]
+    legacy["player"] = player
+    legacy["responses"] = migrated_responses
+    payload = dict(legacy.get("payload") or {})
+    payload.pop("identity", None)
+    answers = dict(payload.get("answers") or {})
+    answers.update(
+        {
+            key: value
+            for key, value in migrated_responses.items()
+            if key in PARTICIPATION_SPECIFIC_PROFILE_FIELDS
+        }
+    )
+    payload["answers"] = answers
+    legacy["payload"] = payload
+    return legacy
 
 
 class ProbeRepositoryStore:
@@ -35,12 +126,18 @@ class ProbeRepositoryStore:
         self.target = target
         self.environment = environment
         self.batch_id = batch_id
+        self.access_code_emoji = ""
         self.access_code_selector = ""
+        self.access_code_selector_6 = ""
         self.access_code_verifier = ""
         self.last_receipt: dict[str, Any] | None = None
 
-    def set_access_code(self, *, selector: str, verifier: str) -> None:
+    def set_access_code(
+        self, *, emoji: str, selector: str, selector_6: str, verifier: str
+    ) -> None:
+        self.access_code_emoji = emoji
         self.access_code_selector = selector
+        self.access_code_selector_6 = selector_6
         self.access_code_verifier = verifier
 
     def _communicate(
@@ -68,6 +165,28 @@ class ProbeRepositoryStore:
             return result
         except Exception as exc:
             diagnostic["error"] = type(exc).__name__
+            partial = getattr(exc, "receipt", None)
+            if isinstance(partial, dict):
+                for key in (
+                    "operation",
+                    "repository",
+                    "target_data_source",
+                    "player_id",
+                    "participation_id",
+                    "submission_id",
+                    "revision",
+                    "phase",
+                    "exception_class",
+                    "notion_status",
+                    "notion_code",
+                    "sanitized_message",
+                    "rollback",
+                    "stages",
+                    "readback_checks",
+                    "readback_detail",
+                ):
+                    if key in partial:
+                        diagnostic[key] = partial[key]
             raise
         finally:
             diagnostic["duration_ms"] = round((perf_counter() - started) * 1000, 2)
@@ -120,14 +239,35 @@ class ProbeRepositoryStore:
             integrated=True,
             idempotency_key=idempotency_key,
         )
-        receipt = self._communicate(
-            "submission.commit",
-            trajectory.participation.id,
-            lambda: self.repository.save_probe_trajectory(payload),
-            event_count=len(trajectory.events),
+        commit = getattr(
+            self.repository,
+            "commit_probe_submission",
+            self.repository.save_probe_trajectory,
+        )
+        try:
+            receipt = self._communicate(
+                "submission.commit",
+                trajectory.participation.id,
+                lambda: commit(payload),
+                event_count=len(trajectory.events),
+            )
+        except Exception as exc:
+            partial = getattr(exc, "receipt", None)
+            self.last_receipt = {
+                "success": False,
+                "record_identity": trajectory.participation.id,
+                "repository_result": dict(partial or {}),
+            }
+            raise
+        committed = bool(
+            receipt is not None
+            and (
+                not isinstance(receipt, dict)
+                or receipt.get("committed", True) is True
+            )
         )
         self.last_receipt = {
-            "success": receipt is not None,
+            "success": committed,
             "record_identity": trajectory.participation.id,
             "repository_result": dict(receipt or {}),
         }
@@ -208,17 +348,51 @@ class ProbeRepositoryStore:
             for item in reviewed
             if item.flags
         }
-        identity = {
+        identity_answers = {
             field_id: answers[field_id]
             for field_id in (self.probe.authoring.profile_fields if self.probe else ())
             if field_id in answers
         }
-        responses = {
+        substantive_answers = {
             field_id: answers[field_id]
             for field_id in (self.probe.authoring.session_fields if self.probe else ())
             if field_id in answers
         }
         submitted_at = str(events[-1].get("timestamp") or "") if events else ""
+        player, responses = split_persistence_payload(
+            participant_id=participation.participant_id,
+            identity_answers=identity_answers,
+            substantive_answers=substantive_answers,
+        )
+        submission_fingerprint = hashlib.blake2s(
+            json.dumps(
+                {
+                    "key": idempotency_key,
+                    "probe_id": participation.probe_id,
+                    "probe_revision": participation.probe_revision,
+                    "answers": responses,
+                    "skips": skips,
+                    "flags": flags,
+                },
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8"),
+            digest_size=16,
+        ).hexdigest()
+        stable_identity_fields = set(identity_answers) - PARTICIPATION_SPECIFIC_PROFILE_FIELDS
+        player["answer_field_ids"] = sorted(stable_identity_fields)
+        player["trajectory_events"] = [
+            event
+            for event in events
+            if str(event.get("question_id") or "") in stable_identity_fields
+        ]
+        player["credential"] = {
+            "emoji": self.access_code_emoji,
+            "selector": self.access_code_selector,
+            "selector_6": self.access_code_selector_6,
+            "verifier": self.access_code_verifier,
+        }
         canonical_payload = {
             "schema": "probe-submission/v1",
             "event_id": self.scope_id,
@@ -228,7 +402,6 @@ class ProbeRepositoryStore:
             "answers": responses,
             "skips": skips,
             "flags": flags,
-            "identity": identity,
             "trajectory": trajectory.to_dict(),
             "submitted_at": submitted_at if integrated else None,
         }
@@ -244,17 +417,19 @@ class ProbeRepositoryStore:
             "probe_id": participation.probe_id,
             "probe_revision": participation.probe_revision,
             "scope_id": participation.scope_id,
-            "submission_id": idempotency_key,
-            "access_code_selector": self.access_code_selector,
-            "access_code_verifier": self.access_code_verifier,
+            "submission_id": submission_fingerprint if integrated else "",
             "state": "submitted" if integrated else "draft",
+            "integrated_at": submitted_at if integrated else None,
+            "revision": 1 if integrated else 0,
             "batch_id": self.batch_id,
             "integrated": integrated,
             "idempotency_key": idempotency_key,
             "trajectory": trajectory.to_dict(),
             "payload": canonical_payload,
             "receipt_metadata": {},
-            "identity": identity,
+            "player": player,
             "responses": responses,
         }
+        if integrated:
+            assert_integrated_submission(record, require_player=False)
         return record

@@ -97,6 +97,7 @@ with st.container(border=True):
                 "notion_sdk": package_version("notion-client"),
                 "deployment": _deployment(),
                 "target": f"{environment} / {_abbreviate(service.target.data_source_id)}",
+                "manifest": service.target.source,
                 "token_hash": service.token_fingerprint,
             },
             indent=2,
@@ -109,15 +110,18 @@ with st.container(border=True):
     st.code(
         json.dumps(
             {
-                "Environment": service.target.environment,
-                "Integration": str(
+                "environment": service.target.environment,
+                "database": service.target.database,
+                "database_id": service.target.database_id,
+                "data_source_id": service.target.data_source_id,
+                "source": service.target.source,
+                "integration": str(
                     st.session_state.get("notion_smoking_gun_integration")
                     or "fuckthesystem (expected; verified during run)"
                 ),
-                "Data source": service.target.data_source_id,
-                "Repository": service.target.repository,
-                "Operation": service.target.operation,
-                "Token configured": service.token_configured,
+                "repository": service.target.repository,
+                "operation": service.target.operation,
+                "token_configured": service.token_configured,
             },
             indent=2,
         ),
@@ -147,9 +151,22 @@ if st.button(
 
 result = str(st.session_state.get("notion_smoking_gun_result") or "")
 if result == "PASS":
-    st.success("PASS · ACCESS + CREATE + READ BACK + VALUE MATCH")
+    st.success(
+        f"{environment} SMOKE TEST: PASS · ACCESS ✓ · CREATE ✓ · "
+        "READ BACK ✓ · VALUE MATCH ✓ · REVERT ✓\n\n"
+        "No active diagnostic record remains."
+    )
 elif result == "FAIL":
-    st.error("FAIL · inspect the chronological sidebar trace")
+    trace = list(st.session_state.get("notion_smoking_gun_trace") or [])
+    final = trace[-1] if trace else {}
+    remaining = str(final.get("created_record_id") or "")
+    if remaining:
+        st.error(
+            f"{environment} SMOKE TEST: PARTIAL FAILURE\n\n"
+            f"Created record remains: `{remaining}`"
+        )
+    else:
+        st.error(f"{environment} SMOKE TEST: FAIL · inspect the sidebar trace")
 
 st.markdown("### Separate operations")
 access_col, create_col, read_col, delete_col = st.columns(4)
@@ -205,11 +222,11 @@ if read_col.button("Read last created record", disabled=not last_page_id or not 
     _save(service)
     st.rerun()
 
-if delete_col.button("Delete smoke record", disabled=not last_page_id or not same_target):
+if delete_col.button("Revert smoke record", disabled=not last_page_id or not same_target):
     service.begin_run(uuid.uuid4().hex[:8])
     try:
         service.archive(last_page_id)
-        service.trace.append({"step": "RESULT", "result": "DELETE PASS", "success": True})
+        service.trace.append({"step": "RESULT", "result": "REVERT PASS", "success": True})
     except Exception:
         service.trace.append(
             {"step": "RESULT", "result": f"FAIL AT {service.trace[-1]['step']}", "success": False}

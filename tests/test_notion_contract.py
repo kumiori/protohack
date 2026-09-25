@@ -3,6 +3,7 @@ import httpx
 import json
 from pathlib import Path
 
+import pytest
 import storage.notion as notion_module
 from notion_client.errors import APIResponseError
 from scripts.bootstrap_protohack_notion import DATABASES, RELATIONS, SCHEMA_VERSION
@@ -10,6 +11,7 @@ from protocol.shared_goals import build_goal_trajectory
 from protocol.timeline_plan import build_plan_payload
 from protocol.trajectory_schema import build_trajectory_document
 from storage.notion import NotionRepository
+from storage.notion import ProbeSubmissionCommitError
 from storage.notion_debug import GenericNotionDebugRepository
 
 
@@ -104,11 +106,40 @@ class FakePages:
     def create(self, *, parent, properties):
         page = {"id": f"page-{len(self.owner.created) + 1}", "properties": properties}
         self.owner.created.append(deepcopy(page))
+        source = str(parent.get("data_source_id") or "")
+        if source.endswith("players"):
+            self.owner.players.append(page)
+        elif source.endswith("responses"):
+            self.owner.responses.append(page)
         return page
 
     def update(self, *, page_id, **changes):
         self.owner.updated.append({"page_id": page_id, **deepcopy(changes)})
+        for collection in (
+            self.owner.players,
+            self.owner.responses,
+            self.owner.events,
+            self.owner.goals,
+            self.owner.goal_trajectories,
+        ):
+            for page in collection:
+                if page["id"] == page_id:
+                    page["properties"].update(deepcopy(changes.get("properties") or {}))
+                    return page
         return {"id": page_id, "properties": changes.get("properties", {})}
+
+    def retrieve(self, *, page_id):
+        for collection in (
+            self.owner.players,
+            self.owner.responses,
+            self.owner.events,
+            self.owner.goals,
+            self.owner.goal_trajectories,
+        ):
+            for page in collection:
+                if page["id"] == page_id:
+                    return deepcopy(page)
+        raise KeyError(page_id)
 
 
 class FakeClient:
@@ -145,13 +176,20 @@ def _manifest(tmp_path: Path) -> Path:
     return path
 
 
-def test_bootstrap_v2_has_no_strategy_to_contact_relation() -> None:
-    assert SCHEMA_VERSION == "protohack-notion-v4-probe-test-submissions"
-    assert "player" not in RELATIONS["responses"]
+def test_bootstrap_has_explicit_probe_player_relation_and_profile_fields() -> None:
+    assert SCHEMA_VERSION == "protohack-notion-v7-player-credential"
+    assert RELATIONS["responses"]["player"] == ("players", "responses")
     assert "participant_uuid" in DATABASES["responses"]["properties"]
     assert "rationale" in DATABASES["responses"]["properties"]
     assert "participant_uuid" in DATABASES["players"]["properties"]
     assert "coordination_status" in DATABASES["players"]["properties"]
+    assert "participant_id" in DATABASES["players"]["properties"]
+    assert "access_code_selector" in DATABASES["players"]["properties"]
+    assert "access_code_selector_6" in DATABASES["players"]["properties"]
+    assert "access_code_emoji" in DATABASES["players"]["properties"]
+    assert "access_code_verifier" in DATABASES["players"]["properties"]
+    assert "institution" in DATABASES["players"]["properties"]
+    assert "base_location_place_id" in DATABASES["players"]["properties"]
     assert "goals" in DATABASES
     assert "goal_trajectories" in DATABASES
     assert RELATIONS["goal_trajectories"]["goal"] == ("goals", "contributions")
@@ -159,6 +197,8 @@ def test_bootstrap_v2_has_no_strategy_to_contact_relation() -> None:
     assert DATABASES["test_submissions"]["title"] == "protohack_ProbeTestSubmissions"
     assert "payload" in DATABASES["test_submissions"]["properties"]
     assert "access_code_verifier" in DATABASES["test_submissions"]["properties"]
+    assert "record_type" in DATABASES["responses"]["properties"]
+    assert "environment" in DATABASES["responses"]["properties"]
 
 
 def test_shared_trajectory_write_keeps_canonical_payload_in_one_field(
@@ -200,6 +240,185 @@ def test_shared_trajectory_write_keeps_canonical_payload_in_one_field(
     assert "goal_id" not in payload["plan"]
     assert created["goal"] == {"relation": [{"id": "goal-page"}]}
     assert created["revision"] == {"number": 1}
+
+
+def _probe_submission_envelope() -> dict:
+    from protocol.probe_access import access_code_from_key
+
+    credential = access_code_from_key("12345678-1234-5678-1234-567812345678")
+    return {
+        "record_type": "probe_submission",
+        "schema": "probe-submission-envelope/v1",
+        "created_at": "2026-09-24T12:00:00+00:00",
+        "updated_at": "2026-09-24T12:01:00+00:00",
+        "integrated_at": "2026-09-24T12:01:00+00:00",
+        "environment": "production",
+        "event_id": "montreal_communs_2026",
+        "participation_id": "participation-1",
+        "participant_id": PARTICIPANT,
+        "probe_id": "montreal_communs_data_ai_short_2026",
+        "probe_revision": 5,
+        "submission_id": "submission-1",
+        "state": "submitted",
+        "revision": 1,
+        "integrated": True,
+        "trajectory": {
+            "events": [
+                {
+                    "timestamp": "2026-09-24T12:00:30+00:00",
+                    "question_id": "email",
+                    "kind": "answered",
+                    "value": "andres@example.org",
+                },
+                {
+                    "timestamp": "2026-09-24T12:01:00+00:00",
+                    "question_id": "participation_position",
+                    "kind": "answered",
+                    "value": "individual",
+                },
+            ]
+        },
+        "player": {
+            "participant_id": PARTICIPANT,
+            "name": "Andrés",
+            "email": "andres@example.org",
+            "institution": "CNRS",
+            "base_location": {
+                "display_label": "Paris, France",
+                "place_id": "test:paris",
+                "latitude": 48.8566,
+                "longitude": 2.3522,
+            },
+            "profile_answers": {"functions": ["research"]},
+            "answer_field_ids": ["email", "name", "base_location"],
+            "trajectory_events": [
+                {
+                    "timestamp": "2026-09-24T12:00:30+00:00",
+                    "question_id": "email",
+                    "kind": "answered",
+                    "value": "andres@example.org",
+                }
+            ],
+            "credential": {
+                "emoji": credential.emoji,
+                "selector": credential.selector,
+                "selector_6": credential.selector_6,
+                "verifier": credential.verifier,
+            },
+        },
+        "responses": {"participation_position": "individual"},
+        "payload": {
+            "schema": "probe-submission/v1",
+            "answers": {"participation_position": "individual"},
+            "trajectory": {"events": []},
+        },
+    }
+
+
+def test_probe_commit_upserts_player_links_response_and_verifies_readback(
+    monkeypatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(notion_module, "Client", FakeClient)
+    repository = NotionRepository(token="test", manifest_path=_manifest(tmp_path))
+    client = FakeClient.instance
+    assert client is not None
+
+    first = repository.commit_probe_submission(_probe_submission_envelope())
+    second_envelope = _probe_submission_envelope()
+    second_envelope["player"]["institution"] = "CNRS updated"
+    second = repository.commit_probe_submission(second_envelope)
+
+    assert first["committed"] is True
+    assert all(first["stages"].values())
+    assert second["committed"] is True
+    assert len(client.players) == 1
+    assert len(client.responses) == 1
+    player = client.players[0]
+    response = client.responses[0]
+    assert notion_module._rich(player["properties"], "participant_id") == PARTICIPANT
+    assert player["properties"]["email"]["email"] == "andres@example.org"
+    assert notion_module._rich(player["properties"], "institution") == "CNRS updated"
+    credential = _probe_submission_envelope()["player"]["credential"]
+    assert notion_module._rich(player["properties"], "access_code_emoji") == credential["emoji"]
+    assert notion_module._rich(player["properties"], "access_code_selector") == credential["selector"]
+    assert notion_module._rich(player["properties"], "access_code_selector_6") == credential["selector_6"]
+    assert notion_module._rich(player["properties"], "access_code_verifier") == credential["verifier"]
+    assert response["properties"]["player"] == {
+        "relation": [{"id": player["id"]}]
+    }
+    persisted = json.loads(notion_module._rich(response["properties"], "value_json"))
+    assert "player" not in persisted
+    assert "access_code_verifier" not in persisted
+    assert "credential" not in persisted
+    assert "email" not in persisted["payload"]
+    assert {
+        event.get("question_id")
+        for event in persisted["trajectory"]["events"]
+    } == {"participation_position"}
+
+    hydrated = repository.get_probe_trajectory("participation-1")
+    assert hydrated is not None
+    assert {
+        event.get("question_id") for event in hydrated["trajectory"]["events"]
+    } == {"email", "participation_position"}
+
+
+def test_revised_probe_submission_creates_second_response_revision(
+    monkeypatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(notion_module, "Client", FakeClient)
+    repository = NotionRepository(token="test", manifest_path=_manifest(tmp_path))
+    client = FakeClient.instance
+    assert client is not None
+
+    repository.commit_probe_submission(_probe_submission_envelope())
+    revised = _probe_submission_envelope()
+    revised["submission_id"] = "submission-2"
+    revised["integrated_at"] = "2026-09-24T13:00:00+00:00"
+    revised["updated_at"] = revised["integrated_at"]
+    revised["trajectory"]["events"][-1]["timestamp"] = revised["integrated_at"]
+    repository.commit_probe_submission(revised)
+
+    assert len(client.players) == 1
+    assert len(client.responses) == 2
+    assert [
+        page["properties"]["revision"]["number"] for page in client.responses
+    ] == [1, 2]
+
+
+def test_probe_commit_reports_player_id_when_response_write_fails(
+    monkeypatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(notion_module, "Client", FakeClient)
+    repository = NotionRepository(token="test", manifest_path=_manifest(tmp_path))
+    monkeypatch.setattr(
+        repository,
+        "_save_probe_trajectory",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("write failed")),
+    )
+
+    with pytest.raises(ProbeSubmissionCommitError) as raised:
+        repository.commit_probe_submission(_probe_submission_envelope())
+
+    receipt = raised.value.receipt
+    assert receipt["committed"] is False
+    assert receipt["player_page_id"]
+    assert receipt["response_page_id"] == ""
+    assert receipt["stages"]["player_identity_persisted"] is True
+    assert receipt["stages"]["response_persisted"] is False
+    assert receipt["phase"] == "response_write"
+    assert receipt["exception_class"] == "RuntimeError"
+    assert receipt["sanitized_message"] == "write failed"
+    assert receipt["rollback"] == {
+        "attempted": True,
+        "response": "not_needed",
+        "player": "archived",
+    }
+    assert any(
+        update["page_id"] == receipt["player_page_id"]
+        and update.get("archived") is True
+        for update in FakeClient.instance.updated
+    )
 
 
 def test_strategy_write_never_contains_player_relation(monkeypatch, tmp_path: Path) -> None:

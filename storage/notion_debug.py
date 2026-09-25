@@ -39,6 +39,7 @@ class GenericNotionDebugRepository(NotionRepository):
 
     def save_probe_trajectory(self, envelope: dict[str, Any]) -> dict[str, Any]:
         participation_id = str(envelope["participation_id"])
+        credential = dict((envelope.get("player") or {}).get("credential") or {})
         existing = next(
             (
                 page
@@ -62,10 +63,10 @@ class GenericNotionDebugRepository(NotionRepository):
             "state": {"select": {"name": str(envelope.get("state") or "draft")}},
             "batch_id": {"rich_text": _text(str(envelope.get("batch_id") or ""))},
             "access_code_selector": {
-                "rich_text": _text(str(envelope.get("access_code_selector") or ""))
+                "rich_text": _text(str(credential.get("selector") or ""))
             },
             "access_code_verifier": {
-                "rich_text": _text(str(envelope.get("access_code_verifier") or ""))
+                "rich_text": _text(str(credential.get("verifier") or ""))
             },
             "updated_at": {"date": {"start": str(envelope["updated_at"])}},
             "payload": {"rich_text": _text(serialized)},
@@ -91,6 +92,12 @@ class GenericNotionDebugRepository(NotionRepository):
         result["_page_id"] = page_id
         return result
 
+    def commit_probe_submission(self, envelope: dict[str, Any]) -> dict[str, Any]:
+        """TEST remains a schema-neutral forensic envelope sink."""
+
+        stored = self.save_probe_trajectory(envelope)
+        return {**stored, "committed": True, "stages": {"debug_envelope": True}}
+
     def get_probe_trajectory(self, participation_id: str) -> dict[str, Any] | None:
         for page in self._pages(
             property_name="participation_id", equals=participation_id
@@ -110,6 +117,35 @@ class GenericNotionDebugRepository(NotionRepository):
                 rows.append(value)
         return rows
 
+    def list_probe_response_audit_rows(self) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        for page in self._pages():
+            value = self._from_page(page)
+            if value is None:
+                rows.append(
+                    {
+                        "_page_id": str(page.get("id") or ""),
+                        "record_type": "",
+                        "state": "",
+                    }
+                )
+                continue
+            # The test repository is deliberately an envelope store and has no
+            # physical Players table. Participant identity is its canonical key.
+            value["player_page_id"] = str(value.get("participant_id") or "")
+            rows.append(value)
+        return rows
+
+    def export_probe_players(self, page_ids: list[str]) -> list[dict[str, Any]]:
+        return []
+
+    def archive_probe_cleanup(
+        self, response_page_ids: list[str], player_page_ids: list[str]
+    ) -> dict[str, int]:
+        for page_id in response_page_ids:
+            self._client.pages.update(page_id=page_id, archived=True)
+        return {"responses": len(response_page_ids), "players": 0, "other": 0}
+
     def find_probe_trajectories_by_access_selector(
         self, access_code_selector: str
     ) -> list[dict[str, Any]]:
@@ -117,6 +153,17 @@ class GenericNotionDebugRepository(NotionRepository):
             value
             for page in self._pages(
                 property_name="access_code_selector", equals=access_code_selector
+            )
+            if (value := self._from_page(page)) is not None
+        ]
+
+    def find_probe_trajectories_by_access_verifier(
+        self, access_code_verifier: str
+    ) -> list[dict[str, Any]]:
+        return [
+            value
+            for page in self._pages(
+                property_name="access_code_verifier", equals=access_code_verifier
             )
             if (value := self._from_page(page)) is not None
         ]

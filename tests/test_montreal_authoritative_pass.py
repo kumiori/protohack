@@ -62,7 +62,9 @@ def test_portrait_email_is_rendered_and_canonically_identity_scoped() -> None:
         participant_id="email",
         scope_id="montreal",
     ).submission_payload(runtime.trajectory, integrated=True)
-    assert payload["identity"]["email"] == "personne@example.org"
+    assert payload["player"]["email"] == "personne@example.org"
+    assert "identity" not in payload
+    assert "email" not in payload["payload"]
     assert "email" not in payload["responses"]
     assert payload["responses"]["knowledge_offer"] == ["governance_models"]
 

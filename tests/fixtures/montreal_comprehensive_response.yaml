@@ -1,0 +1,105 @@
+schema: protocol-hack/probe-state/v1
+probe:
+  id: montreal_communs_data_ai_short_2026
+  revision: 5
+trajectory:
+  schema: probe-trajectory/v1
+  participation:
+    id: fixture-participation
+    participant_id: fixture-player
+    probe_id: montreal_communs_data_ai_short_2026
+    probe_revision: 5
+    scope_id: montreal_communs_2026
+  events:
+    - id: fixture-consent
+      kind: answered
+      timestamp: '2026-09-25T14:29:33+00:00'
+      question_id: participation_acknowledgement
+      question_revision: 4
+      value: accept
+      reason: ''
+      reason_codes: []
+      reason_note: ''
+      legacy_reason_codes: []
+      metadata: {}
+    - id: fixture-availability
+      kind: answered
+      timestamp: '2026-09-25T14:29:34+00:00'
+      question_id: availability
+      question_revision: 4
+      value: [oct28_am_online]
+      reason: ''
+      reason_codes: []
+      reason_note: ''
+      legacy_reason_codes: []
+      metadata: {}
+    - id: fixture-dietary-skip
+      kind: skipped
+      timestamp: '2026-09-25T14:29:35+00:00'
+      question_id: dietary_preferences
+      question_revision: 2
+      value: null
+      reason: ''
+      reason_codes: [prefer_not]
+      reason_note: ''
+      legacy_reason_codes: []
+      metadata: {}
+    - id: fixture-availability-flag
+      kind: flagged
+      timestamp: '2026-09-25T14:29:36+00:00'
+      question_id: availability
+      question_revision: 4
+      value: null
+      reason: ''
+      reason_codes: [useful]
+      reason_note: ''
+      legacy_reason_codes: []
+      metadata: {}
+    - id: fixture-location
+      kind: answered
+      timestamp: '2026-09-25T14:29:37+00:00'
+      question_id: base_location
+      question_revision: 3
+      value:
+        display_label: Montréal, Québec, Canada
+        locality: Montréal
+        region: Québec
+        country: Canada
+        country_code: CA
+        place_id: test:montreal
+        latitude: 45.5019
+        longitude: -73.5674
+      reason: ''
+      reason_codes: []
+      reason_note: ''
+      legacy_reason_codes: []
+      metadata: {}
+    - id: fixture-functions
+      kind: answered
+      timestamp: '2026-09-25T14:29:38+00:00'
+      question_id: functions
+      question_revision: 3
+      value:
+        selected: [research_teaching, other]
+        other: {value: Facilitation algorithmique}
+        companions: {function_title: Modèle léger}
+      reason: ''
+      reason_codes: []
+      reason_note: ''
+      legacy_reason_codes: []
+      metadata: {}
+    - id: fixture-future
+      kind: answered
+      timestamp: '2026-09-25T14:29:39+00:00'
+      question_id: future_conditions
+      question_revision: 3
+      value:
+        - id: step-1
+          action: Documenter un protocole
+          actors:
+            selected: [civil_society]
+      reason: ''
+      reason_codes: []
+      reason_note: ''
+      legacy_reason_codes: []
+      metadata: {}

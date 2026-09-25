@@ -38,6 +38,38 @@ def test_persistence_failure_diagnostic_excludes_message_and_credentials() -> No
     assert "secret_token" not in str(diagnostic)
 
 
+def test_persistence_failure_diagnostic_includes_safe_transaction_phase() -> None:
+    class CommitError(Exception):
+        receipt = {
+            "operation": "commit_probe_submission",
+            "repository": "NotionRepository",
+            "target_data_source": "responses-source",
+            "player_id": "P1",
+            "participation_id": "PART1",
+            "submission_id": "R2",
+            "revision": 2,
+            "phase": "response_write",
+            "exception_class": "APIResponseError",
+            "notion_status": 400,
+            "notion_code": "validation_error",
+            "sanitized_message": "property is invalid",
+            "rollback": {
+                "attempted": True,
+                "player": "not_needed",
+                "response": "archived",
+            },
+            "stages": {"response_persisted": False},
+        }
+
+    diagnostic = _persistence_error_diagnostic(CommitError("secret credential"))
+
+    assert diagnostic["phase"] == "response_write"
+    assert diagnostic["player_id"] == "P1"
+    assert diagnostic["submission_id"] == "R2"
+    assert diagnostic["sanitized_message"] == "property is invalid"
+    assert "secret credential" not in str(diagnostic)
+
+
 def _source_text() -> str:
     return resolve_probe(session_code="montreal_communs_2026").source_path.read_text(
         encoding="utf-8"
@@ -733,6 +765,10 @@ def test_preview_is_side_effect_free_and_equals_the_committed_payload() -> None:
         def save_probe_trajectory(self, trajectory: dict) -> dict:
             self.saved.append(trajectory)
             return super().save_probe_trajectory(trajectory)
+
+        def commit_probe_submission(self, envelope: dict) -> dict:
+            self.saved.append(envelope)
+            return super().commit_probe_submission(envelope)
 
     repository = CaptureRepository()
     store = ProbeRepositoryStore(

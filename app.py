@@ -4,25 +4,29 @@ import streamlit as st
 
 from event_ui import page_for_event
 from protocol.probe_registry import registered_events
+from runtime_environment import is_local_runtime
 from ui import apply_theme, revision_badge
 
 
+LOCAL_RUNTIME = is_local_runtime()
 st.set_page_config(
     page_title="Protocol Laboratory · Commons",
     page_icon="🧬",
     layout="wide",
-    initial_sidebar_state="collapsed",
+    initial_sidebar_state="expanded" if LOCAL_RUNTIME else "collapsed",
 )
 apply_theme()
-st.html(
-    """
-    <style>
-    [data-testid="stSidebarCollapsedControl"] {
-      display: none !important;
-    }
-    </style>
-    """
-)
+if not LOCAL_RUNTIME:
+    st.html(
+        """
+        <style>
+        [data-testid="stSidebar"],
+        [data-testid="stSidebarCollapsedControl"] {
+          display: none !important;
+        }
+        </style>
+        """
+    )
 
 navigation = st.navigation(
     {
@@ -38,7 +42,6 @@ navigation = st.navigation(
                 title="The Handshake",
                 icon="🧪",
                 url_path="protocol-lab-connection",
-                visibility="hidden",
             ),
         ],
         "Commons": [
@@ -46,7 +49,6 @@ navigation = st.navigation(
                 "views/home_redirect.py",
                 title="Home",
                 default=True,
-                visibility="hidden",
             ),
             st.Page(
                 "views/commons.py",
@@ -106,6 +108,12 @@ navigation = st.navigation(
         ],
         "Tests": [
             st.Page(
+                "views/test_confetti_lab.py",
+                title="Confetti Lab",
+                icon="🎉",
+                url_path="test-confetti-lab",
+            ),
+            st.Page(
                 "views/test_markdown_aperture.py",
                 title="Markdown aperture",
                 icon="📝",
@@ -158,7 +166,6 @@ navigation = st.navigation(
                 title="Notion Smoking Gun",
                 icon="🔫",
                 url_path="test_probe-smoking-gun",
-                visibility="hidden",
             ),
             st.Page(
                 "views/test_smokegun.py",

@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 from pathlib import Path
-from time import monotonic
+from time import monotonic, sleep
 from typing import Any, Iterable
 
 from notion_client import Client
 from notion_client.errors import APIResponseError
 
 from .base import RepositoryHealth
+from protocol.probe_results import assert_integrated_submission
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -41,12 +43,18 @@ def _text(content: str) -> list[dict[str, Any]]:
 
 def _rich(properties: dict[str, Any], name: str) -> str:
     values = (properties.get(name) or {}).get("rich_text") or []
-    return "".join(str(value.get("plain_text") or "") for value in values)
+    return "".join(
+        str(value.get("plain_text") or (value.get("text") or {}).get("content") or "")
+        for value in values
+    )
 
 
 def _title_value(properties: dict[str, Any], name: str = "Name") -> str:
     values = (properties.get(name) or {}).get("title") or []
-    return "".join(str(value.get("plain_text") or "") for value in values)
+    return "".join(
+        str(value.get("plain_text") or (value.get("text") or {}).get("content") or "")
+        for value in values
+    )
 
 
 def _email(properties: dict[str, Any], name: str = "email") -> str | None:
@@ -66,6 +74,22 @@ def _date(properties: dict[str, Any], name: str) -> str:
 
 def _relation(page_id: str) -> dict[str, Any]:
     return {"relation": [{"id": page_id}]}
+
+
+def _safe_exception_message(exc: Exception) -> str:
+    """Expose an actionable API message without headers, tokens, or payloads."""
+
+    message = str(getattr(exc, "message", "") or str(exc) or type(exc).__name__)
+    message = " ".join(message.split())
+    return message[:500]
+
+
+class ProbeSubmissionCommitError(RuntimeError):
+    """A recoverable partial Notion commit with safe page identifiers."""
+
+    def __init__(self, message: str, *, receipt: dict[str, Any]) -> None:
+        super().__init__(message)
+        self.receipt = receipt
 
 
 class NotionRepository:
@@ -136,80 +160,437 @@ class NotionRepository:
             status="available",
         ))
 
+    def _persistence_call(self, callback):
+        """Retry a bounded Notion rate limit without hiding other failures."""
+
+        for attempt in range(4):
+            try:
+                return callback()
+            except APIResponseError as exc:
+                status = int(getattr(exc, "status", 0) or 0)
+                code = str(getattr(exc, "code", "") or "")
+                if status != 429 and code != "rate_limited":
+                    raise
+                if attempt == 3:
+                    raise
+                headers = getattr(exc, "headers", None) or {}
+                try:
+                    delay = float(headers.get("retry-after", 1))
+                except (TypeError, ValueError):
+                    delay = 1.0
+                sleep(min(max(delay, 0.25), 5.0))
+
     def save_probe_trajectory(
         self, trajectory: dict[str, Any]
     ) -> dict[str, Any]:
+        return self._save_probe_trajectory(trajectory)
+
+    def _save_probe_trajectory(
+        self,
+        trajectory: dict[str, Any],
+        *,
+        player_page_id: str = "",
+    ) -> dict[str, Any]:
         participation_id = str(trajectory["participation_id"])
         probe_id = str(trajectory["probe_id"])
-        payload = json.dumps(trajectory, ensure_ascii=False, separators=(",", ":"))
+        integrated = bool(trajectory.get("integrated"))
+        submission_id = str(trajectory.get("submission_id") or "")
+        query_property = "submission_id" if integrated else "participation_id"
+        query_value = submission_id if integrated else participation_id
         pages = self._query_all(
             "responses",
-            filter_={
-                "property": "item_id",
-                "rich_text": {"equals": participation_id},
-            },
+            filter_={"property": query_property, "rich_text": {"equals": query_value}},
         )
         existing = next(
             (
                 page
                 for page in pages
-                if _rich(page.get("properties") or {}, "item_id")
-                == participation_id
+                if _rich(page.get("properties") or {}, query_property) == query_value
             ),
             None,
         )
         events = ((trajectory.get("trajectory") or {}).get("events") or [])
         updated_at = str(events[-1].get("timestamp") or "") if events else None
+        revision = int(trajectory.get("revision") or 0)
+        if integrated and existing is None:
+            related = self._query_all(
+                "responses",
+                filter_={
+                    "property": "participation_id",
+                    "rich_text": {"equals": participation_id},
+                },
+            )
+            revision = max(
+                [
+                    int(((page.get("properties") or {}).get("revision") or {}).get("number") or 0)
+                    for page in related
+                    if _rich(page.get("properties") or {}, "probe_id") == probe_id
+                ]
+                or [0]
+            ) + 1
+        elif existing is not None:
+            revision = int(
+                ((existing.get("properties") or {}).get("revision") or {}).get("number")
+                or revision
+                or 1
+            )
+        trajectory = {**trajectory, "revision": revision}
+        payload = json.dumps(trajectory, ensure_ascii=False, separators=(",", ":"))
         properties = {
-            "response_value": {"rich_text": _text(probe_id)},
+            "record_type": {"select": {"name": str(trajectory.get("record_type") or "probe_submission")}},
             "value_label": {
                 "rich_text": _text(f"{len(events)} trajectory events")
             },
             "value_json": {"rich_text": _text(payload)},
-            "revision": {"number": int(trajectory["probe_revision"])},
+            "revision": {"number": revision},
+            "submission_id": {
+                "rich_text": _text(str(trajectory.get("submission_id") or ""))
+            },
+            "event_id": {"rich_text": _text(str(trajectory.get("event_id") or ""))},
+            "probe_id": {"rich_text": _text(probe_id)},
+            "probe_revision": {"number": int(trajectory["probe_revision"])},
+            "participation_id": {"rich_text": _text(participation_id)},
+            "submission_state": {
+                "select": {"name": str(trajectory.get("state") or "draft")}
+            },
+            "environment": {
+                "select": {"name": str(trajectory.get("environment") or "production")}
+            },
         }
+        if player_page_id:
+            properties["player"] = _relation(player_page_id)
         if updated_at:
             properties["submitted_at"] = {"date": {"start": updated_at}}
+        integrated_at = str(trajectory.get("integrated_at") or "")
+        if integrated_at:
+            properties["integrated_at"] = {"date": {"start": integrated_at}}
         if existing:
-            self._client.pages.update(
-                page_id=str(existing["id"]),
-                properties=properties,
+            self._persistence_call(
+                lambda: self._client.pages.update(
+                    page_id=str(existing["id"]),
+                    properties=properties,
+                )
             )
             result = dict(trajectory)
             result["_page_id"] = str(existing["id"])
+            result["_created"] = False
             return result
-        created = self._client.pages.create(
-            parent={
-                "type": "data_source_id",
-                "data_source_id": self._sources["responses"],
-            },
-            properties={
-                "Name": {"title": _text(f"{probe_id} trajectory")},
-                "session": _relation(self._session_page_id),
-                "participant_uuid": {
-                    "rich_text": _text(str(trajectory["participant_id"]))
+        created = self._persistence_call(
+            lambda: self._client.pages.create(
+                parent={
+                    "type": "data_source_id",
+                    "data_source_id": self._sources["responses"],
                 },
-                "question_id": {"rich_text": _text(probe_id)},
-                "item_id": {"rich_text": _text(participation_id)},
-                "question_type": {"select": {"name": "other"}},
-                "text_id": {"rich_text": _text(probe_id)},
-                "device_id": {
-                    "rich_text": _text(str(trajectory["participant_id"]))
+                properties={
+                    "Name": {"title": _text(f"{probe_id} trajectory")},
+                    "session": _relation(self._session_page_id),
+                    **properties,
+                    **({"created_at": {"date": {"start": str(trajectory.get("created_at") or updated_at)}}} if trajectory.get("created_at") or updated_at else {}),
                 },
-                "protocol_version": {
-                    "rich_text": _text(f"v{trajectory['probe_revision']}")
-                },
-                **properties,
-                **(
-                    {"created_at": {"date": {"start": updated_at}}}
-                    if updated_at
-                    else {}
-                ),
-            },
+            )
         )
         result = dict(trajectory)
         result["_page_id"] = str(created["id"])
+        result["_created"] = True
         return result
+
+    @staticmethod
+    def _location_properties(value: Any) -> dict[str, Any]:
+        location = value if isinstance(value, dict) else {}
+        label = str(
+            location.get("display_label")
+            or location.get("label")
+            or location.get("formatted")
+            or (value if isinstance(value, str) else "")
+            or ""
+        )
+        latitude = location.get("latitude", location.get("lat"))
+        longitude = location.get("longitude", location.get("lng"))
+        return {
+            "base_location": {
+                "rich_text": _text(
+                    json.dumps(location, ensure_ascii=False, separators=(",", ":"))
+                    if location
+                    else label
+                )
+            },
+            "base_location_label": {"rich_text": _text(label)},
+            "base_location_place_id": {
+                "rich_text": _text(
+                    str(location.get("place_id") or location.get("stable_place_id") or "")
+                )
+            },
+            "base_location_lat": {
+                "number": float(latitude) if latitude not in {None, ""} else None
+            },
+            "base_location_lon": {
+                "number": float(longitude) if longitude not in {None, ""} else None
+            },
+        }
+
+    def _probe_player_page(self, participant_id: str) -> dict[str, Any] | None:
+        for property_name in ("participant_id", "participant_uuid"):
+            pages = self._query_all(
+                "players",
+                filter_={
+                    "property": property_name,
+                    "rich_text": {"equals": participant_id},
+                },
+            )
+            match = next(
+                (
+                    page
+                    for page in pages
+                    if _rich(page.get("properties") or {}, property_name)
+                    == participant_id
+                ),
+                None,
+            )
+            if match:
+                return match
+        return None
+
+    def _upsert_probe_player(self, envelope: dict[str, Any]) -> dict[str, Any]:
+        player = dict(envelope.get("player") or {})
+        credential = dict(player.get("credential") or {})
+        participant_id = str(player.get("participant_id") or envelope["participant_id"])
+        name = str(player.get("name") or "").strip()
+        email = str(player.get("email") or "").strip()
+        institution = str(player.get("institution") or "").strip()
+        profile_json = json.dumps(
+            {
+                "profile_answers": player.get("profile_answers") or {},
+                "answer_field_ids": player.get("answer_field_ids") or [],
+                "trajectory_events": player.get("trajectory_events") or [],
+            },
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+        existing = self._probe_player_page(participant_id)
+        existing_properties = (existing or {}).get("properties") or {}
+        emoji = str(credential.get("emoji") or _rich(existing_properties, "access_code_emoji"))
+        selector = str(credential.get("selector") or _rich(existing_properties, "access_code_selector"))
+        selector_6 = str(credential.get("selector_6") or _rich(existing_properties, "access_code_selector_6"))
+        verifier = str(credential.get("verifier") or _rich(existing_properties, "access_code_verifier"))
+        if existing and not (selector and verifier):
+            raise RuntimeError("Existing Player credential is incomplete.")
+        properties: dict[str, Any] = {
+            "Name": {"title": _text(name or f"Participant {participant_id[:8]}")},
+            "session": _relation(self._session_page_id),
+            "participant_id": {"rich_text": _text(participant_id)},
+            "participant_uuid": {"rich_text": _text(participant_id)},
+            "nickname": {"rich_text": _text(name)},
+            "email": {"email": email or None},
+            "institution": {"rich_text": _text(institution)},
+            "access_code_emoji": {"rich_text": _text(emoji)},
+            "access_code_selector": {"rich_text": _text(selector)},
+            "access_code_selector_6": {"rich_text": _text(selector_6)},
+            "access_code_verifier": {"rich_text": _text(verifier)},
+            "profile_json": {"rich_text": _text(profile_json)},
+            "role": {"select": {"name": "participant"}},
+            "status": {"select": {"name": "active"}},
+        }
+        properties.update(self._location_properties(player.get("base_location")))
+        if existing:
+            page = self._persistence_call(
+                lambda: self._client.pages.update(
+                    page_id=str(existing["id"]), properties=properties
+                )
+            )
+        else:
+            page = self._persistence_call(
+                lambda: self._client.pages.create(
+                    parent={
+                        "type": "data_source_id",
+                        "data_source_id": self._sources["players"],
+                    },
+                    properties=properties,
+                )
+            )
+        return page
+
+    @staticmethod
+    def _substantive_envelope(envelope: dict[str, Any]) -> dict[str, Any]:
+        response = deepcopy(envelope)
+        player = dict(response.get("player") or {})
+        identity_fields = {
+            str(field_id) for field_id in (player.get("answer_field_ids") or [])
+        }
+        response.pop("player", None)
+        response.pop("access_code_selector", None)
+        response.pop("access_code_verifier", None)
+        payload = dict(response.get("payload") or {})
+        payload.pop("identity", None)
+        for container in (response, payload):
+            trajectory = deepcopy(container.get("trajectory") or {})
+            trajectory["events"] = [
+                event
+                for event in (trajectory.get("events") or [])
+                if str(event.get("question_id") or "") not in identity_fields
+            ]
+            container["trajectory"] = trajectory
+        response["payload"] = payload
+        return response
+
+    def commit_probe_submission(self, envelope: dict[str, Any]) -> dict[str, Any]:
+        """Idempotently persist Player then linked Response and verify both."""
+
+        participant_id = str(envelope.get("participant_id") or "")
+        participation_id = str(envelope.get("participation_id") or "")
+        submission_id = str(envelope.get("submission_id") or "")
+        receipt: dict[str, Any] = {
+            "operation": "commit_probe_submission",
+            "repository": type(self).__name__,
+            "target_data_source": str(self._sources.get("responses") or ""),
+            "player_id": participant_id,
+            "participation_id": participation_id,
+            "submission_id": submission_id,
+            "revision": int(envelope.get("revision") or 0),
+            "phase": "prepare",
+            "committed": False,
+            "player_page_id": "",
+            "response_page_id": "",
+            "exception_class": "",
+            "notion_status": 0,
+            "notion_code": "",
+            "sanitized_message": "",
+            "rollback": {"attempted": False, "response": "not_needed", "player": "not_needed"},
+            "stages": {
+                "player_resolve_upsert": False,
+                "player_identity_persisted": False,
+                "response_persisted": False,
+                "response_player_relation": False,
+                "read_back_verified": False,
+            },
+        }
+        player_existed = False
+        response_created = False
+        try:
+            assert_integrated_submission(envelope, require_player=False)
+            receipt["phase"] = "player_write"
+            player_existed = self._probe_player_page(participant_id) is not None
+            player_page = self._upsert_probe_player(envelope)
+            player_page_id = str(player_page.get("id") or "")
+            if not player_page_id:
+                raise RuntimeError("Player upsert returned no page ID.")
+            receipt["player_page_id"] = player_page_id
+            receipt["stages"]["player_resolve_upsert"] = True
+            receipt["stages"]["player_identity_persisted"] = True
+
+            response = self._substantive_envelope(envelope)
+            assert_integrated_submission(
+                {**response, "player_page_id": player_page_id}
+            )
+            receipt["phase"] = "response_write"
+            stored = self._save_probe_trajectory(
+                response,
+                player_page_id=player_page_id,
+            )
+            response_page_id = str(stored.get("_page_id") or "")
+            if not response_page_id:
+                raise RuntimeError("Response write returned no page ID.")
+            receipt["response_page_id"] = response_page_id
+            response_created = bool(stored.get("_created"))
+            receipt["revision"] = int(stored.get("revision") or receipt["revision"])
+            receipt["stages"]["response_persisted"] = True
+
+            receipt["phase"] = "readback"
+            player_read = self._persistence_call(
+                lambda: self._client.pages.retrieve(page_id=player_page_id)
+            )
+            response_read = self._persistence_call(
+                lambda: self._client.pages.retrieve(page_id=response_page_id)
+            )
+            player_properties = player_read.get("properties") or {}
+            response_properties = response_read.get("properties") or {}
+            try:
+                persisted_envelope = json.loads(
+                    _rich(response_properties, "value_json") or "{}"
+                )
+            except json.JSONDecodeError:
+                persisted_envelope = {}
+            relation_ids = {
+                str(item.get("id") or "")
+                for item in (response_properties.get("player") or {}).get("relation") or []
+            }
+            relation_ok = player_page_id in relation_ids
+            receipt["stages"]["response_player_relation"] = relation_ok
+            checks = {
+                "player_id": _rich(player_properties, "participant_id")
+                == str(envelope["participant_id"]),
+                "submission_id": _rich(response_properties, "submission_id")
+                == str(envelope["submission_id"]),
+                "event_id": _rich(response_properties, "event_id")
+                == str(envelope["event_id"]),
+                "probe_id": _rich(response_properties, "probe_id")
+                == str(envelope["probe_id"]),
+                "probe_revision": int(
+                    (response_properties.get("probe_revision") or {}).get("number") or 0
+                )
+                == int(envelope["probe_revision"]),
+                "response_revision": int(
+                    (response_properties.get("revision") or {}).get("number") or 0
+                )
+                == int(receipt["revision"]),
+                # Notion's date property truncates seconds. The canonical
+                # envelope stored in value_json retains the exact instant.
+                "integrated_at": str(persisted_envelope.get("integrated_at") or "")
+                == str(envelope["integrated_at"]),
+                "player_relation": relation_ok,
+            }
+            receipt["readback_checks"] = checks
+            if not checks["integrated_at"]:
+                receipt["readback_detail"] = {
+                    "integrated_at_expected": str(envelope["integrated_at"]),
+                    "integrated_at_actual": _date(
+                        response_properties, "integrated_at"
+                    ),
+                    "canonical_integrated_at_actual": str(
+                        persisted_envelope.get("integrated_at") or ""
+                    ),
+                }
+            verified = all(checks.values())
+            receipt["stages"]["read_back_verified"] = verified
+            receipt["committed"] = verified
+            if not verified:
+                raise RuntimeError("Player/Response read-back verification failed.")
+            receipt["phase"] = "receipt"
+            return receipt
+        except Exception as exc:
+            receipt["exception_class"] = type(exc).__name__
+            receipt["notion_status"] = int(getattr(exc, "status", 0) or 0)
+            receipt["notion_code"] = str(getattr(exc, "code", "") or "")
+            receipt["sanitized_message"] = _safe_exception_message(exc)
+            rollback = receipt["rollback"]
+            if response_created or (receipt["player_page_id"] and not player_existed):
+                rollback["attempted"] = True
+            if response_created and receipt["response_page_id"]:
+                try:
+                    self._persistence_call(
+                        lambda: self._client.pages.update(
+                            page_id=receipt["response_page_id"], archived=True
+                        )
+                    )
+                    rollback["response"] = "archived"
+                except Exception as rollback_exc:
+                    rollback["response"] = (
+                        "failed: " + _safe_exception_message(rollback_exc)
+                    )
+            if receipt["player_page_id"] and not player_existed:
+                try:
+                    self._persistence_call(
+                        lambda: self._client.pages.update(
+                            page_id=receipt["player_page_id"], archived=True
+                        )
+                    )
+                    rollback["player"] = "archived"
+                except Exception as rollback_exc:
+                    rollback["player"] = (
+                        "failed: " + _safe_exception_message(rollback_exc)
+                    )
+            raise ProbeSubmissionCommitError(
+                "Probe submission was not fully committed.", receipt=receipt
+            ) from exc
 
     def get_probe_trajectory(
         self, participation_id: str
@@ -217,26 +598,22 @@ class NotionRepository:
         pages = self._query_all(
             "responses",
             filter_={
-                "property": "item_id",
+                "property": "participation_id",
                 "rich_text": {"equals": participation_id},
             },
         )
         for page in pages:
             properties = page.get("properties") or {}
-            if _rich(properties, "item_id") != participation_id:
+            if _rich(properties, "participation_id") != participation_id:
                 continue
-            raw = _rich(properties, "value_json")
-            try:
-                value = json.loads(raw)
-            except json.JSONDecodeError:
-                continue
-            if value.get("record_type") in {"probe_trajectory", "probe_submission"}:
-                value["_page_id"] = str(page.get("id") or "")
+            value = self._probe_envelope_from_page(page)
+            if value is not None:
                 return value
         return None
 
-    @staticmethod
-    def _probe_envelope_from_page(page: dict[str, Any]) -> dict[str, Any] | None:
+    def _probe_envelope_from_page(
+        self, page: dict[str, Any]
+    ) -> dict[str, Any] | None:
         properties = page.get("properties") or {}
         raw = _rich(properties, "value_json")
         try:
@@ -246,6 +623,54 @@ class NotionRepository:
         if value.get("record_type") not in {"probe_trajectory", "probe_submission"}:
             return None
         value["_page_id"] = str(page.get("id") or "")
+        relations = (properties.get("player") or {}).get("relation") or []
+        player_page_id = str(relations[0].get("id") or "") if relations else ""
+        if player_page_id:
+            player_page = self._client.pages.retrieve(page_id=player_page_id)
+            player_properties = player_page.get("properties") or {}
+            try:
+                profile = json.loads(_rich(player_properties, "profile_json") or "{}")
+            except json.JSONDecodeError:
+                profile = {}
+            profile_answers = (
+                profile.get("profile_answers")
+                if isinstance(profile.get("profile_answers"), dict)
+                else profile
+            )
+            raw_location = _rich(player_properties, "base_location")
+            try:
+                base_location: Any = json.loads(raw_location) if raw_location else None
+            except json.JSONDecodeError:
+                base_location = raw_location or None
+            value["player"] = {
+                "participant_id": (
+                    _rich(player_properties, "participant_id")
+                    or _rich(player_properties, "participant_uuid")
+                ),
+                "name": _rich(player_properties, "nickname"),
+                "email": _email(player_properties),
+                "institution": _rich(player_properties, "institution"),
+                "base_location": base_location,
+                "profile_answers": profile_answers,
+                "answer_field_ids": list(profile.get("answer_field_ids") or []),
+                "trajectory_events": list(profile.get("trajectory_events") or []),
+                "credential": {
+                    "emoji": _rich(player_properties, "access_code_emoji"),
+                    "selector": _rich(player_properties, "access_code_selector"),
+                    "selector_6": _rich(player_properties, "access_code_selector_6"),
+                    "verifier": _rich(player_properties, "access_code_verifier"),
+                },
+            }
+            identity_events = list(profile.get("trajectory_events") or [])
+            if identity_events:
+                trajectory = deepcopy(value.get("trajectory") or {})
+                events = list(trajectory.get("events") or []) + identity_events
+                trajectory["events"] = sorted(
+                    events,
+                    key=lambda event: str(event.get("timestamp") or ""),
+                )
+                value["trajectory"] = trajectory
+            value["player_page_id"] = player_page_id
         return value
 
     def list_probe_trajectories(
@@ -254,7 +679,7 @@ class NotionRepository:
         rows = []
         for page in self._query_all(
             "responses",
-            filter_={"property": "question_id", "rich_text": {"equals": probe_id}},
+            filter_={"property": "probe_id", "rich_text": {"equals": probe_id}},
         ):
             value = self._probe_envelope_from_page(page)
             if value is None:
@@ -263,15 +688,158 @@ class NotionRepository:
                 rows.append(value)
         return rows
 
+    def list_probe_response_audit_rows(self) -> list[dict[str, Any]]:
+        """Return physical Response metadata without silently dropping bad rows."""
+
+        rows: list[dict[str, Any]] = []
+        for page in self._query_all("responses"):
+            properties = page.get("properties") or {}
+            raw = _rich(properties, "value_json")
+            try:
+                envelope = json.loads(raw) if raw else {}
+            except json.JSONDecodeError:
+                envelope = {}
+            relations = (properties.get("player") or {}).get("relation") or []
+            rows.append(
+                {
+                    **(envelope if isinstance(envelope, dict) else {}),
+                    "_page_id": str(page.get("id") or ""),
+                    "name": _title_value(properties),
+                    "record_type": _select(properties, "record_type") or str(envelope.get("record_type") or ""),
+                    "event_id": _rich(properties, "event_id") or str(envelope.get("event_id") or ""),
+                    "probe_id": _rich(properties, "probe_id") or str(envelope.get("probe_id") or ""),
+                    "probe_revision": int((properties.get("probe_revision") or {}).get("number") or envelope.get("probe_revision") or 0),
+                    "submission_id": _rich(properties, "submission_id") or str(envelope.get("submission_id") or ""),
+                    "state": _select(properties, "submission_state") or str(envelope.get("state") or ""),
+                    "environment": _select(properties, "environment") or str(envelope.get("environment") or ""),
+                    "created_at": _date(properties, "created_at") or str(envelope.get("created_at") or ""),
+                    "integrated_at": _date(properties, "integrated_at") or str(envelope.get("integrated_at") or ""),
+                    "revision": int((properties.get("revision") or {}).get("number") or envelope.get("revision") or 0),
+                    "player_page_id": str(relations[0].get("id") or "") if relations else "",
+                }
+            )
+        return rows
+
+    def export_probe_players(self, page_ids: list[str]) -> list[dict[str, Any]]:
+        records: list[dict[str, Any]] = []
+        for page_id in page_ids:
+            page = self._client.pages.retrieve(page_id=page_id)
+            properties = page.get("properties") or {}
+            records.append(
+                {
+                    "page_id": page_id,
+                    "participant_id": _rich(properties, "participant_id") or _rich(properties, "participant_uuid"),
+                    "name": _title_value(properties),
+                    "email": _email(properties),
+                    "institution": _rich(properties, "institution"),
+                    "base_location": _rich(properties, "base_location"),
+                    "profile_json": _rich(properties, "profile_json"),
+                }
+            )
+        return records
+
+    def archive_probe_cleanup(
+        self, response_page_ids: list[str], player_page_ids: list[str]
+    ) -> dict[str, int]:
+        for page_id in response_page_ids:
+            self._persistence_call(
+                lambda page_id=page_id: self._client.pages.update(
+                    page_id=page_id, archived=True
+                )
+            )
+        for page_id in player_page_ids:
+            self._persistence_call(
+                lambda page_id=page_id: self._client.pages.update(
+                    page_id=page_id, archived=True
+                )
+            )
+        return {"responses": len(response_page_ids), "players": len(player_page_ids), "other": 0}
+
     def find_probe_trajectories_by_access_selector(
         self, access_code_selector: str
     ) -> list[dict[str, Any]]:
-        # The selector lives inside the canonical envelope so the existing
-        # generic response table remains schema-neutral.
-        matches = []
+        players = self._query_all(
+            "players",
+            filter_={
+                "property": "access_code_selector",
+                "rich_text": {"equals": access_code_selector},
+            },
+        )
+        return self._probe_trajectories_for_players(
+            players,
+            expected_property="access_code_selector",
+            expected_value=access_code_selector,
+        )
+
+    def find_probe_trajectories_by_access_verifier(
+        self, access_code_verifier: str
+    ) -> list[dict[str, Any]]:
+        players = self._query_all(
+            "players",
+            filter_={
+                "property": "access_code_verifier",
+                "rich_text": {"equals": access_code_verifier},
+            },
+        )
+        return self._probe_trajectories_for_players(
+            players,
+            expected_property="access_code_verifier",
+            expected_value=access_code_verifier,
+        )
+
+    def _probe_trajectories_for_players(
+        self,
+        players: list[dict[str, Any]],
+        *,
+        expected_property: str,
+        expected_value: str,
+    ) -> list[dict[str, Any]]:
+        owners: dict[str, tuple[str, dict[str, str]]] = {}
+        for page in players:
+            properties = page.get("properties") or {}
+            if _rich(properties, expected_property) != expected_value:
+                continue
+            participant_id = (
+                _rich(properties, "participant_id")
+                or _rich(properties, "participant_uuid")
+            )
+            if participant_id:
+                owners[participant_id] = (
+                    str(page.get("id") or ""),
+                    {
+                        "emoji": _rich(properties, "access_code_emoji"),
+                        "selector": _rich(properties, "access_code_selector"),
+                        "selector_6": _rich(properties, "access_code_selector_6"),
+                        "verifier": _rich(properties, "access_code_verifier"),
+                    },
+                )
+
+        matches: list[dict[str, Any]] = []
+        for participant_id, (player_page_id, credential) in owners.items():
+            if not player_page_id:
+                continue
+            for page in self._query_all(
+                "responses",
+                filter_={
+                    "property": "player",
+                    "relation": {"contains": player_page_id},
+                },
+            ):
+                value = self._probe_envelope_from_page(page)
+                if value is None or str(value.get("participant_id") or "") != participant_id:
+                    continue
+                player = dict(value.get("player") or {})
+                player["credential"] = credential
+                value["player"] = player
+                matches.append(value)
+
+        if owners:
+            return matches
         for page in self._query_all("responses"):
             value = self._probe_envelope_from_page(page)
-            if value and str(value.get("access_code_selector") or "") == access_code_selector:
+            if value is not None and str(value.get(expected_property) or "") == expected_value:
+                # Read-only compatibility for submissions written before the
+                # Player-owned credential migration.
                 matches.append(value)
         return matches
 
@@ -1015,7 +1583,9 @@ class NotionRepository:
                 arguments["filter"] = filter_
             if cursor:
                 arguments["start_cursor"] = cursor
-            response = self._client.data_sources.query(**arguments)
+            response = self._persistence_call(
+                lambda: self._client.data_sources.query(**arguments)
+            )
             yield from response.get("results") or []
             if not response.get("has_more"):
                 return
