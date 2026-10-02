@@ -348,6 +348,35 @@ def _render_host(
     repository_health: RepositoryHealth,
     repository: Any,
 ) -> None:
+    if event.slug != "commons-montreal":
+        _render_host_operations(event, test_mode=test_mode,
+            repository_health=repository_health, repository=repository)
+        return
+    from probe_host_ui import authenticate_host, render_dashboard
+
+    st.title("Host")
+    if not authenticate_host():
+        return
+    if st.button("Lock host view", key="montreal_host_lock"):
+        st.session_state.host_authenticated = False
+        st.rerun()
+    if repository_health.available:
+        registration = resolve_probe(event_slug=event.slug, variant=_variant(event))
+        render_dashboard(registration, repository, test_mode=test_mode)
+    else:
+        _render_repository_failure(repository_health, detailed=True)
+    with st.expander("Repository diagnostics and test cleanup"):
+        _render_host_operations(event, test_mode=test_mode,
+            repository_health=repository_health, repository=repository)
+
+
+def _render_host_operations(
+    event: RegisteredEvent,
+    *,
+    test_mode: bool,
+    repository_health: RepositoryHealth,
+    repository: Any,
+) -> None:
     st.title(f"{event.title} · Host")
     st.caption("How the event is operating · operational surface")
     if not event.host_enabled:
@@ -454,10 +483,11 @@ def _render_host(
                     f"Archived {result['responses']} Responses and {result['players']} Players; other databases: 0."
                 )
                 st.session_state.pop(plan_key, None)
-    st.info(
-        "Participation totals and coordination controls will appear when the shared "
-        "repository exposes event-scoped operational queries."
-    )
+    if event.slug != "commons-montreal":
+        st.info(
+            "Participation totals and coordination controls will appear when the shared "
+            "repository exposes event-scoped operational queries."
+        )
 
 
 def render_event(event: RegisteredEvent) -> None:
