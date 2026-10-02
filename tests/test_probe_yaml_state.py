@@ -324,6 +324,13 @@ def test_review_surface_renders_full_yaml_download() -> None:
     labels = [item.label for item in app.get("download_button")]
     assert "Télécharger YAML" in labels
     assert "Télécharger mes réponses" in labels
+    headings = [item.value for item in app.subheader]
+    assert "Relire mes réponses" not in headings
+    assert "Merci" not in headings
+    assert any(
+        item.value == "Une copie de l’ensemble de mes réponses avant de les intégrer."
+        for item in app.markdown
+    )
 
 
 def test_yaml_review_integration_reveals_credential_only_after_receipt() -> None:

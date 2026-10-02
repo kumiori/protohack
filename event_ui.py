@@ -5,6 +5,7 @@ from __future__ import annotations
 from functools import partial
 from datetime import datetime, timezone
 import json
+import yaml
 from typing import Any
 from urllib.parse import urlencode
 
@@ -13,13 +14,13 @@ from probe_engine import (
     InputType,
     ProbeRuntime,
     evaluate_representation,
-    evaluate_results,
     trajectory_from_dict,
 )
 
+from probe_results_ui import render_results_landscape
 from probe_ui import render_registered_probe
 from protocol.probe_registry import RegisteredEvent, resolve_event, resolve_probe
-from protocol.probe_results import audit_probe_submissions
+from protocol.probe_results import audit_probe_submissions, load_audited_trajectories
 from protocol.probe_cleanup import plan_probe_cleanup
 from storage import get_repository, repository_mode
 from storage.base import RepositoryHealth
@@ -81,8 +82,7 @@ def _surface_links(event: RegisteredEvent) -> None:
 def _render_results(
     event: RegisteredEvent, *, test_mode: bool, repository: Any
 ) -> None:
-    st.title(f"{event.title} · Results")
-    st.caption("What the Probe represents · public participant-facing surface")
+    st.title("Notre paysage commun")
     if not event.results_enabled:
         st.warning("Results are disabled for this event.")
         return
@@ -101,11 +101,18 @@ def _render_results(
         probe_id=probe.id,
     )
     records = list(audit.included)
-    trajectories = tuple(
-        trajectory_from_dict(record["trajectory"])
-        for record in records
-        if record.get("trajectory")
-    )
+    try:
+        trajectories = tuple(
+            trajectory_from_dict(trajectory)
+            for trajectory in load_audited_trajectories(
+                repository, audit, event_id=registration.session_code, probe_id=probe.id
+            )
+        )
+    except Exception as exc:
+        st.error("Les trajectoires complètes ne peuvent pas être chargées pour le moment.")
+        with st.sidebar.expander("Developer · Results hydration"):
+            st.json({"error_type": type(exc).__name__})
+        return
     if test_mode:
         with st.expander("RESULTS DATA AUDIT", expanded=False):
             st.json(audit.counts)
@@ -176,8 +183,7 @@ def _render_results(
         source_label = "réponses intégrées au Forum"
         source_detail = f"{len(trajectories)} trajectoire(s) intégrée(s)"
         synthetic_label = "non"
-    with st.container(border=True):
-        st.markdown("**Source des données**")
+    with st.expander("Source des données"):
         st.write(source_detail)
         st.caption(
             f"Source : {source_label} · Probe : {probe.id}@{probe.revision} · "
@@ -190,40 +196,49 @@ def _render_results(
         st.info(
             "Les représentations sont définies, mais aucune donnée n’est encore disponible."
         )
-    if probe.results is not None and trajectories:
-        projection = evaluate_results(probe, trajectories)
-        st.markdown(f"### {projection.title}")
-        if projection.intro:
-            st.write(projection.intro)
-        for block in projection.blocks:
-            with st.container(border=True):
-                if block.kind == "narrative":
-                    st.write(block.narrative)
-                elif block.result is not None:
-                    st.markdown(
-                        f"**{block.representation_id.replace('_', ' ').title()}**"
-                    )
-                    with st.expander("Voir les données structurées"):
-                        st.json(block.result.to_dict())
-        return
+    results = []
     for representation in probe.representations:
-        with st.container(border=True):
-            st.markdown(f"**{(representation.title or representation.id.replace('_', ' ').title())}**")
-            st.caption(f"{representation.type.value} · {representation.scope.value}")
-            if trajectories:
-                population = trajectories[:1] if representation.scope.value == "participant" else trajectories
-                try:
-                    result = evaluate_representation(probe, representation, population)
-                except Exception as exc:
-                    st.caption("Cette représentation canonique n’est pas encore disponible.")
-                    with st.sidebar.expander(
-                        f"Developer · representation {representation.id}"
-                    ):
-                        st.exception(exc)
-                else:
-                    st.write(f"{len(population)} contribution(s) intégrée(s)")
-                    with st.expander("Voir les données structurées"):
-                        st.json(result.to_dict())
+        if representation.scope.value != "collective":
+            st.caption(f"{representation.title or representation.id} · représentation individuelle réservée")
+            continue
+        try:
+            results.append(evaluate_representation(probe, representation, trajectories).to_dict())
+        except Exception as exc:
+            st.warning(f"Représentation indisponible : {representation.id}")
+            with st.sidebar.expander(f"Developer · representation {representation.id}"):
+                st.json({"error_type": type(exc).__name__, "probe_revision": probe.revision})
+    # The optional sidecar contains layout and disclosure policy, never observations.
+    layout_path = registration.source_path.with_suffix(".results.yaml")
+    layout = yaml.safe_load(layout_path.read_text(encoding="utf-8")) if layout_path.exists() else {}
+    if probe.results is not None:
+        st.markdown(f"### {probe.results.title}")
+        if probe.results.intro:
+            st.write(probe.results.intro)
+        for block in probe.results.blocks:
+            if block.narrative:
+                st.write(block.narrative)
+            if block.commentary:
+                st.write(block.commentary)
+    render_results_landscape(
+        probe, results,
+        view_context={
+            **layout,
+            "public_records": layout.get("privacy", {}).get("public_records", "aggregate"),
+            "show_title": False,
+            "cohort": len(trajectories),
+            "trajectories": len(trajectories),
+            "excluded": sum(
+                row.get("event_id") == registration.session_code and row.get("probe_id") == probe.id
+                for row in audit.excluded
+            ),
+            "excluded_physical_rows": len(audit.excluded),
+            "synthetic": bool(test_mode and generate),
+        },
+    )
+    # Structured data remain inspectable without publishing identities or raw prose.
+    with st.expander("Voir les données structurées"):
+        from protocol.probe_structures import public_result
+        st.json([public_result(result) for result in results])
 
 
 def _synthetic_value(probe: Any, field: Any, index: int) -> Any:

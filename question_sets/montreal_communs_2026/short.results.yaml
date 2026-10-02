@@ -1,0 +1,42 @@
+schema: probe-results-layout/v1
+# Consumer layout only. All observations still come from RepresentationResults.
+sections:
+  - title: 01 · LE CHAMP
+    subtitle: Qui sommes-nous ?
+    representations: [participation_overview, participant_portrait]
+  - title: 02 · LES ÉCHANGES
+    subtitle: Ce que nous pouvons partager ↔ ce que nous recherchons
+    representations: [knowledge_exchange]
+  - title: 03 · L’HORIZON
+    subtitle: Ce que nous aimerions voir émerger
+    representations: [future_landscape.component.1, future_landscape.component.2]
+  - title: 04 · LES CHEMINS
+    subtitle: Comment cela pourrait arriver
+    representations: [future_landscape.component.3]
+  - title: 05 · NOS CAPACITÉS D’ACTION
+    subtitle: Ce que nous pouvons déjà mettre en mouvement
+    representations: [future_landscape.component.4, future_landscape.component.5]
+record_relations:
+  future_landscape.component.3:
+    actor_field: actors
+    category_field: category
+privacy:
+  public_records: aggregate
+  participant_identity: hidden
+component_titles:
+  participation_overview.component.1: Notre participation
+  participation_overview.component.2: Quand sommes-nous là ?
+  participation_overview.component.3: Préférences alimentaires
+  participant_portrait.component.1: Secteurs
+  participant_portrait.component.2: Fonctions
+  participant_portrait.component.3: Depuis quelle position ?
+  knowledge_exchange: Partage et recherche
+  future_landscape.component.1: Ce que nous aimerions voir émerger
+  future_landscape.component.2: Ce que cela changerait
+  future_landscape.component.3: Actions proposées et acteur·ices associés
+  future_landscape.component.4: Ce que nous pouvons mettre sur la table
+  future_landscape.component.5: Depuis quelles positions pouvons-nous agir ?
+
+# Adjacent multi-select components share a responsive visual frame.
+distribution_pairs:
+  - [participant_portrait.component.1, participant_portrait.component.2]

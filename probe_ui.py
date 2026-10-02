@@ -1741,6 +1741,8 @@ def render_registered_probe(
         st.title("Relire vos réponses")
         review = {item.question_id: item for item in runtime.review()}
         for step in probe.steps:
+            if step.id in {"review", "done"} and not step.field_ids:
+                continue
             st.subheader(step.title)
             for field_id in step.field_ids:
                 item = review[field_id]
@@ -1818,8 +1820,7 @@ def render_registered_probe(
         prepared = runtime.prepare_finalisation(idempotency_key=participation_id)
         st.markdown("### Télécharger mes réponses")
         st.write(
-            "Téléchargez si vous le souhaitez une copie de l’ensemble de vos réponses "
-            "avant de les intégrer."
+            "Une copie de l’ensemble de mes réponses avant de les intégrer."
         )
         st.download_button(
             "Télécharger mes réponses",

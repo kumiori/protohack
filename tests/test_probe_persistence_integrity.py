@@ -112,3 +112,48 @@ def test_cleanup_scope_is_exact_and_players_are_archived_only_when_orphaned() ->
     assert plan.player_page_ids == ("player-2",)
     assert [row["_page_id"] for row in plan.legacy_candidates] == ["legacy"]
     assert plan.responses_export()["kind"] == "Responses"
+
+
+def test_results_hydration_preserves_audited_selection_and_physical_rows():
+    from copy import deepcopy
+    from types import SimpleNamespace
+    from protocol.probe_results import load_audited_trajectories
+
+    old = _row()
+    latest = _row(_page_id='response-2', submission_id='submission-2',
+                  integrated_at='2026-10-01T00:00:00+00:00')
+    original = deepcopy(latest)
+    audit = audit_probe_submissions([old, latest], event_id=latest['event_id'], probe_id=latest['probe_id'])
+    joined = deepcopy(latest)
+    joined['trajectory']['events'].append({'kind': 'answered', 'question_id': 'sectors', 'value': ['research']})
+    repository = SimpleNamespace(list_probe_trajectories=lambda *args: [old, joined])
+    loaded = load_audited_trajectories(repository, audit, event_id=latest['event_id'], probe_id=latest['probe_id'])
+    assert len(loaded) == 1
+    assert loaded[0]['events'][-1]['question_id'] == 'sectors'
+    assert latest == original
+    assert audit.trajectories[0] == original['trajectory']
+    loaded[0]['events'].clear()
+    assert joined['trajectory']['events']
+
+
+@pytest.mark.parametrize('failure', ['missing', 'ambiguous', 'different_submission', 'different_player'])
+def test_results_hydration_fails_explicitly_instead_of_rendering_false_unanswered(failure):
+    from copy import deepcopy
+    from types import SimpleNamespace
+    from protocol.probe_results import load_audited_trajectories
+
+    selected = _row()
+    joined = deepcopy(selected)
+    rows = [joined]
+    if failure == 'missing':
+        rows = []
+    elif failure == 'ambiguous':
+        rows.append(deepcopy(joined))
+    elif failure == 'different_submission':
+        joined['submission_id'] = 'another-submission'
+    else:
+        joined['player_page_id'] = 'another-player'
+    audit = audit_probe_submissions([selected], event_id=selected['event_id'], probe_id=selected['probe_id'])
+    repository = SimpleNamespace(list_probe_trajectories=lambda *args: rows)
+    with pytest.raises(ValueError, match='hydration'):
+        load_audited_trajectories(repository, audit, event_id=selected['event_id'], probe_id=selected['probe_id'])

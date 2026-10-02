@@ -127,3 +127,38 @@ def audit_probe_submissions(
         excluded=tuple(excluded),
         trajectories=tuple(dict(row["trajectory"]) for row in included),
     )
+
+
+def load_audited_trajectories(
+    repository: Any, audit: ProbeResultsAudit, *, event_id: str, probe_id: str
+) -> tuple[dict[str, Any], ...]:
+    """Hydrate exactly the audited submissions through the repository boundary.
+
+    Physical Response rows deliberately omit stable Player profile events.
+    The repository's canonical loader restores those events. Audit selection
+    remains authoritative: no excluded or superseded submission can re-enter.
+    Missing or ambiguous hydration is an error, never an unanswered projection.
+    """
+    from copy import deepcopy
+
+    if not audit.included:
+        return ()
+    hydrated = repository.list_probe_trajectories(event_id, probe_id)
+    trajectories = []
+    for selected in audit.included:
+        key = '_page_id' if selected.get('_page_id') else 'submission_id'
+        matches = [row for row in hydrated if row.get(key) == selected.get(key)]
+        if len(matches) != 1:
+            raise ValueError('Audited submission has no unique canonical hydration.')
+        row = matches[0]
+        for field in ('submission_id', 'event_id', 'probe_id', 'probe_revision',
+                      'participant_id', 'participation_id'):
+            if selected.get(field) is not None and row.get(field) != selected[field]:
+                raise ValueError('Canonical hydration does not match the audited submission.')
+        if row.get('player_page_id') and row['player_page_id'] != selected.get('player_page_id'):
+            raise ValueError('Canonical hydration changed the audited Player relation.')
+        trajectory = row.get('trajectory')
+        if not isinstance(trajectory, dict) or not isinstance(trajectory.get('events'), list):
+            raise ValueError('Canonical hydration has no valid trajectory.')
+        trajectories.append(deepcopy(trajectory))
+    return tuple(trajectories)

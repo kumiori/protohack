@@ -1,0 +1,28 @@
+const {chromium}=require(process.env.PLAYWRIGHT_PACKAGE || 'playwright');
+(async()=>{
+ const browser=await chromium.launch({headless:true,...(process.env.CHROME_EXECUTABLE ? {executablePath:process.env.CHROME_EXECUTABLE} : {})});
+ const page=await browser.newPage({viewport:{width:1440,height:1000}});
+ await page.goto((process.env.RESULTS_PREVIEW_URL || 'http://127.0.0.1:8517/') + '?view=results&test=1');
+ await page.getByText('Notre paysage commun',{exact:true}).waitFor();
+ await page.getByText('Generate ephemeral synthetic test data',{exact:true}).click();
+ await page.getByText('Actions ↔ acteur·ices',{exact:true}).waitFor();
+ await page.locator('.landscape-exchange').evaluate(e=>e.scrollIntoView({block:'start'}));
+ await page.screenshot({path:'/tmp/probe-results-exchange-desktop.png'});
+ const desktopTopology=page.frameLocator('iframe[title="st.iframe"]');
+ await desktopTopology.locator('svg [data-node="action-1"]').click();
+ if(!(await desktopTopology.locator('#detail').innerText()).includes('Proposition 1')) throw Error('Desktop detail unavailable');
+ await page.setViewportSize({width:390,height:844});
+ const collapse=page.locator('[data-testid="stSidebarCollapseButton"] button');
+ if(await page.locator('[data-testid=stSidebar]').getAttribute('aria-expanded') === 'true') await collapse.evaluate(e=>e.click());
+ await page.waitForTimeout(500);
+ await page.locator('.landscape-exchange').evaluate(e=>e.scrollIntoView({block:'start'}));
+ await page.screenshot({path:'/tmp/probe-results-exchange-mobile.png'});
+ if(await page.locator('[data-testid="stMain"]').evaluate(e=>e.scrollWidth>e.clientWidth)) throw Error('Mobile horizontal overflow');
+ await page.getByText('Actions ↔ acteur·ices',{exact:true}).scrollIntoViewIfNeeded();
+ const topology=page.frameLocator('iframe[title="st.iframe"]');
+ await topology.locator('#mobile button').first().click();
+ if(!(await topology.locator('#detail').innerText()).includes('Source : future_conditions')) throw Error('Mobile detail unavailable');
+ await page.screenshot({path:'/tmp/probe-results-topology-mobile.png'});
+ console.log('Desktop/mobile screenshots, graph clicks and overflow checks passed.');
+ await browser.close();
+})().catch(e=>{console.error(e.message);process.exit(1)});
