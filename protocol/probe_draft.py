@@ -50,6 +50,11 @@ def load_probe_state(
         if not isinstance(source, Mapping) or source.get("id") != probe.id:
             raise ValueError("Le fichier appartient à une autre Probe.")
         revision = int(source.get("revision") or 0)
+        if revision < 1 or revision > probe.revision:
+            raise ValueError(
+                f"La révision {revision} du fichier est incompatible avec "
+                f"la révision {probe.revision} du questionnaire."
+            )
         raw_trajectory = payload.get("trajectory")
         if not isinstance(raw_trajectory, Mapping):
             raise ValueError("Le fichier ne contient pas de trajectoire canonique.")
@@ -107,6 +112,12 @@ def inspect_probe_state(
     source = payload.get("probe") if isinstance(payload, Mapping) else {}
     source_revision = int((source or {}).get("revision") or 0)
     trajectory = load_probe_state(payload, probe=probe)
+    runtime = ProbeRuntime.hydrate(
+        probe,
+        trajectory,
+        participant_id=trajectory.participation.participant_id,
+        scope_id=trajectory.participation.scope_id,
+    )
     counts = {"answered": 0, "skipped": 0, "flagged": 0}
     touched_questions: set[str] = set()
     checkpoint_sections: set[str] = set()
@@ -133,6 +144,12 @@ def inspect_probe_state(
         "revision": source_revision or probe.revision,
         "current_revision": probe.revision,
         "revision_compatible": True,
+        "resolved": sum(
+            1
+            for item in runtime.review()
+            if item.state.startswith("answered") or item.state.startswith("skipped")
+        ),
+        "saved_at": trajectory.events[-1].timestamp if trajectory.events else "",
         "answers": counts["answered"],
         "skips": counts["skipped"],
         "flags": counts["flagged"],
@@ -238,10 +255,22 @@ def load_checkpoint_draft(
     if not isinstance(source, Mapping) or source.get("id") != probe.id:
         raise ValueError("Draft belongs to a different Probe.")
     revision = int(source.get("revision") or 0)
-    if revision != probe.revision:
+    if revision < 1 or revision > probe.revision:
         raise ValueError(
-            f"Draft Probe revision {revision} cannot be loaded as revision {probe.revision}; "
-            "an explicit migration is required."
+            f"Draft Probe revision {revision} is incompatible with revision {probe.revision}."
+        )
+    authored_question_ids = {question.id for question in probe.questions}
+    uploaded_question_ids = {
+        str(item.get("question_id") or "")
+        for key in ("answers", "skips", "flags")
+        for item in payload.get(key) or ()
+        if str(item.get("question_id") or "")
+    }
+    unknown = uploaded_question_ids - authored_question_ids
+    if unknown:
+        raise ValueError(
+            "Le fichier contient des questions incompatibles : "
+            + ", ".join(sorted(unknown))
         )
     participation = payload.get("participation") or {}
     checkpoint = payload.get("checkpoint") or {}
@@ -287,12 +316,17 @@ def load_checkpoint_draft(
                 "id": str(participation.get("id") or ""),
                 "participant_id": str(participation.get("participant_id") or ""),
                 "probe_id": probe.id,
-                "probe_revision": revision,
+                "probe_revision": probe.revision,
                 "scope_id": str(participation.get("scope_id") or ""),
             },
             "events": [event for _, event in sorted(events, key=lambda row: row[0])],
         }
     )
-    if trajectory.participation.probe_revision != probe.revision:
-        raise ValueError("Draft trajectory revision does not match its Probe metadata.")
+    runtime = ProbeRuntime.hydrate(
+        probe,
+        trajectory,
+        participant_id=trajectory.participation.participant_id,
+        scope_id=trajectory.participation.scope_id,
+    )
+    runtime.reconciliation()
     return trajectory

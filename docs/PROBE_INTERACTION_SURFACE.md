@@ -34,6 +34,28 @@ durable authenticated draft adapter is selected, deployed checkpoints use the
 dedicated process-local draft repository plus explicit YAML export; they never
 write partial trajectories into the production Notion responses collection.
 
+## Participant entry and local recovery
+
+The landing page keeps three separate entry semantics:
+
+- **Oui, je commence** creates a new browser-scoped participation;
+- **Non, j’ai déjà un code d’accès** resolves an existing persistent Player and
+  Response history;
+- **Je veux reprendre ma session** restores a participant-held checkpoint or
+  state file without resolving or creating a Player.
+
+Local recovery uses the same `load_probe_state` path as developer state import.
+The preview validates the file schema, Probe identity, event scope, revision and
+trajectory integrity before rebinding participant and participation identifiers
+to the fresh browser session. Applying the file hydrates the ordinary
+`ProbeRuntime`; normal pending-question calculation chooses where traversal
+resumes. Compatible earlier revisions pass through Probe Engine reconciliation,
+while future revisions and unknown question identities are rejected.
+
+Uploading or applying a local session file performs no repository write and does
+not mint a Player credential. Credential creation remains part of an explicitly
+requested, receipt-verified final integration.
+
 ## Subordinate value rule
 
 A companion is supplementary and optional unless its canonical field explicitly

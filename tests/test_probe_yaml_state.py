@@ -5,7 +5,12 @@ from streamlit.testing.v1 import AppTest
 from streamlit.proto.Common_pb2 import FileURLs
 from streamlit.runtime.uploaded_file_manager import UploadedFile, UploadedFileRec
 
-from protocol.probe_draft import dump_probe_state, inspect_probe_state, load_probe_state
+from protocol.probe_draft import (
+    dump_checkpoint_draft,
+    dump_probe_state,
+    inspect_probe_state,
+    load_probe_state,
+)
 from protocol.probe_registry import resolve_probe
 from protocol.probe_store import ProbeRepositoryStore
 from storage.memory import InMemoryRepository
@@ -17,6 +22,9 @@ LOCAL_DEVELOPER_APP = ROOT / "tests" / "fixtures" / "probe_local_developer_app.p
 TEST_MODE_APP = ROOT / "tests" / "fixtures" / "probe_new_participant_app.py"
 REVIEW_EXPORT_APP = ROOT / "tests" / "fixtures" / "probe_review_export_app.py"
 RETURNING_REVIEW_APP = ROOT / "tests" / "fixtures" / "probe_returning_review_app.py"
+SESSION_RECOVERY_APP = (
+    ROOT / "tests" / "fixtures" / "probe_session_recovery_app.py"
+)
 
 
 def _runtime():
@@ -84,6 +92,100 @@ def test_complete_yaml_state_round_trip_is_semantically_lossless() -> None:
     assert diagnostic["flags"] == 1
 
 
+def test_landing_exposes_local_session_recovery_before_identity_choices() -> None:
+    app = AppTest.from_file(str(LOCAL_DEVELOPER_APP), default_timeout=10).run()
+
+    labels = [button.label for button in app.button]
+    recovery_index = labels.index("Je veux reprendre ma session")
+    fresh_index = labels.index("Oui, je commence")
+    returning_index = labels.index("Non, j’ai déjà un code d’accès")
+
+    assert fresh_index < recovery_index < returning_index
+    entry_columns = app.get("column")
+    assert len(entry_columns) == 3
+    assert [column.weight for column in entry_columns] == pytest.approx([1 / 3] * 3)
+    source = (ROOT / "probe_ui.py").read_text(encoding="utf-8")
+    recovery_style = source[source.index(
+        '[class*="st-key-probe_entry_recovery_action_"] button {'
+    ):]
+    assert "background: #b9ead7 !important" in recovery_style.split("}", 1)[0]
+
+    next(
+        button
+        for button in app.button
+        if button.label == "Je veux reprendre ma session"
+    ).click().run()
+
+    assert not app.exception
+    assert "Charger un fichier de session" in [
+        uploader.label for uploader in app.get("file_uploader")
+    ]
+
+
+def test_checkpoint_upload_restores_canonical_events_without_persistence_write() -> None:
+    registration, probe, source_runtime = _runtime()
+    source_runtime.answer("participation_acknowledgement", "accept")
+    source_runtime.answer("availability", ["oct28_am_online"])
+    source_runtime.skip("dietary_preferences", reason_codes=["prefer_not"])
+    source_runtime.reach_checkpoint(
+        "participation",
+        ProbeRepositoryStore(
+            InMemoryRepository(),
+            probe=probe,
+            probe_id=probe.id,
+            participant_id="participant",
+            scope_id=registration.session_code,
+        ),
+    )
+    session_yaml = dump_checkpoint_draft(
+        probe,
+        source_runtime.trajectory,
+        section_id="participation",
+    )
+
+    app = AppTest.from_file(str(SESSION_RECOVERY_APP), default_timeout=10).run()
+    next(
+        button
+        for button in app.button
+        if button.label == "Je veux reprendre ma session"
+    ).click().run()
+    upload_key = f"probe_entry_recovery_upload_{probe.id}"
+    app.session_state[upload_key] = UploadedFile(
+        UploadedFileRec(
+            "checkpoint-state",
+            "checkpoint.yaml",
+            "application/yaml",
+            session_yaml.encode("utf-8"),
+        ),
+        FileURLs(),
+    )
+
+    app.run()
+    assert not app.exception
+    assert "Session reconnue" in [item.value for item in app.success]
+    assert any(
+        "3 questions renseignées" in item.value for item in app.markdown
+    )
+
+    next(button for button in app.button if button.label == "Reprendre").click().run()
+
+    assert not app.exception
+    participation_id = app.session_state[
+        f"probe_participation_{registration.session_code}"
+    ]
+    restored = app.session_state[f"probe_session_trajectory_{participation_id}"]
+    assert restored.events == source_runtime.trajectory.events
+    assert restored.participation.id == participation_id
+    assert restored.participation.participant_id == app.session_state["participant_uuid"]
+    assert "Qui suis-je ?" in [title.value for title in app.title]
+    assert (
+        f"probe_player_credential_{app.session_state['participant_uuid']}"
+        not in app.session_state
+    )
+    repository = app.session_state["session_recovery_repository"]
+    assert repository.list_probe_trajectories(registration.session_code, probe.id) == []
+
+
 def test_partial_yaml_rebinds_runtime_identity_without_answering_later_fields() -> None:
     registration, probe, runtime = _runtime()
     runtime.answer("participation_acknowledgement", "accept")
@@ -129,6 +231,12 @@ def test_revision_drift_is_explicitly_accepted_only_when_question_ids_are_compat
 
     payload["trajectory"]["events"][0]["question_id"] = "removed_question"
     with pytest.raises(ValueError, match="removed_question"):
+        load_probe_state(payload, probe=probe)
+
+    payload = yaml.safe_load(dump_probe_state(probe, runtime.trajectory))
+    payload["probe"]["revision"] = probe.revision + 1
+    payload["trajectory"]["participation"]["probe_revision"] = probe.revision + 1
+    with pytest.raises(ValueError, match="incompatible"):
         load_probe_state(payload, probe=probe)
 
 
@@ -337,8 +445,9 @@ def test_yaml_review_integration_reveals_credential_only_after_receipt() -> None
     app = AppTest.from_file(str(REVIEW_EXPORT_APP), default_timeout=10).run()
 
     assert "J’ai conservé mon code" not in [item.label for item in app.button]
+    assert "probe_player_credential_review-export-player" not in app.session_state
     next(
-        button for button in app.button if button.label == "Intégrer mes réponses"
+        button for button in app.button if button.label == "Envoyer mes réponses"
     ).click().run()
 
     assert not app.exception
@@ -369,7 +478,7 @@ def test_returning_review_integrates_without_credential_dialog() -> None:
 
     assert "J’ai conservé mon code" not in [item.label for item in app.button]
     next(
-        button for button in app.button if button.label == "Intégrer mes réponses"
+        button for button in app.button if button.label == "Envoyer mes réponses"
     ).click().run()
 
     assert not app.exception

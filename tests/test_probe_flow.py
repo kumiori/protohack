@@ -141,6 +141,7 @@ def test_event_surface_wraps_the_generic_probe_adapter() -> None:
     assert 'st.sidebar.expander("Developer · Canonical event log"' in ui_source
     assert "TEST MODE · writes go to the shared test database only" in ui_source
     assert "Est-ce votre première participation ?" in ui_source
+    assert "Je veux reprendre ma session" in ui_source
     assert "Oui, je commence" in ui_source
     assert "Non, j’ai déjà un code d’accès" in ui_source
     assert "J’ai conservé mon code" in ui_source
@@ -155,7 +156,7 @@ def test_event_surface_wraps_the_generic_probe_adapter() -> None:
     assert "runtime.skip(" in ui_source
     assert 'label="Signaler"' in ui_source
     assert '"Passer"' in ui_source
-    assert '"Intégrer mes réponses"' in ui_source
+    assert '"Envoyer mes réponses"' in ui_source
     assert "runtime.flag(" in ui_source
     assert 'st.query_params["participation"] =' not in ui_source
     assert "_normalise_rich_questionnaire" not in loader_source
@@ -1007,7 +1008,7 @@ def test_checkpoint_retains_answer_skip_and_flag_without_becoming_submission() -
     assert restored == runtime.trajectory
 
 
-def test_yaml_checkpoint_draft_round_trips_and_rejects_revision_drift() -> None:
+def test_yaml_checkpoint_draft_round_trips_and_reconciles_compatible_revision_drift() -> None:
     probe = _probe()
     runtime = ProbeRuntime(
         probe,
@@ -1047,7 +1048,13 @@ def test_yaml_checkpoint_draft_round_trips_and_rejects_revision_drift() -> None:
 
     payload = exported_payload
     payload["probe"]["revision"] = probe.revision - 1
-    with pytest.raises(ValueError, match="explicit migration"):
+    payload["answers"][0]["question_revision"] = 1
+    restored_previous = load_checkpoint_draft(payload, probe=probe)
+    assert restored_previous.participation.probe_revision == probe.revision
+    assert restored_previous.events[0].question_revision == 1
+
+    payload["answers"][0]["question_id"] = "removed_question"
+    with pytest.raises(ValueError, match="removed_question"):
         load_checkpoint_draft(payload, probe=probe)
 
 

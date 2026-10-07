@@ -64,8 +64,96 @@ def _render_probe_entry_gate(
     st.title(welcome.title)
     with st.container(key="editorial_lead"):
         st.write(welcome.body)
+
+    recovery_dialog_key = f"{gate_key}_local_recovery"
+    recovery_pending_key = f"{gate_key}_local_recovery_pending"
+
+    @st.dialog("Reprendre ma session")
+    def local_session_recovery() -> None:
+        st.write(
+            "Si vous avez sauvegardé votre progression lors d’une précédente "
+            "session, déposez ici le fichier téléchargé à ce moment-là."
+        )
+        uploaded = st.file_uploader(
+            "Charger un fichier de session",
+            type=("yaml", "yml"),
+            key=f"probe_entry_recovery_upload_{probe.id}",
+        )
+        if uploaded is not None:
+            try:
+                raw = uploaded.getvalue().decode("utf-8")
+                diagnostic = inspect_probe_state(raw, probe=probe)
+                load_probe_state(
+                    raw,
+                    probe=probe,
+                    expected_scope_id=registration.session_code,
+                )
+            except (UnicodeDecodeError, ValueError, ProbeRuntimeError) as exc:
+                st.session_state.pop(recovery_pending_key, None)
+                st.error(str(exc))
+            else:
+                st.session_state[recovery_pending_key] = {
+                    "raw": raw,
+                    "diagnostic": diagnostic,
+                }
+
+        pending = st.session_state.get(recovery_pending_key)
+        if pending:
+            diagnostic = pending["diagnostic"]
+            st.success("Session reconnue")
+            st.markdown(f"**Questionnaire**  \n{probe.title}")
+            st.markdown(
+                "**Progression**  \n"
+                f"{diagnostic['resolved']} questions renseignées"
+            )
+            if diagnostic.get("saved_at"):
+                st.markdown(f"**Sauvegardée**  \n{diagnostic['saved_at']}")
+
+        cancel_column, resume_column = st.columns(2)
+        if cancel_column.button(
+            "Annuler",
+            type="secondary",
+            width="stretch",
+            key=f"probe_entry_recovery_cancel_{probe.id}",
+        ):
+            st.session_state[recovery_dialog_key] = False
+            st.session_state.pop(recovery_pending_key, None)
+            st.rerun()
+        if resume_column.button(
+            "Reprendre",
+            type="primary",
+            width="stretch",
+            disabled=not bool(pending),
+            key=f"probe_entry_recovery_apply_{probe.id}",
+        ):
+            participant_id = str(uuid.uuid4())
+            participation_id = uuid.uuid5(
+                uuid.NAMESPACE_URL,
+                f"{registration.session_code}:{probe.id}:{participant_id}",
+            ).hex
+            restored = load_probe_state(
+                pending["raw"],
+                probe=probe,
+                participant_id=participant_id,
+                participation_id=participation_id,
+                expected_scope_id=registration.session_code,
+            )
+            st.session_state[gate_key] = participant_id
+            st.session_state["participant_uuid"] = participant_id
+            st.session_state[f"probe_returning_player_{participant_id}"] = False
+            st.session_state[f"probe_participation_{registration.session_code}"] = (
+                participation_id
+            )
+            st.session_state[f"probe_session_trajectory_{participation_id}"] = restored
+            st.session_state[f"probe_hydrated_{participation_id}"] = True
+            st.session_state[f"probe_stage_{participation_id}"] = "steps"
+            st.session_state[recovery_dialog_key] = False
+            st.session_state.pop(recovery_pending_key, None)
+            st.query_params["run"] = participant_id
+            st.rerun()
+
     st.markdown("### Est-ce votre première participation ?")
-    fresh, returning = st.columns(2)
+    fresh, recovery, returning = st.columns(3)
     if fresh.button(
         "Oui, je commence",
         type="primary",
@@ -84,14 +172,24 @@ def _render_probe_entry_gate(
         st.session_state[f"probe_returning_player_{participant_id}"] = False
         st.session_state[f"probe_stage_{participation_id}"] = "steps"
         st.rerun()
+    if recovery.button(
+        "Je veux reprendre ma session",
+        type="secondary",
+        width="stretch",
+        key=f"probe_entry_recovery_action_{probe.id}",
+    ):
+        st.session_state[recovery_dialog_key] = True
+        st.rerun()
     if returning.button(
         "Non, j’ai déjà un code d’accès",
-        type="secondary",
+        type="tertiary",
         width="stretch",
         key=f"probe_entry_returning_{probe.id}",
     ):
         st.session_state[f"{gate_key}_returning"] = True
         st.rerun()
+    if st.session_state.get(recovery_dialog_key):
+        local_session_recovery()
     if st.session_state.get(f"{gate_key}_returning"):
         with st.form(f"probe_entry_code_form_{probe.id}"):
             raw_code = st.text_input(
@@ -840,6 +938,16 @@ def _render_probe_styles() -> None:
             color: #13221d !important;
             border: 1px solid rgba(19, 34, 29, .28) !important;
             box-shadow: none !important;
+        }
+        [class*="st-key-probe_entry_recovery_action_"] button {
+            background: #b9ead7 !important;
+            color: #13221d !important;
+            border: 1px solid rgba(19, 34, 29, .34) !important;
+            box-shadow: none !important;
+        }
+        [class*="st-key-probe_entry_recovery_action_"] button:hover {
+            background: #a9dfca !important;
+            border-color: rgba(19, 34, 29, .52) !important;
         }
         [data-testid="stPopover"] button {
             background: transparent !important;
@@ -1798,25 +1906,18 @@ def render_registered_probe(
         preview_hints = probe.authoring.presentation_hints.get("submission_preview", {})
         credential_state_key = f"probe_player_credential_{participant_id}"
         existing_credential = st.session_state.get(credential_state_key)
-        prepared_access = credential_for_player(
-            existing=existing_credential,
-            mint=lambda: mint_probe_access_code(
-                repository.find_probe_trajectories_by_access_selector
-            ),
+        prepared_access = (
+            credential_for_player(existing=existing_credential, mint=lambda: None)
+            if existing_credential
+            else None
         )
-        st.session_state[credential_state_key] = {
-            "full_key": prepared_access.full_key,
-            "emoji": prepared_access.emoji,
-            "selector": prepared_access.selector,
-            "selector_6": prepared_access.selector_6,
-            "verifier": prepared_access.verifier,
-        }
-        submission_store.set_access_code(
-            emoji=prepared_access.emoji,
-            selector=prepared_access.selector,
-            selector_6=prepared_access.selector_6,
-            verifier=prepared_access.verifier,
-        )
+        if prepared_access is not None:
+            submission_store.set_access_code(
+                emoji=prepared_access.emoji,
+                selector=prepared_access.selector,
+                selector_6=prepared_access.selector_6,
+                verifier=prepared_access.verifier,
+            )
         prepared = runtime.prepare_finalisation(idempotency_key=participation_id)
         st.markdown("### Télécharger mes réponses")
         st.write(
@@ -1857,6 +1958,27 @@ def render_registered_probe(
         integrate_dialog_key = f"probe_integrate_dialog_{participation_id}"
 
         def commit_integration() -> None:
+            nonlocal prepared_access
+            if prepared_access is None:
+                prepared_access = credential_for_player(
+                    existing=None,
+                    mint=lambda: mint_probe_access_code(
+                        repository.find_probe_trajectories_by_access_selector
+                    ),
+                )
+                st.session_state[credential_state_key] = {
+                    "full_key": prepared_access.full_key,
+                    "emoji": prepared_access.emoji,
+                    "selector": prepared_access.selector,
+                    "selector_6": prepared_access.selector_6,
+                    "verifier": prepared_access.verifier,
+                }
+                submission_store.set_access_code(
+                    emoji=prepared_access.emoji,
+                    selector=prepared_access.selector,
+                    selector_6=prepared_access.selector_6,
+                    verifier=prepared_access.verifier,
+                )
             try:
                 runtime.finalise(
                     submission_store,
@@ -1897,7 +2019,7 @@ def render_registered_probe(
             st.rerun()
 
         if st.button(
-            "Intégrer mes réponses",
+            "Envoyer mes réponses",
             type="primary",
             width="stretch",
             disabled=not test_mode and repository_mode() != "notion",
@@ -1907,6 +2029,9 @@ def render_registered_probe(
         @st.dialog("Votre code d’accès")
         def confirm_integration() -> None:
             code = prepared_access
+            if code is None:
+                st.error("Le code d’accès n’est disponible qu’après l’intégration.")
+                return
             full_display = code.full_key
             st.write(
                 "Conservez l’un de ces codes. Il vous permettra de retrouver vos réponses."
